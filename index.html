@@ -2866,7 +2866,7 @@ function uid(){return _user?.id||null;}
 async function sbUpsert(table,data,conflict){
   if(!_sb){await bootSupabase();if(!_sb)return;}
   try{
-    const row={...data,updated_by:uid(),updated_at:new Date().toISOString()};
+    const row=Object.assign({},data,{updated_by:uid(),updated_at:new Date().toISOString()});
     // Remove undefined/function values
     Object.keys(row).forEach(k=>{if(typeof row[k]==='function'||row[k]===undefined)delete row[k];});
     const {error}=await _sb.from(table).upsert(row,{onConflict:conflict});
@@ -2891,7 +2891,8 @@ async function sbInsert(table,data){
   try{
     const{id_seq,...row}=data;
     Object.keys(row).forEach(k=>{if(typeof row[k]==='function'||row[k]===undefined)delete row[k];});
-    const{error}=await _sb.from(table).insert({...row,updated_by:uid(),updated_at:new Date().toISOString()});
+    const row2=Object.assign({},row,{updated_by:uid(),updated_at:new Date().toISOString()});
+    const{error}=await _sb.from(table).insert(row2);
     if(error){console.error('sbInsert error:',error);const ind=document.getElementById('save-indicator');if(ind){ind.textContent='⚠ Erro: '+error.message;ind.style.opacity='1';ind.style.color='var(--r2)';}return;}
     await logChange('insert',table,data.id||'',JSON.stringify(data).slice(0,100));
     const ind=document.getElementById('save-indicator');
@@ -2954,17 +2955,8 @@ function dbAfterDeleteProjeto(id,obra){
 }
 function dbAfterSaveRDO(rdo){
   saveToStorage();
-  if(!_sb){
-    bootSupabase().then(()=>sbUpsert('rdo',rdo,'id,obra'));
-  } else {
-    sbUpsert('rdo',rdo,'id,obra').then(()=>{
-      // Verify save by reloading from Supabase
-      if(_sb) _sb.from('rdo').select('*').eq('id',rdo.id).eq('obra',rdo.obra).then(({data,error})=>{
-        if(error) console.error('Verify error:',error);
-        else console.log('RDO saved OK:',data);
-      });
-    });
-  }
+  if(_sb) sbUpsert('rdo',rdo,'id,obra');
+  else bootSupabase().then(()=>{if(_sb)sbUpsert('rdo',rdo,'id,obra');});
 }
 function dbAfterDeleteRDO(rdo){saveToStorage();sbDelete('rdo','id',rdo.id,'Excluiu RDO: '+rdo.obra);}
 function dbAfterSaveDoc(doc){saveToStorage();sbUpsert('documentacao',doc,'id,obra');}
