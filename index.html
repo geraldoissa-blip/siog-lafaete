@@ -214,7 +214,7 @@ textarea{resize:vertical;min-height:68px}
     </div>
     <div>
       <label class="auth-lbl">Supabase Anon Key</label>
-      <input class="auth-inp" id="cfg-key" placeholder="eyJhbGci..." value="sb_publishable_I7OCMi-5tMuJYoUYt5Delg_xyz-_1jy" autocomplete="off"/>
+      <input class="auth-inp" id="cfg-key" placeholder="eyJhbGci..." value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnYm10a2d6ZGRhbGh4eGd2eWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTgwNDEsImV4cCI6MjA5MjA5NDA0MX0.XrPs-0aUaOPtu-0dWfkMnNfkyoG5qs_9G00gMUHM4CE" autocomplete="off"/>
     </div>
     <button class="auth-btn" onclick="saveConfig()">Conectar</button>
     <div id="cfg-msg" class="auth-msg"></div>
@@ -326,6 +326,7 @@ textarea{resize:vertical;min-height:68px}
   <div id="hdr-title">Dashboard Geral</div>
   <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Tema Claro</button>
   <div id="user-info" style="display:none"><div id="user-av"></div><span id="user-name"></span><button id="logout-btn" onclick="doSignOut()">✕</button></div>
+  <div id="sb-status" style="font-size:10px;color:var(--tx3);white-space:nowrap"></div>
   <div id="save-indicator" style="font-size:11px;color:var(--g2);opacity:0;transition:opacity 2s;white-space:nowrap"></div>
   <button class="btn btn-sm" onclick="exportBackup()" title="Backup JSON">⬇ Backup</button>
   <button class="btn btn-sm" onclick="importBackup()" title="Restaurar Backup">⬆ Restaurar</button>
@@ -2633,7 +2634,7 @@ let _isAdmin = false;
 function getConfig(){
   return{
     url:localStorage.getItem('sb_url')||'https://sgbmtkgzddalhxxgvygg.supabase.co',
-    key:localStorage.getItem('sb_key')||'sb_publishable_I7OCMi-5tMuJYoUYt5Delg_xyz-_1jy'
+    key:localStorage.getItem('sb_key')||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnYm10a2d6ZGRhbGh4eGd2eWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTgwNDEsImV4cCI6MjA5MjA5NDA0MX0.XrPs-0aUaOPtu-0dWfkMnNfkyoG5qs_9G00gMUHM4CE'
   };
 }
 
@@ -2670,7 +2671,10 @@ async function bootSupabase(){
   }
 
   try{
-    _sb=window.supabase.createClient(cfg.url,cfg.key);
+    // Support both new (sb_publishable_) and legacy (eyJ) key formats
+    _sb=window.supabase.createClient(cfg.url,cfg.key,{
+      auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
+    });
     
     // Listen for auth changes (handles magic link return)
     _sb.auth.onAuthStateChange(async(event,session)=>{
@@ -2730,10 +2734,13 @@ function showApp(){
   document.getElementById('auth-screen').classList.remove('show');
   document.getElementById('app').style.opacity='1';
   document.getElementById('app').style.pointerEvents='all';
-  // If app shows but user not yet identified, try to get session
-  if(_sb && !_user){
+  // Ensure Supabase is connected
+  if(!_sb){
+    bootSupabase();
+  } else if(!_user){
     _sb.auth.getSession().then(({data:{session}})=>{
-      if(session && !_user) onSignedIn(session);
+      if(session) onSignedIn(session);
+      else showAuth();
     });
   }
 }
@@ -2801,6 +2808,9 @@ async function onSignedIn(session){
   // Load data from Supabase
   await syncFromSupabase();
 
+  // Show connection status
+  const sbSt=document.getElementById('sb-status');
+  if(sbSt)sbSt.textContent='🟢 Conectado: '+_user.email.split('@')[0];
   // Show app
   showApp();
   renderDashboard();
@@ -2924,7 +2934,15 @@ function dbAfterDeleteProjeto(id,obra){
   if(_sb)_sb.from('observacoes').delete().eq('obra',obra).then(()=>{});
   if(_sb)_sb.from('avancos').delete().eq('projeto_key',id+'|'+obra).then(()=>{});
 }
-function dbAfterSaveRDO(rdo){saveToStorage();sbUpsert('rdo',rdo,'id,obra');}
+function dbAfterSaveRDO(rdo){
+  saveToStorage();
+  // Ensure Supabase is initialized before saving
+  if(!_sb){
+    bootSupabase().then(()=>sbUpsert('rdo',rdo,'id,obra'));
+  } else {
+    sbUpsert('rdo',rdo,'id,obra');
+  }
+}
 function dbAfterDeleteRDO(rdo){saveToStorage();sbDelete('rdo','id',rdo.id,'Excluiu RDO: '+rdo.obra);}
 function dbAfterSaveDoc(doc){saveToStorage();sbUpsert('documentacao',doc,'id,obra');}
 function dbAfterSaveMed(med,isNew){saveToStorage();if(isNew)sbInsert('medicoes',med);else sbUpdate('medicoes',med,'id_seq',med.id_seq);}
@@ -2938,7 +2956,7 @@ function dbAfterSaveCrono(key,av){saveToStorage();sbUpsert('avancos',{projeto_ke
 window.addEventListener('load',()=>{
   // Pre-configure Supabase credentials
   if(!localStorage.getItem('sb_url')) localStorage.setItem('sb_url','https://sgbmtkgzddalhxxgvygg.supabase.co');
-  if(!localStorage.getItem('sb_key')) localStorage.setItem('sb_key','sb_publishable_I7OCMi-5tMuJYoUYt5Delg_xyz-_1jy');
+  if(!localStorage.getItem('sb_key')) localStorage.setItem('sb_key','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnYm10a2d6ZGRhbGh4eGd2eWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTgwNDEsImV4cCI6MjA5MjA5NDA0MX0.XrPs-0aUaOPtu-0dWfkMnNfkyoG5qs_9G00gMUHM4CE');
   document.getElementById('app').style.opacity='0';
   document.getElementById('app').style.pointerEvents='none';
   // Restore from localStorage while Supabase loads
