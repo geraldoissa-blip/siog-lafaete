@@ -1124,6 +1124,18 @@ function openProjModal(idx){
     document.getElementById('pp-valor').value=p.valor||'';
     document.getElementById('pp-obs').value=p.obs||'';
     document.getElementById('pp-parcial').value=(p.parciais&&p.parciais.length)?'sim':'nao';
+    // Repopulate parciais with THIS project's data (fix: was keeping previous project's parciais)
+    document.getElementById('pp-parciais').innerHTML='';
+    (p.parciais||[]).forEach(par=>{
+      const d=document.createElement('div');
+      d.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:end';
+      d.innerHTML=`<div><label style="font-size:11px;color:var(--tx3);display:block;margin-bottom:3px">Nome</label><input type="text" class="parc-nome" placeholder="PRAÇA P07" value="${par.nome||''}"></div>
+        <div><label style="font-size:11px;color:var(--tx3);display:block;margin-bottom:3px">Prazo Contratual</label><input type="date" class="parc-cont" value="${xl2iso(par.prazo_cont)||''}"></div>
+        <div><label style="font-size:11px;color:var(--tx3);display:block;margin-bottom:3px">Prazo Cliente</label><input type="date" class="parc-cli" value="${xl2iso(par.prazo_cli)||''}"></div>
+        <div><label style="font-size:11px;color:var(--tx3);display:block;margin-bottom:3px">Tendência</label><input type="date" class="parc-tend" value="${xl2iso(par.tendencia)||''}"></div>
+        <button onclick="this.closest('div[style]').remove()" class="btn btn-sm btn-r" style="margin-top:18px">✕</button>`;
+      document.getElementById('pp-parciais').appendChild(d);
+    });
     toggleParcial();
   }
   openMo('mo-proj');
@@ -1131,8 +1143,9 @@ function openProjModal(idx){
 function toggleParcial(){document.getElementById('pp-parcial-sec').style.display=document.getElementById('pp-parcial').value==='sim'?'block':'none';}
 function addParcialRow(){
   const d=document.createElement('div');
-  d.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:end';
+  d.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:end';
   d.innerHTML=`<div><label style="font-size:11px;color:var(--tx3);display:block;margin-bottom:3px">Nome</label><input type="text" class="parc-nome" placeholder="PRAÇA P07"></div>
+    <div><label style="font-size:11px;color:var(--tx3);display:block;margin-bottom:3px">Prazo Contratual</label><input type="date" class="parc-cont"></div>
     <div><label style="font-size:11px;color:var(--tx3);display:block;margin-bottom:3px">Prazo Cliente</label><input type="date" class="parc-cli"></div>
     <div><label style="font-size:11px;color:var(--tx3);display:block;margin-bottom:3px">Tendência</label><input type="date" class="parc-tend"></div>
     <button onclick="this.closest('div[style]').remove()" class="btn btn-sm btn-r" style="margin-top:18px">✕</button>`;
@@ -1149,7 +1162,8 @@ function salvarProjeto(){
       const n=div.querySelector('.parc-nome')?.value.trim();
       const c=div.querySelector('.parc-cli')?.value;
       const t=div.querySelector('.parc-tend')?.value;
-      if(n)parciais.push({nome:n,inicio:str2xl(document.getElementById('pp-inicio').value),prazo_cont:null,prazo_cli:str2xl(c),tendencia:str2xl(t)});
+      const pc=div.querySelector('.parc-cont')?.value;
+      if(n)parciais.push({nome:n,inicio:str2xl(document.getElementById('pp-inicio').value),prazo_cont:str2xl(pc),prazo_cli:str2xl(c),tendencia:str2xl(t)});
     });
   }
   const tend=str2xl(document.getElementById('pp-tend').value);
