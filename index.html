@@ -2254,8 +2254,19 @@ function gerarRelatorio(){
       ${['ID','Obra','Última Atualiz.','⬤','Enviado','⬤','Assinado','⬤','Responsável','Modelo','Status'].map(TH).join('')}
     </tr></thead><tbody>
     ${RDO.map(r=>{const st=getRdoStatus(r);const c=st==='Atualizado'?'#48c774':st==='Pendente'?'#ff6b6b':'#ffc107';
-      const fd=v=>{if(!v||isNaN(v))return{txt:v,dot:'🟡'};const d=TODAY_XL-v;return{txt:xl2str(v),dot:d<=7?'🟢':'🔴'};};
-      const a=fd(r.atualizacao),e=fd(r.enviado),s=fd(r.assinado);
+      // Same logic as RDO tab: green<=7d, red>7d, yellow=text/special; assinado=green if ==enviado
+      const fd=v=>{
+        if(!v||v==='NÃO INICIADA')return{txt:'<span style="color:#aaa">NÃO INICIADA</span>',dot:'🟡'};
+        if(v==='PENDENTE')return{txt:'<span style="color:#ffc107;font-weight:600">PENDENTE</span>',dot:'🟡'};
+        if(isNaN(v))return{txt:v,dot:'🟡'};
+        const d=TODAY_XL-v;return{txt:xl2str(v),dot:d<=7?'🟢':'🔴'};
+      };
+      const fdAssinado=r=>{
+        if(r.assinado&&!isNaN(r.assinado)&&r.enviado&&!isNaN(r.enviado)&&r.assinado===r.enviado)
+          return{txt:xl2str(r.assinado),dot:'🟢'};
+        return fd(r.assinado);
+      };
+      const a=fd(r.atualizacao),e=fd(r.enviado),s=fdAssinado(r);
       return`<tr style="border-bottom:1px solid #222">${TD(r.id,'color:#aaa;font-family:monospace;font-size:10px')}${TD(r.obra,'font-weight:500')}<td style="padding:6px 10px">${a.txt}</td><td style="padding:6px 10px;text-align:center">${a.dot}</td><td style="padding:6px 10px">${e.txt}</td><td style="padding:6px 10px;text-align:center">${e.dot}</td><td style="padding:6px 10px">${s.txt}</td><td style="padding:6px 10px;text-align:center">${s.dot}</td>${TD(r.resp||'—','color:#aaa')}${TD(r.modelo||'—','color:#aaa')}<td style="padding:6px 10px;color:${c};font-weight:700">${st}</td></tr>`;
     }).join('')}
     </tbody></table></div>`;
