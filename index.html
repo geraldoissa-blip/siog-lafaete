@@ -2590,6 +2590,15 @@ function loadFromStorage() {
     if(!raw) return false;
     const data = JSON.parse(raw);
     if(!data || !data.PROJETOS) return false;
+    // Version check: if stored data has fewer projects than seed data, ignore it
+    // This handles the case where old corrupted data is in localStorage
+    const MIN_PROJETOS = 20; // seed data has 23
+    const MIN_RDO = 10;      // seed data has 15
+    if(data.PROJETOS.length < MIN_PROJETOS || (data.RDO && data.RDO.length < MIN_RDO)) {
+      console.warn('localStorage data incomplete, using seed data');
+      localStorage.removeItem(STORAGE_KEY);
+      return false;
+    }
     // Restore all data arrays
     if(data.PROJETOS   && data.PROJETOS.length)    PROJETOS    = data.PROJETOS;
     if(data.RDO        && data.RDO.length)         RDO         = data.RDO;
