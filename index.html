@@ -175,7 +175,7 @@ textarea{resize:vertical;min-height:68px}
 }
 
 /* ── AUTH & SETUP ──────────────────────────────── */
-#setup-screen,#auth-screen{position:fixed;inset:0;background:#111;z-index:999;display:none;align-items:center;justify-content:center}
+#setup-screen,#auth-screen{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;display:none;align-items:center;justify-content:center}
 #setup-screen.show,#auth-screen.show{display:flex}
 .auth-box{background:#1e1e1e;border:1px solid #333;border-radius:16px;padding:36px;width:100%;max-width:440px;box-shadow:0 8px 40px rgba(0,0,0,.6)}
 .auth-logo{text-align:center;margin-bottom:24px}
@@ -1354,7 +1354,11 @@ function salvarRDO(){
     histograma:document.getElementById('re-hist').value,obs:document.getElementById('re-obs').value};
   if(ei>=0)RDO[ei]=novo;else RDO.push(novo);
   closeMo('mo-rdo');renderRDO();updateBadges();
-  dbAfterSaveRDO(novo);
+  // Save to Supabase with clean data
+  const rdoToSave = {id:novo.id, obra:novo.obra, atualizacao:String(novo.atualizacao||''), 
+    enviado:String(novo.enviado||''), assinado:String(novo.assinado||''),
+    resp:novo.resp||'', modelo:novo.modelo||'', histograma:novo.histograma||'', obs:novo.obs||''};
+  dbAfterSaveRDO(rdoToSave);
 }
 function saveRdoComments(){
   _rdoComments={dest:document.getElementById('rdo-dest').value,crit:document.getElementById('rdo-crit').value,prov:document.getElementById('rdo-prov').value,dir:document.getElementById('rdo-dir').value};
@@ -2562,6 +2566,15 @@ function loadFromStorage() {
     if(data.AVANCOS)                               AVANCOS     = data.AVANCOS;
     const saved = new Date(data.ts).toLocaleString('pt-BR');
     console.log('✅ Dados restaurados do armazenamento local. Último save:', saved);
+    // Apply admin class from cached role
+    const cachedAdmin = localStorage.getItem('sb_is_admin');
+    if(cachedAdmin === 'true'){
+      document.body.classList.add('is-admin');
+      document.body.classList.remove('non-admin');
+    } else {
+      document.body.classList.add('non-admin');
+      document.body.classList.remove('is-admin');
+    }
     return true;
   } catch(e) {
     console.warn('Erro ao carregar dados locais:', e);
@@ -2717,16 +2730,15 @@ async function bootSupabase(){
 
 // ── Auth UI ──────────────────────────────────────────────────
 function showSetup(){
+  // Only show setup if Supabase not configured - don't hide app
   document.getElementById('setup-screen').classList.add('show');
   document.getElementById('auth-screen').classList.remove('show');
-  document.getElementById('app').style.opacity='0';
-  document.getElementById('app').style.pointerEvents='none';
 }
 function showAuth(){
+  // Only show auth if no local session - don't hide app
+  // App remains visible with local data while user logs in
   document.getElementById('setup-screen').classList.remove('show');
   document.getElementById('auth-screen').classList.add('show');
-  document.getElementById('app').style.opacity='0';
-  document.getElementById('app').style.pointerEvents='none';
   showStep(1);
 }
 function showApp(){
@@ -2796,6 +2808,7 @@ async function onSignedIn(session){
   document.getElementById('user-av').textContent=initials;
   document.getElementById('user-name').textContent=_user.email.split('@')[0];
   document.getElementById('user-info').style.display='flex';
+  localStorage.setItem('sb_is_admin', _isAdmin ? 'true' : 'false');
   if(_isAdmin){
     document.getElementById('user-info').insertAdjacentHTML('beforeend','<span class="admin-badge">ADMIN</span>');
     document.body.classList.add('is-admin');
@@ -2811,8 +2824,17 @@ async function onSignedIn(session){
   // Show connection status
   const sbSt=document.getElementById('sb-status');
   if(sbSt)sbSt.textContent='🟢 Conectado: '+_user.email.split('@')[0];
-  // Show app
-  showApp();
+  // Ensure app is visible and auth screens hidden
+  document.getElementById('setup-screen').classList.remove('show');
+  document.getElementById('auth-screen').classList.remove('show');
+  document.getElementById('app').style.opacity='1';
+  document.getElementById('app').style.pointerEvents='all';
+  // Sync with Supabase
+  syncFromSupabase().then(()=>{
+    renderDashboard();renderProjetos();updateBadges();populateAllSelects();
+    // Push local data to Supabase if it's empty (first time setup)
+    pushLocalDataToSupabase();
+  });
   renderDashboard();
   renderProjetos();
   updateBadges();
@@ -2841,13 +2863,13 @@ async function syncFromSupabase(){
       _sb.from('observacoes').select('*').order('id_seq',{ascending:true}),
       _sb.from('avancos').select('*'),
     ]);
-    // Only replace if Supabase has data (otherwise keep JS seed data)
-    if(p.data?.length)  PROJETOS     = p.data.map(function(x){return Object.assign({},x,{parciais:x.parciais||[]});});
-    if(r.data?.length)  RDO          = r.data;
-    if(d.data?.length)  DOCUMENTACAO = d.data.map(function(x){return Object.assign({},x,{art_tipos:x.art_tipos||[]});});
-    if(m.data?.length)  MEDICOES     = m.data;
-    if(ps.data?.length) PESQUISAS    = ps.data;
-    if(o.data?.length)  OBSERVACOES  = o.data;
+    // Only replace local data if Supabase has MORE records (prevents losing seed data)
+    if(p.data?.length >= PROJETOS.length)  PROJETOS = p.data.map(function(x){return Object.assign({},x,{parciais:x.parciais||[]});});
+    if(r.data?.length >= RDO.length)       RDO = r.data;
+    if(d.data?.length >= DOCUMENTACAO.length) DOCUMENTACAO = d.data.map(function(x){return Object.assign({},x,{art_tipos:x.art_tipos||[]});});
+    if(m.data?.length >= MEDICOES.length)  MEDICOES = m.data;
+    if(ps.data?.length >= PESQUISAS.length) PESQUISAS = ps.data;
+    if(o.data?.length >= OBSERVACOES.length) OBSERVACOES = o.data;
     if(av.data?.length){
       AVANCOS={};
       av.data.forEach(x=>{AVANCOS[x.projeto_key]={prev:x.prev,real:x.real,semana:x.semana}});
@@ -2936,6 +2958,107 @@ async function logChange(action,table,registroId,descricao){
   }
 }
 
+// ── Push local data to Supabase (first time setup) ──────────
+async function pushLocalDataToSupabase(){
+  if(!_sb||!_user)return;
+  const uid=_user.id;
+  const ts=new Date().toISOString();
+  const ind=document.getElementById('save-indicator');
+  function showMsg(m){if(ind){ind.textContent=m;ind.style.opacity='1';ind.style.color='var(--bl2)';}}
+
+  try{
+    // ── PROJETOS ──────────────────────────────────────────
+    const{data:pDb}=await _sb.from('projetos').select('id');
+    if(!pDb||pDb.length<PROJETOS.length){
+      showMsg('⬆ Sincronizando projetos...');
+      for(const p of PROJETOS){
+        const row=Object.assign({},p,{updated_by:uid,updated_at:ts});
+        delete row.parciais_obj;
+        if(typeof row.parciais!=='string') row.parciais=JSON.stringify(row.parciais||[]);
+        await _sb.from('projetos').upsert(row,{onConflict:'id'}).catch(e=>console.warn('proj:',e.message));
+      }
+      console.log('✅ Projetos sync:',PROJETOS.length);
+    }
+
+    // ── RDO ───────────────────────────────────────────────
+    const{data:rDb}=await _sb.from('rdo').select('id');
+    if(!rDb||rDb.length<RDO.length){
+      showMsg('⬆ Sincronizando RDO...');
+      for(const r of RDO){
+        const row={id:r.id,obra:r.obra,
+          atualizacao:String(r.atualizacao||''),enviado:String(r.enviado||''),
+          assinado:String(r.assinado||''),resp:r.resp||'',
+          modelo:r.modelo||'',histograma:r.histograma||'',obs:r.obs||'',
+          updated_by:uid,updated_at:ts};
+        await _sb.from('rdo').upsert(row,{onConflict:'id,obra'}).catch(e=>console.warn('rdo:',e.message));
+      }
+      console.log('✅ RDO sync:',RDO.length);
+    }
+
+    // ── DOCUMENTAÇÃO ──────────────────────────────────────
+    const{data:dDb}=await _sb.from('documentacao').select('id');
+    if(!dDb||dDb.length<DOCUMENTACAO.length){
+      showMsg('⬆ Sincronizando documentação...');
+      for(const d of DOCUMENTACAO){
+        const row=Object.assign({},d,{
+          art_tipos:JSON.stringify(d.art_tipos||[]),
+          updated_by:uid,updated_at:ts});
+        await _sb.from('documentacao').upsert(row,{onConflict:'id,obra'}).catch(e=>console.warn('doc:',e.message));
+      }
+      console.log('✅ Doc sync:',DOCUMENTACAO.length);
+    }
+
+    // ── MEDIÇÕES ──────────────────────────────────────────
+    const{data:mDb}=await _sb.from('medicoes').select('id_seq');
+    if(!mDb||mDb.length<MEDICOES.length){
+      showMsg('⬆ Sincronizando medições...');
+      for(const m of MEDICOES){
+        const{id_seq,...row}=Object.assign({},m,{updated_by:uid,updated_at:ts});
+        await _sb.from('medicoes').insert(row).catch(()=>{});
+      }
+      console.log('✅ Medições sync:',MEDICOES.length);
+    }
+
+    // ── PESQUISAS ─────────────────────────────────────────
+    const{data:psDb}=await _sb.from('pesquisas').select('id_seq');
+    if(!psDb||psDb.length<PESQUISAS.length){
+      showMsg('⬆ Sincronizando pesquisas...');
+      for(const p of PESQUISAS){
+        const{id_seq,...row}=Object.assign({},p,{updated_by:uid,updated_at:ts});
+        await _sb.from('pesquisas').insert(row).catch(()=>{});
+      }
+      console.log('✅ Pesquisas sync:',PESQUISAS.length);
+    }
+
+    // ── OBSERVAÇÕES ───────────────────────────────────────
+    const{data:oDb}=await _sb.from('observacoes').select('id_seq');
+    if(!oDb||oDb.length<OBSERVACOES.length){
+      showMsg('⬆ Sincronizando observações...');
+      for(const o of OBSERVACOES){
+        const{id_seq,...row}=Object.assign({},o,{updated_by:uid,updated_at:ts});
+        await _sb.from('observacoes').insert(row).catch(()=>{});
+      }
+      console.log('✅ Observações sync:',OBSERVACOES.length);
+    }
+
+    // ── AVANÇOS ───────────────────────────────────────────
+    const{data:avDb}=await _sb.from('avancos').select('projeto_key');
+    if(!avDb||avDb.length<Object.keys(AVANCOS).length){
+      showMsg('⬆ Sincronizando avanços...');
+      for(const[key,av] of Object.entries(AVANCOS)){
+        await _sb.from('avancos').upsert({projeto_key:key,prev:av.prev,real:av.real,
+          semana:av.semana||'',updated_by:uid,updated_at:ts},{onConflict:'projeto_key'}).catch(()=>{});
+      }
+      console.log('✅ Avanços sync:',Object.keys(AVANCOS).length);
+    }
+
+    showMsg('✅ Dados sincronizados com o servidor!');
+    if(ind){clearTimeout(ind._t2);ind._t2=setTimeout(()=>{ind.style.opacity='0';},5000);}
+    console.log('✅ Sincronização completa com Supabase');
+  }catch(e){
+    console.warn('pushLocalDataToSupabase error:',e);
+  }
+}
 // ── DB-aware save overrides ───────────────────────────────────
 // These are called AFTER the local data is updated and rendered
 
@@ -2969,16 +3092,20 @@ function dbAfterSaveCrono(key,av){saveToStorage();sbUpsert('avancos',{projeto_ke
 
 // ── Init ─────────────────────────────────────────────────────
 window.addEventListener('load',()=>{
-  // Pre-configure Supabase credentials
-  if(!localStorage.getItem('sb_url')) localStorage.setItem('sb_url','https://sgbmtkgzddalhxxgvygg.supabase.co');
-  if(!localStorage.getItem('sb_key')) localStorage.setItem('sb_key','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnYm10a2d6ZGRhbGh4eGd2eWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTgwNDEsImV4cCI6MjA5MjA5NDA0MX0.XrPs-0aUaOPtu-0dWfkMnNfkyoG5qs_9G00gMUHM4CE');
-  document.getElementById('app').style.opacity='0';
-  document.getElementById('app').style.pointerEvents='none';
-  // Restore from localStorage while Supabase loads
-  loadFromStorage();
-  const cfg=getConfig();
-  if(cfg.url&&cfg.key)bootSupabase();
-  else showSetup();
+  try {
+    // Pre-configure Supabase credentials
+    if(!localStorage.getItem('sb_url')) localStorage.setItem('sb_url','https://sgbmtkgzddalhxxgvygg.supabase.co');
+    if(!localStorage.getItem('sb_key')) localStorage.setItem('sb_key','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnYm10a2d6ZGRhbGh4eGd2eWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTgwNDEsImV4cCI6MjA5MjA5NDA0MX0.XrPs-0aUaOPtu-0dWfkMnNfkyoG5qs_9G00gMUHM4CE');
+    // Load local data first
+    loadFromStorage();
+  } catch(e) { console.warn('Storage error:', e); }
+  // App always shows - no black screen ever
+  try { renderDashboard(); } catch(e) { console.warn('Dashboard error:', e); }
+  try { renderProjetos(); } catch(e) { console.warn('Projetos error:', e); }
+  try { updateBadges(); } catch(e) {}
+  try { populateAllSelects(); } catch(e) {}
+  // Connect Supabase in background (non-blocking)
+  setTimeout(()=>{ try { bootSupabase(); } catch(e) { console.warn('Supabase error:', e); } }, 100);
 });
 
 </script>
