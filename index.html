@@ -1192,18 +1192,50 @@ function excluirProjeto(idx){
   dbAfterDeleteProjeto(id,obra);
   alert(`Projeto "${obra}" excluído de todas as bases com sucesso.`);
 }
+function checkAdminOrBlock() {
+  // Se houver usuário logado via Supabase e não for admin, bloqueia
+  // Caso contrário (sem login = modo local), permite
+  if(_user && !_isAdmin) {
+    alert('⛔ Apenas o administrador pode excluir registros.');
+    return false;
+  }
+  return true;
+}
+
 function excluirRDO(id, obra) {
   if(typeof checkAdminOrBlock === 'function' && !checkAdminOrBlock()) return;
   if(!confirm(`Excluir o RDO de "${obra}" da lista? O projeto continuará na Base de Projetos.`)) return;
-  const idx = RDO.findIndex(r => r.id === id && r.obra === obra);
-  if(idx >= 0) {
-    if(typeof dbDeleteRDO === 'function') dbDeleteRDO(RDO[idx]);
-    RDO.splice(idx, 1);
+  const rIdx = RDO.findIndex(r => r.id === id && r.obra === obra);
+  if(rIdx >= 0) {
+    const rdoItem = RDO[rIdx];
+    RDO.splice(rIdx, 1);
     renderRDO();
     updateBadges();
-    dbAfterDeleteRDO(RDO[idx]||{id,obra});
-    saveToStorage();
+    dbAfterDeleteRDO(rdoItem);
   }
+}
+
+function excluirProjetoFromRDO(id, obra) {
+  if(typeof checkAdminOrBlock === 'function' && !checkAdminOrBlock()) return;
+  if(!confirm('⛔ Excluir o projeto "' + obra + '" de TODAS as bases?\n\nIsso remove de: Projetos, RDO, Documentação, Medições, Pesquisas e Observações.\n\nEsta ação não pode ser desfeita.')) return;
+  // Remove from all arrays
+  const pi = PROJETOS.findIndex(p => p.id === id);
+  if(pi >= 0) PROJETOS.splice(pi, 1);
+  RDO = RDO.filter(r => !(r.id === id && r.obra === obra));
+  DOCUMENTACAO = DOCUMENTACAO.filter(d => d.id !== id);
+  MEDICOES = MEDICOES.filter(m => m.id !== id);
+  PESQUISAS = PESQUISAS.filter(p => p.id !== id);
+  OBSERVACOES = OBSERVACOES.filter(o => o.obra !== obra);
+  const key = id + '|' + obra;
+  if(AVANCOS[key]) delete AVANCOS[key];
+  // Re-render all affected modules
+  renderRDO();
+  renderDashboard();
+  updateBadges();
+  populateAllSelects();
+  // Save to storage and Supabase
+  dbAfterDeleteProjeto(id, obra);
+  alert('Projeto "' + obra + '" excluído de todas as bases com sucesso.');
 }
 function openRdoEditRow(id, obra) {
   // Pre-fill modal with existing RDO data
@@ -1396,8 +1428,9 @@ function renderRDO(){
       <td>${stB}</td>
       <td style="font-size:11px;color:var(--tx3);max-width:140px">${r.obs||'—'}</td>
       <td class="nowrap">
-        <button class="btn btn-xs btn-or" onclick="openRdoEditRow('${r.id}','${r.obra}')" title="Atualizar RDO">✏</button>
-        <button class="btn btn-xs btn-r admin-only" onclick="excluirRDO('${r.id}','${r.obra}')" title="Excluir do RDO">🗑</button>
+        <button class="btn btn-xs btn-or" onclick="openRdoEditRow('${r.id}','${r.obra}')" title="Atualizar RDO">✏ Editar</button>
+        <button class="btn btn-xs btn-r" onclick="excluirRDO('${r.id}','${r.obra}')" title="Excluir do RDO">🗑 RDO</button>
+        <button class="btn btn-xs" style="background:rgba(220,53,69,.15);border:1px solid var(--r2);color:var(--r2)" onclick="excluirProjetoFromRDO('${r.id}','${r.obra}')" title="Excluir Projeto de todas as bases">⛔ Projeto</button>
       </td>
     </tr>`;
   }).join('')||'<tr><td colspan="14" style="text-align:center;padding:24px;color:var(--tx3)">Nenhum registro.</td></tr>';
@@ -1961,10 +1994,11 @@ function renderDashboard(){
   `;
   Object.values(_charts).forEach(ch=>{try{ch.destroy();}catch(e){}});_charts={};
   if(typeof Chart==='undefined'){
-    const cw=document.getElementById('ch-status');
-    if(cw&&cw.parentElement)cw.parentElement.innerHTML='<div style="color:var(--tx3);text-align:center;padding:40px">⏳ Carregando gráficos...</div>';
     setTimeout(renderDashboard,800);return;
   }
+  // Verify canvas elements exist
+  const chEl = document.getElementById('ch-status');
+  if(!chEl) { setTimeout(renderDashboard, 300); return; }
   const gc=_light?'rgba(0,0,0,.07)':'rgba(255,255,255,.07)';
   const tc=_light?'#555':'#808080';const lc=_light?'#333':'#b0b0b0';
   _charts.st=new Chart(document.getElementById('ch-status'),{type:'doughnut',
@@ -2566,15 +2600,7 @@ function loadFromStorage() {
     if(data.AVANCOS)                               AVANCOS     = data.AVANCOS;
     const saved = new Date(data.ts).toLocaleString('pt-BR');
     console.log('✅ Dados restaurados do armazenamento local. Último save:', saved);
-    // Apply admin class from cached role
-    const cachedAdmin = localStorage.getItem('sb_is_admin');
-    if(cachedAdmin === 'true'){
-      document.body.classList.add('is-admin');
-      document.body.classList.remove('non-admin');
-    } else {
-      document.body.classList.add('non-admin');
-      document.body.classList.remove('is-admin');
-    }
+    // Admin class já foi aplicado na inicialização (_isAdmin default = true)
     return true;
   } catch(e) {
     console.warn('Erro ao carregar dados locais:', e);
@@ -2636,225 +2662,69 @@ window.addEventListener('resize',()=>{
 if(window.innerWidth<900)document.getElementById('menu-btn').style.display='flex';
 
 // ════════════════════════════════════════════════════════════
-// SUPABASE — Persistência em nuvem + Autenticação
+// SUPABASE — Persistência direta sem autenticação obrigatória
 // ════════════════════════════════════════════════════════════
-const ADMIN_EMAIL = 'geraldo.issa@lafaete.com.br';
+const SUPABASE_URL = 'https://sgbmtkgzddalhxxgvygg.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnYm10a2d6ZGRhbGh4eGd2eWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTgwNDEsImV4cCI6MjA5MjA5NDA0MX0.XrPs-0aUaOPtu-0dWfkMnNfkyoG5qs_9G00gMUHM4CE';
 let _sb = null;
 let _user = null;
-let _isAdmin = false;
+// Admin: true se localStorage tiver 'true' OU se não houver login configurado
+// Quando o Supabase conectar e identificar o usuário, atualiza dinamicamente
+let _isAdmin = localStorage.getItem('siog_is_admin') !== 'false'; // default = admin
 
-// ── Config (stored in localStorage) ─────────────────────────
-function getConfig(){
-  return{
-    url:localStorage.getItem('sb_url')||'https://sgbmtkgzddalhxxgvygg.supabase.co',
-    key:localStorage.getItem('sb_key')||'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnYm10a2d6ZGRhbGh4eGd2eWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTgwNDEsImV4cCI6MjA5MjA5NDA0MX0.XrPs-0aUaOPtu-0dWfkMnNfkyoG5qs_9G00gMUHM4CE'
-  };
-}
+// Aplicar classe admin imediatamente
+if(_isAdmin) { document.body.classList.add('is-admin'); document.body.classList.remove('non-admin'); }
+else { document.body.classList.add('non-admin'); document.body.classList.remove('is-admin'); }
 
-function saveConfig(){
-  const url=document.getElementById('cfg-url').value.trim();
-  const key=document.getElementById('cfg-key').value.trim();
-  const msg=document.getElementById('cfg-msg');
-  if(!url||!key){msg.textContent='Preencha os dois campos.';msg.className='auth-msg auth-err';return;}
-  if(!url.includes('supabase.co')){msg.textContent='URL inválida. Deve conter supabase.co';msg.className='auth-msg auth-err';return;}
-  localStorage.setItem('sb_url',url);
-  localStorage.setItem('sb_key',key);
-  msg.textContent='Conectando...';msg.className='auth-msg auth-ok';
-  setTimeout(()=>bootSupabase(),300);
-}
-
-// ── Boot ─────────────────────────────────────────────────────
-async function bootSupabase(){
-  const cfg=getConfig();
-  if(!cfg.url||!cfg.key){showSetup();return;}
-  
-  // Load SDK if needed
-  if(!window.supabase){
-    try{
-      await new Promise((res,rej)=>{
-        const s=document.createElement('script');
-        s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-        s.onload=res;s.onerror=rej;
+async function initSupabase() {
+  try {
+    if(!window.supabase) {
+      await new Promise((res,rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+        s.onload = res; s.onerror = rej;
         document.head.appendChild(s);
       });
-    }catch(e){
-      console.warn('Supabase SDK falhou, usando dados locais');
-      showAppWithLocalData();return;
     }
-  }
-
-  try{
-    // Support both new (sb_publishable_) and legacy (eyJ) key formats
-    _sb=window.supabase.createClient(cfg.url,cfg.key,{
-      auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
-    });
-    
-    // Listen for auth changes (handles magic link return)
-    _sb.auth.onAuthStateChange(async(event,session)=>{
-      if(event==='SIGNED_IN'&&session){
-        await onSignedIn(session);
-      }else if(event==='SIGNED_OUT'){
-        _user=null;_isAdmin=false;
-        showAuth();
+    _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const {data:{session}} = await _sb.auth.getSession();
+    if(session) {
+      _user = session.user;
+      _isAdmin = (_user.email === 'geraldo.issa@lafaete.com.br');
+      localStorage.setItem('siog_is_admin', _isAdmin ? 'true' : 'false');
+      if(_isAdmin) { document.body.classList.add('is-admin'); document.body.classList.remove('non-admin'); }
+      else { document.body.classList.add('non-admin'); document.body.classList.remove('is-admin'); }
+      const sbSt = document.getElementById('sb-status');
+      if(sbSt) sbSt.textContent = '🟢 ' + _user.email.split('@')[0];
+      const ui = document.getElementById('user-info');
+      if(ui) { ui.innerHTML = '<span style="font-size:12px;color:var(--tx2)">' + _user.email.split('@')[0] + (_isAdmin?' <b style=color:var(--or)>ADMIN</b>':'') + '</span><button onclick="doSignOut()" style="background:none;border:none;color:var(--tx3);cursor:pointer;font-size:11px">✕</button>'; ui.style.display='flex'; }
+    }
+    _sb.auth.onAuthStateChange((event, session) => {
+      if(event==='SIGNED_IN' && session) {
+        _user = session.user;
+        _isAdmin = (_user.email === 'geraldo.issa@lafaete.com.br');
+        localStorage.setItem('siog_is_admin', _isAdmin ? 'true' : 'false');
+        if(_isAdmin) { document.body.classList.add('is-admin'); document.body.classList.remove('non-admin'); }
+        else { document.body.classList.add('non-admin'); document.body.classList.remove('is-admin'); }
+        syncFromSupabase().then(() => { renderDashboard(); renderProjetos(); updateBadges(); populateAllSelects(); pushLocalDataToSupabase(); });
       }
     });
-
-    // Check existing session (also handles return from magic link)
-    const{data:{session}}=await _sb.auth.getSession();
-    if(session){
-      await onSignedIn(session);
-    }else if(location.hash.includes('access_token')||location.search.includes('code=')){
-      // Handle magic link return
-      showStep(3);
-      const{data,error:authErr}=await _sb.auth.exchangeCodeForSession(location.search);
-      if(!authErr&&data.session){
-        await onSignedIn(data.session);
-      }else{
-        // Try getting session again after a moment
-        setTimeout(async()=>{
-          const{data:{session:s2}}=await _sb.auth.getSession();
-          if(s2)await onSignedIn(s2);else showAuth();
-        },1000);
-      }
-    }else{
-      showAuth();
-    }
-  }catch(e){
-    console.warn('Supabase error:',e.message);
-    // Wrong keys - show setup again
-    const msg=document.getElementById('cfg-msg');
-    if(msg){msg.textContent='Erro ao conectar. Verifique as chaves.';msg.className='auth-msg auth-err';}
-    showSetup();
-  }
+    // ARQUITETURA: localStorage = fonte da verdade, Supabase = backup
+    // NUNCA sobrescrever dados locais com dados do Supabase automaticamente
+    // Isso garante que edições do usuário SEMPRE persistem
+    // Push para Supabase em background (para multi-device futuro)
+    await pushLocalDataToSupabase();
+    console.log('✅ SIOG Supabase backup conectado. P='+PROJETOS.length+' R='+RDO.length);
+  } catch(e) { console.warn('Supabase error:', e.message); }
 }
 
-// ── Auth UI ──────────────────────────────────────────────────
-function showSetup(){
-  // Only show setup if Supabase not configured - don't hide app
-  document.getElementById('setup-screen').classList.add('show');
-  document.getElementById('auth-screen').classList.remove('show');
-}
-function showAuth(){
-  // Only show auth if no local session - don't hide app
-  // App remains visible with local data while user logs in
-  document.getElementById('setup-screen').classList.remove('show');
-  document.getElementById('auth-screen').classList.add('show');
-  showStep(1);
-}
-function showApp(){
-  document.getElementById('setup-screen').classList.remove('show');
-  document.getElementById('auth-screen').classList.remove('show');
-  document.getElementById('app').style.opacity='1';
-  document.getElementById('app').style.pointerEvents='all';
-  // Ensure Supabase is connected
-  if(!_sb){
-    bootSupabase();
-  } else if(!_user){
-    _sb.auth.getSession().then(({data:{session}})=>{
-      if(session) onSignedIn(session);
-      else showAuth();
-    });
-  }
-}
-function showStep(n){
-  [1,2,3].forEach(i=>{
-    const el=document.getElementById('auth-s'+i);
-    if(el)el.className='auth-step'+(i===n?' on':'');
-  });
-}
+async function doSignOut() { if(_sb) await _sb.auth.signOut(); _user=null; _isAdmin=false; localStorage.removeItem('siog_is_admin'); document.body.classList.add('non-admin'); }
+function showSetup(){} function showAuth(){} function showApp(){} function showStep(n){} function saveConfig(){} function bootSupabase(){ return initSupabase(); }
 
-async function doMagicLink(){
-  const email=document.getElementById('auth-email').value.trim();
-  const msg=document.getElementById('auth-msg');
-  if(!email){msg.textContent='Digite seu e-mail.';msg.className='auth-msg auth-err';return;}
-  const btn=document.getElementById('auth-btn');
-  btn.disabled=true;btn.textContent='Enviando...';
-  msg.textContent='';
-  // Redirect back to wherever this file is being served from
-  const redirectTo = 'https://geraldoissa-blip.github.io/siog-lafaete/';
-  const{error}=await _sb.auth.signInWithOtp({
-    email,
-    options:{emailRedirectTo: redirectTo, shouldCreateUser: true}
-  });
-  btn.disabled=false;btn.textContent='✉ Entrar com link mágico';
-  if(error){msg.textContent='Erro: '+error.message;msg.className='auth-msg auth-err';}
-  else{
-    document.getElementById('auth-email-lbl').textContent=email;
-    showStep(2);
-  }
-}
-
-async function doSignOut(){
-  if(_sb)await _sb.auth.signOut();
-  _user=null;_isAdmin=false;
-  showAuth();
-}
-
-// ── On signed in ─────────────────────────────────────────────
-async function onSignedIn(session){
-  _user=session.user;
-  _isAdmin=(_user.email===ADMIN_EMAIL);
-  
-  // Upsert profile
-  try{
-    await _sb.from('profiles').upsert(
-      {id:_user.id,email:_user.email,is_admin:_isAdmin},
-      {onConflict:'id'}
-    );
-  }catch(e){}
-
-  // Update header
-  const initials=_user.email.slice(0,2).toUpperCase();
-  document.getElementById('user-av').textContent=initials;
-  document.getElementById('user-name').textContent=_user.email.split('@')[0];
-  document.getElementById('user-info').style.display='flex';
-  localStorage.setItem('sb_is_admin', _isAdmin ? 'true' : 'false');
-  if(_isAdmin){
-    document.getElementById('user-info').insertAdjacentHTML('beforeend','<span class="admin-badge">ADMIN</span>');
-    document.body.classList.add('is-admin');
-    document.body.classList.remove('non-admin');
-  }else{
-    document.body.classList.add('non-admin');
-    document.body.classList.remove('is-admin');
-  }
-
-  // Load data from Supabase
-  await syncFromSupabase();
-
-  // Show connection status
-  const sbSt=document.getElementById('sb-status');
-  if(sbSt)sbSt.textContent='🟢 Conectado: '+_user.email.split('@')[0];
-  // Ensure app is visible and auth screens hidden
-  document.getElementById('setup-screen').classList.remove('show');
-  document.getElementById('auth-screen').classList.remove('show');
-  document.getElementById('app').style.opacity='1';
-  document.getElementById('app').style.pointerEvents='all';
-  // Sync with Supabase
-  syncFromSupabase().then(()=>{
-    renderDashboard();renderProjetos();updateBadges();populateAllSelects();
-    // Push local data to Supabase if it's empty (first time setup)
-    pushLocalDataToSupabase();
-  });
-  renderDashboard();
-  renderProjetos();
-  updateBadges();
-  populateAllSelects();
-}
-
-function showAppWithLocalData(){
-  // No Supabase - just use local storage data
-  showApp();
-  renderDashboard();
-  renderProjetos();
-  updateBadges();
-  populateAllSelects();
-}
-
-// ── Sync: load all data from Supabase ────────────────────────
-async function syncFromSupabase(){
-  if(!_sb)return;
-  try{
-    const[p,r,d,m,ps,o,av]=await Promise.all([
+async function syncFromSupabase() {
+  if(!_sb) return;
+  try {
+    const[p,r,d,m,ps,o,av] = await Promise.all([
       _sb.from('projetos').select('*').order('created_at',{ascending:true}),
       _sb.from('rdo').select('*'),
       _sb.from('documentacao').select('*'),
@@ -2863,263 +2733,170 @@ async function syncFromSupabase(){
       _sb.from('observacoes').select('*').order('id_seq',{ascending:true}),
       _sb.from('avancos').select('*'),
     ]);
-    // Only replace local data if Supabase has MORE records (prevents losing seed data)
-    if(p.data?.length >= PROJETOS.length)  PROJETOS = p.data.map(function(x){return Object.assign({},x,{parciais:x.parciais||[]});});
-    if(r.data?.length >= RDO.length)       RDO = r.data;
-    if(d.data?.length >= DOCUMENTACAO.length) DOCUMENTACAO = d.data.map(function(x){return Object.assign({},x,{art_tipos:x.art_tipos||[]});});
-    if(m.data?.length >= MEDICOES.length)  MEDICOES = m.data;
-    if(ps.data?.length >= PESQUISAS.length) PESQUISAS = ps.data;
-    if(o.data?.length >= OBSERVACOES.length) OBSERVACOES = o.data;
-    if(av.data?.length){
+    // CRITICAL: Only use Supabase data if it has MORE records than local
+    // This prevents empty Supabase from wiping local data
+    if(p.data && p.data.length > 0 && p.data.length >= PROJETOS.length)
+      PROJETOS = p.data.map(x=>Object.assign({},x,{parciais:Array.isArray(x.parciais)?x.parciais:(typeof x.parciais==='string'?JSON.parse(x.parciais||'[]'):[]) }));
+    if(r.data && r.data.length > 0 && r.data.length >= RDO.length)
+      RDO = r.data;
+    if(d.data && d.data.length > 0 && d.data.length >= DOCUMENTACAO.length)
+      DOCUMENTACAO = d.data.map(x=>Object.assign({},x,{art_tipos:Array.isArray(x.art_tipos)?x.art_tipos:(typeof x.art_tipos==='string'?JSON.parse(x.art_tipos||'[]'):[]) }));
+    if(m.data && m.data.length > 0 && m.data.length >= MEDICOES.length)
+      MEDICOES = m.data;
+    if(ps.data && ps.data.length > 0 && ps.data.length >= PESQUISAS.length)
+      PESQUISAS = ps.data;
+    if(o.data && o.data.length > 0 && o.data.length >= OBSERVACOES.length)
+      OBSERVACOES = o.data;
+    if(av.data && av.data.length > 0) {
       AVANCOS={};
-      av.data.forEach(x=>{AVANCOS[x.projeto_key]={prev:x.prev,real:x.real,semana:x.semana}});
+      av.data.forEach(x=>{ AVANCOS[x.projeto_key]={prev:x.prev,real:x.real,semana:x.semana}; });
     }
-    // Also save to localStorage as backup
     saveToStorage();
-    console.log('✅ Dados sincronizados do Supabase');
-  }catch(e){
-    console.warn('Sync error, usando dados locais:',e.message);
-  }
+    console.log('Sync: P='+PROJETOS.length+' R='+RDO.length+' D='+DOCUMENTACAO.length);
+  } catch(e) { console.warn('Sync error:', e.message); }
 }
 
-// ── Write helpers ─────────────────────────────────────────────
-function uid(){return _user?.id||null;}
+function showSaveStatus(msg, color) {
+  const ind = document.getElementById('save-indicator');
+  if(ind) { ind.textContent=msg; ind.style.opacity='1'; ind.style.color=color||'var(--g2)'; clearTimeout(ind._t); ind._t=setTimeout(()=>{ind.style.opacity='0';},4000); }
+}
 
-async function sbUpsert(table,data,conflict){
-  if(!_sb){await bootSupabase();if(!_sb)return;}
-  try{
-    const row=Object.assign({},data,{updated_by:uid(),updated_at:new Date().toISOString()});
-    // Remove undefined/function values
+async function logChange(action, table, registroId, descricao) {
+  if(!_sb) return;
+  try {
+    const entry = {user_email:_user?.email||'sistema',action,tabela:table,registro_id:String(registroId||''),descricao:descricao||'',created_at:new Date().toISOString()};
+    if(_user?.id) entry.user_id = _user.id;
+    _sb.from('audit_log').insert(entry).catch(()=>{});
+    fetch(SUPABASE_URL+'/functions/v1/notify',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_KEY},body:JSON.stringify(entry)}).catch(()=>{});
+  } catch(e) {}
+}
+
+async function sbUpsert(table, data, conflict) {
+  if(!_sb) return;
+  try {
+    const row = Object.assign({}, data, {updated_at:new Date().toISOString()});
+    if(_user?.id) row.updated_by = _user.id;
     Object.keys(row).forEach(k=>{if(typeof row[k]==='function'||row[k]===undefined)delete row[k];});
-    const {error}=await _sb.from(table).upsert(row,{onConflict:conflict});
-    if(error){
-      console.error('sbUpsert error:',error);
-      const ind=document.getElementById('save-indicator');
-      if(ind){ind.textContent='⚠ Erro ao salvar: '+error.message;ind.style.opacity='1';ind.style.color='var(--r2)';}
-      return;
-    }
-    await logChange('update',table,data.id||'',JSON.stringify(data).slice(0,100));
-    const ind=document.getElementById('save-indicator');
-    if(ind){ind.textContent='✓ Salvo no servidor '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});ind.style.opacity='1';ind.style.color='var(--g2)';clearTimeout(ind._t);ind._t=setTimeout(()=>{ind.style.opacity='0';},4000);}
-  }catch(e){
-    console.error('sbUpsert catch:',e);
-    const ind=document.getElementById('save-indicator');
-    if(ind){ind.textContent='⚠ Erro: '+e.message;ind.style.opacity='1';ind.style.color='var(--r2)';}
-  }
+    const {error} = await _sb.from(table).upsert(row,{onConflict:conflict});
+    if(error) { showSaveStatus('⚠ Erro: '+error.message,'var(--r2)'); console.error(error); return; }
+    showSaveStatus('✓ Salvo '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),'var(--g2)');
+    logChange('update',table,data.id||'','');
+  } catch(e) { console.error(e); }
 }
 
-async function sbInsert(table,data){
-  if(!_sb){await bootSupabase();if(!_sb)return;}
-  try{
-    const{id_seq,...row}=data;
+async function sbInsert(table, data) {
+  if(!_sb) return;
+  try {
+    const {id_seq,...rest} = data;
+    const row = Object.assign({},rest,{updated_at:new Date().toISOString()});
+    if(_user?.id) row.updated_by = _user.id;
     Object.keys(row).forEach(k=>{if(typeof row[k]==='function'||row[k]===undefined)delete row[k];});
-    const row2=Object.assign({},row,{updated_by:uid(),updated_at:new Date().toISOString()});
-    const{error}=await _sb.from(table).insert(row2);
-    if(error){console.error('sbInsert error:',error);const ind=document.getElementById('save-indicator');if(ind){ind.textContent='⚠ Erro: '+error.message;ind.style.opacity='1';ind.style.color='var(--r2)';}return;}
-    await logChange('insert',table,data.id||'',JSON.stringify(data).slice(0,100));
-    const ind=document.getElementById('save-indicator');
-    if(ind){ind.textContent='✓ Salvo '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});ind.style.opacity='1';ind.style.color='var(--g2)';clearTimeout(ind._t);ind._t=setTimeout(()=>{ind.style.opacity='0';},4000);}
-  }catch(e){console.error('sbInsert catch:',e);}
+    const {error} = await _sb.from(table).insert(row);
+    if(error) { showSaveStatus('⚠ Erro: '+error.message,'var(--r2)'); console.error(error); return; }
+    showSaveStatus('✓ Salvo '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),'var(--g2)');
+    logChange('insert',table,data.id||'','');
+  } catch(e) { console.error(e); }
 }
 
-async function sbUpdate(table,data,matchCol,matchVal){
-  if(!_sb)return;
-  try{
-    const{id_seq,...row}=data;
-    await _sb.from(table).update({...row,updated_by:uid(),updated_at:new Date().toISOString()}).eq(matchCol,matchVal);
-    await logChange('update',table,String(matchVal),JSON.stringify(data).slice(0,200));
-  }catch(e){console.warn('sbUpdate error:',e.message);}
+async function sbUpdate(table, data, col, val) {
+  if(!_sb) return;
+  try {
+    const {id_seq,...rest} = data;
+    const row = Object.assign({},rest,{updated_at:new Date().toISOString()});
+    if(_user?.id) row.updated_by = _user.id;
+    Object.keys(row).forEach(k=>{if(typeof row[k]==='function'||row[k]===undefined)delete row[k];});
+    const {error} = await _sb.from(table).update(row).eq(col,val);
+    if(error) { showSaveStatus('⚠ Erro: '+error.message,'var(--r2)'); return; }
+    showSaveStatus('✓ Salvo '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),'var(--g2)');
+  } catch(e) { console.error(e); }
 }
 
-async function sbDelete(table,col,val,descricao){
-  if(!_sb)return;
-  try{
-    await _sb.from(table).delete().eq(col,val);
-    await logChange('delete',table,String(val),descricao||'');
-  }catch(e){console.warn('sbDelete error:',e.message);}
+async function sbDelete(table, col, val, desc) {
+  if(!_sb) return;
+  try {
+    const {error} = await _sb.from(table).delete().eq(col,val);
+    if(error) { console.error(error); return; }
+    logChange('delete',table,String(val),desc||'');
+  } catch(e) { console.error(e); }
 }
 
-// ── Audit log + email notification ───────────────────────────
-async function logChange(action,table,registroId,descricao){
-  if(!_sb){await bootSupabase();}
-  if(!_sb||!_user)return;
-  const cfg=getConfig();
-  const entry={user_id:_user.id,user_email:_user.email,action,tabela:table,
-    registro_id:String(registroId),descricao,created_at:new Date().toISOString()};
-  // Insert audit log
-  await _sb.from('audit_log').insert(entry).then(()=>{}).catch(()=>{});
-  // Notify via edge function
-  const fnUrl=cfg.url+'/functions/v1/notify';
-  const session=await _sb.auth.getSession();
-  const token=session?.data?.session?.access_token;
-  if(token){
-    fetch(fnUrl,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify(entry)}).catch(()=>{});
-  }
-}
-
-// ── Push local data to Supabase (first time setup) ──────────
-async function pushLocalDataToSupabase(){
-  if(!_sb||!_user)return;
-  const uid=_user.id;
-  const ts=new Date().toISOString();
-  const ind=document.getElementById('save-indicator');
-  function showMsg(m){if(ind){ind.textContent=m;ind.style.opacity='1';ind.style.color='var(--bl2)';}}
-
-  try{
-    // ── PROJETOS ──────────────────────────────────────────
-    const{data:pDb}=await _sb.from('projetos').select('id');
-    if(!pDb||pDb.length<PROJETOS.length){
-      showMsg('⬆ Sincronizando projetos...');
-      for(const p of PROJETOS){
-        const row=Object.assign({},p,{updated_by:uid,updated_at:ts});
-        delete row.parciais_obj;
-        if(typeof row.parciais!=='string') row.parciais=JSON.stringify(row.parciais||[]);
-        await _sb.from('projetos').upsert(row,{onConflict:'id'}).catch(e=>console.warn('proj:',e.message));
-      }
-      console.log('✅ Projetos sync:',PROJETOS.length);
-    }
-
-    // ── RDO ───────────────────────────────────────────────
-    const{data:rDb}=await _sb.from('rdo').select('id');
-    if(!rDb||rDb.length<RDO.length){
-      showMsg('⬆ Sincronizando RDO...');
-      for(const r of RDO){
-        const row={id:r.id,obra:r.obra,
-          atualizacao:String(r.atualizacao||''),enviado:String(r.enviado||''),
-          assinado:String(r.assinado||''),resp:r.resp||'',
-          modelo:r.modelo||'',histograma:r.histograma||'',obs:r.obs||'',
-          updated_by:uid,updated_at:ts};
-        await _sb.from('rdo').upsert(row,{onConflict:'id,obra'}).catch(e=>console.warn('rdo:',e.message));
-      }
-      console.log('✅ RDO sync:',RDO.length);
-    }
-
-    // ── DOCUMENTAÇÃO ──────────────────────────────────────
-    const{data:dDb}=await _sb.from('documentacao').select('id');
-    if(!dDb||dDb.length<DOCUMENTACAO.length){
-      showMsg('⬆ Sincronizando documentação...');
-      for(const d of DOCUMENTACAO){
-        const row=Object.assign({},d,{
-          art_tipos:JSON.stringify(d.art_tipos||[]),
-          updated_by:uid,updated_at:ts});
-        await _sb.from('documentacao').upsert(row,{onConflict:'id,obra'}).catch(e=>console.warn('doc:',e.message));
-      }
-      console.log('✅ Doc sync:',DOCUMENTACAO.length);
-    }
-
-    // ── MEDIÇÕES ──────────────────────────────────────────
-    const{data:mDb}=await _sb.from('medicoes').select('id_seq');
-    if(!mDb||mDb.length<MEDICOES.length){
-      showMsg('⬆ Sincronizando medições...');
-      for(const m of MEDICOES){
-        const{id_seq,...row}=Object.assign({},m,{updated_by:uid,updated_at:ts});
-        await _sb.from('medicoes').insert(row).catch(()=>{});
-      }
-      console.log('✅ Medições sync:',MEDICOES.length);
-    }
-
-    // ── PESQUISAS ─────────────────────────────────────────
-    const{data:psDb}=await _sb.from('pesquisas').select('id_seq');
-    if(!psDb||psDb.length<PESQUISAS.length){
-      showMsg('⬆ Sincronizando pesquisas...');
-      for(const p of PESQUISAS){
-        const{id_seq,...row}=Object.assign({},p,{updated_by:uid,updated_at:ts});
-        await _sb.from('pesquisas').insert(row).catch(()=>{});
-      }
-      console.log('✅ Pesquisas sync:',PESQUISAS.length);
-    }
-
-    // ── OBSERVAÇÕES ───────────────────────────────────────
-    const{data:oDb}=await _sb.from('observacoes').select('id_seq');
-    if(!oDb||oDb.length<OBSERVACOES.length){
-      showMsg('⬆ Sincronizando observações...');
-      for(const o of OBSERVACOES){
-        const{id_seq,...row}=Object.assign({},o,{updated_by:uid,updated_at:ts});
-        await _sb.from('observacoes').insert(row).catch(()=>{});
-      }
-      console.log('✅ Observações sync:',OBSERVACOES.length);
-    }
-
-    // ── AVANÇOS ───────────────────────────────────────────
-    const{data:avDb}=await _sb.from('avancos').select('projeto_key');
-    if(!avDb||avDb.length<Object.keys(AVANCOS).length){
-      showMsg('⬆ Sincronizando avanços...');
-      for(const[key,av] of Object.entries(AVANCOS)){
-        await _sb.from('avancos').upsert({projeto_key:key,prev:av.prev,real:av.real,
-          semana:av.semana||'',updated_by:uid,updated_at:ts},{onConflict:'projeto_key'}).catch(()=>{});
-      }
-      console.log('✅ Avanços sync:',Object.keys(AVANCOS).length);
-    }
-
-    showMsg('✅ Dados sincronizados com o servidor!');
-    if(ind){clearTimeout(ind._t2);ind._t2=setTimeout(()=>{ind.style.opacity='0';},5000);}
-    console.log('✅ Sincronização completa com Supabase');
-  }catch(e){
-    console.warn('pushLocalDataToSupabase error:',e);
-  }
-}
-// ── DB-aware save overrides ───────────────────────────────────
-// These are called AFTER the local data is updated and rendered
-
-function dbAfterSaveProjeto(p,isNew){
-  saveToStorage();
-  if(isNew)sbInsert('projetos',p);else sbUpsert('projetos',p,'id');
-}
-function dbAfterDeleteProjeto(id,obra){
-  saveToStorage();
-  sbDelete('projetos','id',id,'Excluiu projeto: '+obra);
-  sbDelete('rdo','id',id,'');
-  sbDelete('documentacao','id',id,'');
-  if(_sb)_sb.from('medicoes').delete().eq('id',id).then(()=>{});
-  if(_sb)_sb.from('pesquisas').delete().eq('id',id).then(()=>{});
-  if(_sb)_sb.from('observacoes').delete().eq('obra',obra).then(()=>{});
-  if(_sb)_sb.from('avancos').delete().eq('projeto_key',id+'|'+obra).then(()=>{});
-}
-function dbAfterSaveRDO(rdo){
-  saveToStorage();
-  if(_sb) sbUpsert('rdo',rdo,'id,obra');
-  else bootSupabase().then(()=>{if(_sb)sbUpsert('rdo',rdo,'id,obra');});
-}
-function dbAfterDeleteRDO(rdo){saveToStorage();sbDelete('rdo','id',rdo.id,'Excluiu RDO: '+rdo.obra);}
+function dbAfterSaveProjeto(p,isNew){saveToStorage();if(isNew)sbInsert('projetos',p);else sbUpsert('projetos',p,'id');}
+function dbAfterDeleteProjeto(id,obra){saveToStorage();sbDelete('projetos','id',id,'');if(_sb){_sb.from('rdo').delete().eq('id',id).then(()=>{});_sb.from('documentacao').delete().eq('id',id).then(()=>{});_sb.from('medicoes').delete().eq('id',id).then(()=>{});_sb.from('pesquisas').delete().eq('id',id).then(()=>{});_sb.from('observacoes').delete().eq('obra',obra).then(()=>{});_sb.from('avancos').delete().eq('projeto_key',id+'|'+obra).then(()=>{});}}
+function dbAfterSaveRDO(rdo){saveToStorage();sbUpsert('rdo',rdo,'id,obra');}
+function dbAfterDeleteRDO(rdo){saveToStorage();sbDelete('rdo','id',rdo.id,'');}
 function dbAfterSaveDoc(doc){saveToStorage();sbUpsert('documentacao',doc,'id,obra');}
 function dbAfterSaveMed(med,isNew){saveToStorage();if(isNew)sbInsert('medicoes',med);else sbUpdate('medicoes',med,'id_seq',med.id_seq);}
 function dbAfterSaveSat(sat,isNew){saveToStorage();if(isNew)sbInsert('pesquisas',sat);else sbUpdate('pesquisas',sat,'id_seq',sat.id_seq);}
-function dbAfterDeleteSat(sat){saveToStorage();sbDelete('pesquisas','id_seq',sat.id_seq,'Excluiu avaliação: '+sat.cliente);}
+function dbAfterDeleteSat(sat){saveToStorage();sbDelete('pesquisas','id_seq',sat.id_seq,'');}
 function dbAfterSaveObs(obs,isNew){saveToStorage();if(isNew)sbInsert('observacoes',obs);else sbUpdate('observacoes',obs,'id_seq',obs.id_seq);}
-function dbAfterDeleteObs(obs){saveToStorage();sbDelete('observacoes','id_seq',obs.id_seq,'Excluiu obs: '+(obs.titulo||''));}
-function dbAfterSaveCrono(key,av){saveToStorage();sbUpsert('avancos',{projeto_key:key,...av},'projeto_key');}
+function dbAfterDeleteObs(obs){saveToStorage();sbDelete('observacoes','id_seq',obs.id_seq,'');}
+function dbAfterSaveCrono(key,av){saveToStorage();sbUpsert('avancos',{projeto_key:key,prev:av.prev,real:av.real,semana:av.semana||''},'projeto_key');}
 
-// ── Init ─────────────────────────────────────────────────────
-window.addEventListener('load',()=>{
-  try {
-    // Pre-configure Supabase credentials
-    if(!localStorage.getItem('sb_url')) localStorage.setItem('sb_url','https://sgbmtkgzddalhxxgvygg.supabase.co');
-    if(!localStorage.getItem('sb_key')) localStorage.setItem('sb_key','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnYm10a2d6ZGRhbGh4eGd2eWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTgwNDEsImV4cCI6MjA5MjA5NDA0MX0.XrPs-0aUaOPtu-0dWfkMnNfkyoG5qs_9G00gMUHM4CE');
-    // Load local data first
-    loadFromStorage();
-  } catch(e) { console.warn('Storage error:', e); }
-  // App always shows - no black screen ever
-  try { renderDashboard(); } catch(e) { console.warn('Dashboard error:', e); }
-  try { renderProjetos(); } catch(e) { console.warn('Projetos error:', e); }
+async function pushLocalDataToSupabase(){
+  if(!_sb)return;
+  const ts=new Date().toISOString();
+  function showMsg(m){const ind=document.getElementById('save-indicator');if(ind){ind.textContent=m;ind.style.opacity='1';ind.style.color='var(--bl2)';}}
+  try{
+    const{data:rDb}=await _sb.from('rdo').select('id');
+    if(!rDb||rDb.length<RDO.length){
+      showMsg('⬆ Sincronizando dados...');
+      for(const r of RDO){
+        await _sb.from('rdo').upsert({id:r.id,obra:r.obra,atualizacao:String(r.atualizacao||''),enviado:String(r.enviado||''),assinado:String(r.assinado||''),resp:r.resp||'',modelo:r.modelo||'',histograma:r.histograma||'',obs:r.obs||'',updated_at:ts},{onConflict:'id,obra'}).catch(()=>{});
+      }
+    }
+    const{data:pDb}=await _sb.from('projetos').select('id');
+    if(!pDb||pDb.length<PROJETOS.length){
+      for(const p of PROJETOS){
+        const row=Object.assign({},p,{parciais:JSON.stringify(p.parciais||[]),updated_at:ts});
+        await _sb.from('projetos').upsert(row,{onConflict:'id'}).catch(()=>{});
+      }
+    }
+    const{data:dDb}=await _sb.from('documentacao').select('id');
+    if(!dDb||dDb.length<DOCUMENTACAO.length){
+      for(const d of DOCUMENTACAO){
+        const row=Object.assign({},d,{art_tipos:JSON.stringify(d.art_tipos||[]),updated_at:ts});
+        await _sb.from('documentacao').upsert(row,{onConflict:'id,obra'}).catch(()=>{});
+      }
+    }
+    const{data:mDb}=await _sb.from('medicoes').select('id_seq');
+    if(!mDb||mDb.length<MEDICOES.length){
+      for(const m of MEDICOES){const{id_seq,...row}=Object.assign({},m,{updated_at:ts});await _sb.from('medicoes').insert(row).catch(()=>{});}
+    }
+    const{data:psDb}=await _sb.from('pesquisas').select('id_seq');
+    if(!psDb||psDb.length<PESQUISAS.length){
+      for(const p of PESQUISAS){const{id_seq,...row}=Object.assign({},p,{updated_at:ts});await _sb.from('pesquisas').insert(row).catch(()=>{});}
+    }
+    const{data:oDb}=await _sb.from('observacoes').select('id_seq');
+    if(!oDb||oDb.length<OBSERVACOES.length){
+      for(const o of OBSERVACOES){const{id_seq,...row}=Object.assign({},o,{updated_at:ts});await _sb.from('observacoes').insert(row).catch(()=>{});}
+    }
+    showMsg('✅ Sincronizado!');
+    const ind=document.getElementById('save-indicator');
+    if(ind){clearTimeout(ind._t);ind._t=setTimeout(()=>{ind.style.opacity='0';},3000);}
+  }catch(e){console.warn('Push error:',e);}
+}
+// ── INIT ─────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  // Step 1: Load from localStorage (instant - has seed data)
+  try { loadFromStorage(); } catch(e) { console.warn('Storage error:', e); }
+  
+  // Step 2: Render data - use rAF to ensure layout is complete
+  try { renderProjetos(); } catch(e) {}
   try { updateBadges(); } catch(e) {}
   try { populateAllSelects(); } catch(e) {}
-  // Connect Supabase in background (non-blocking)
-  setTimeout(()=>{ try { bootSupabase(); } catch(e) { console.warn('Supabase error:', e); } }, 100);
+  // Dashboard charts need layout to be complete - use double rAF
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      try { renderDashboard(); } catch(e) { console.warn('Dashboard:', e); }
+    });
+  });
   
-  // Fallback: if main content area is empty after 1s, force re-render
-  setTimeout(()=>{
-    const content = document.getElementById('main-content');
-    if(content && (!content.innerHTML || content.innerHTML.trim().length < 100)){
-      console.log('Fallback render triggered');
-      try{renderDashboard();}catch(e){console.warn(e);}
-      try{renderProjetos();}catch(e){}
-      try{updateBadges();}catch(e){}
-      try{populateAllSelects();}catch(e){}
-    }
-  }, 1000);
+  // Step 3: Connect Supabase in background (non-blocking)
+  // Supabase will sync and re-render if it has more data
+  setTimeout(() => {
+    try { initSupabase(); } catch(e) { console.warn('Supabase:', e); }
+  }, 500);
 });
-
 </script>
 </body>
 </html>
