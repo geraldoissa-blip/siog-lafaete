@@ -132,7 +132,7 @@ textarea{resize:vertical;min-height:68px}
 .sat-row-new td,.sat-row-new td *{color:var(--tx)!important;font-style:normal!important}
 .sat-row-old td,.sat-row-old td *{color:var(--tx3)!important;font-style:normal!important}
 /* CHARTS */
-.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;min-height:240px}
 .chart-card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad2);padding:14px 18px}
 .chart-title{font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
 /* SPLIT LAYOUT */
@@ -339,7 +339,7 @@ textarea{resize:vertical;min-height:68px}
 <div id="page-dashboard" class="page active">
   <div class="kpi-grid" id="kpi-dash"></div>
   <div class="charts-grid">
-    <div class="chart-card"><div class="chart-title">Status da Carteira</div><div style="height:190px"><canvas id="ch-status"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Status da Carteira</div><div style="height:190px;position:relative"><canvas id="ch-status"></canvas></div></div>
     <div class="chart-card"><div class="chart-title">Financeiro (R$ milhões)</div><div style="height:190px"><canvas id="ch-fin"></canvas></div></div>
     <div class="chart-card" style="grid-column:1/-1"><div class="chart-title">Avanço Físico — Previsto vs Realizado</div><div id="ch-av-wrap" style="height:280px"><canvas id="ch-av"></canvas></div></div>
   </div>
@@ -2884,12 +2884,11 @@ window.addEventListener('load', () => {
   try { renderProjetos(); } catch(e) {}
   try { updateBadges(); } catch(e) {}
   try { populateAllSelects(); } catch(e) {}
-  // Dashboard charts need layout to be complete - use double rAF
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      try { renderDashboard(); } catch(e) { console.warn('Dashboard:', e); }
-    });
-  });
+  // Dashboard charts need CSS layout to complete first
+  // setTimeout(300) is more reliable than rAF for grid layouts
+  setTimeout(() => {
+    try { renderDashboard(); } catch(e) { console.warn('Dashboard:', e); }
+  }, 300);
   
   // Step 3: Connect Supabase in background (non-blocking)
   // Supabase will sync and re-render if it has more data
