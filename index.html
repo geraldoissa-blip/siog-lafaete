@@ -2002,8 +2002,20 @@ function renderDashboard(){
   const gc=_light?'rgba(0,0,0,.07)':'rgba(255,255,255,.07)';
   const tc=_light?'#555':'#808080';const lc=_light?'#333':'#b0b0b0';
   _charts.st=new Chart(document.getElementById('ch-status'),{type:'doughnut',
-    data:{labels:['Ativos','Atrasados','Encerrados'],datasets:[{data:[ativos,atrasados,enc],backgroundColor:['#E87722','#dc3545','#808080'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:lc,font:{size:11},boxWidth:12}}}}});
+    data:{
+      labels:['Ativos: '+ativos,'Atrasados: '+atrasados,'Encerrados: '+enc],
+      datasets:[{data:[ativos,atrasados,enc],backgroundColor:['#E87722','#dc3545','#808080'],borderWidth:0}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'right',labels:{color:lc,font:{size:12},boxWidth:14,padding:10}},
+        tooltip:{callbacks:{label:function(ctx){
+          const total=ctx.dataset.data.reduce((a,b)=>a+b,0);
+          const pct=total?Math.round(ctx.parsed/total*100):0;
+          return ' '+ctx.parsed+' projetos ('+pct+'%)';
+        }}}
+      }
+    }});
   _charts.fin=new Chart(document.getElementById('ch-fin'),{type:'bar',
     data:{labels:['Carteira','Medido','Faturado','Recebido'],datasets:[{data:[tC/1e6,tM/1e6,tF/1e6,tR/1e6],backgroundColor:['#E87722aa','#28a745aa','#1a6fdbaa','#28c76faa'],borderColor:['#E87722','#28a745','#1a6fdb','#28c76f'],borderWidth:1}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>v.toFixed(1)+'M',color:tc},grid:{color:gc}},x:{ticks:{color:tc},grid:{display:false}}}}});
@@ -2769,7 +2781,14 @@ async function syncFromSupabase() {
 
 function showSaveStatus(msg, color) {
   const ind = document.getElementById('save-indicator');
-  if(ind) { ind.textContent=msg; ind.style.opacity='1'; ind.style.color=color||'var(--g2)'; clearTimeout(ind._t); ind._t=setTimeout(()=>{ind.style.opacity='0';},4000); }
+  if(ind) { 
+    ind.textContent=msg; 
+    ind.style.opacity='1'; 
+    ind.style.color=color||'var(--g2)';
+    ind.style.fontWeight='600';
+    clearTimeout(ind._t); 
+    ind._t=setTimeout(()=>{ind.style.opacity='0';}, color && color.includes('r2') ? 8000 : 5000); 
+  }
 }
 
 async function logChange(action, table, registroId, descricao) {
