@@ -2706,7 +2706,9 @@ async function initSupabase() {
         localStorage.setItem('siog_is_admin', _isAdmin ? 'true' : 'false');
         if(_isAdmin) { document.body.classList.add('is-admin'); document.body.classList.remove('non-admin'); }
         else { document.body.classList.add('non-admin'); document.body.classList.remove('is-admin'); }
-        syncFromSupabase().then(() => { renderDashboard(); renderProjetos(); updateBadges(); populateAllSelects(); pushLocalDataToSupabase(); });
+        // Don't sync FROM Supabase - use localStorage as source of truth
+        pushLocalDataToSupabase();
+        renderDashboard(); renderProjetos(); updateBadges(); populateAllSelects();
       }
     });
     // ARQUITETURA: localStorage = fonte da verdade, Supabase = backup
