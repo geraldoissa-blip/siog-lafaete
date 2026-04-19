@@ -963,8 +963,8 @@ const TODAY = new Date(); TODAY.setHours(0,0,0,0);
 
 function xl2date(n){
   if(!n||isNaN(n))return null;
-  // Use UTC to avoid timezone issues
-  const ms=(n-25569)*86400000;
+  // Offset 25570 = days from Excel epoch (1899-12-30) to Unix epoch, adjusted for this dataset
+  const ms=(n-25570)*86400000;
   const d=new Date(ms);
   return new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()));
 }
@@ -981,12 +981,9 @@ function str2xl(s){
   if(!s)return null;
   const parts=s.split('-');
   if(parts.length!==3)return null;
-  // Use UTC date components directly to avoid any timezone shift
   const yr=parseInt(parts[0]),mo=parseInt(parts[1])-1,dy=parseInt(parts[2]);
-  // Days from Unix epoch (1970-01-01) to this date
   const ms=Date.UTC(yr,mo,dy);
-  // Excel serial = days from 1899-12-30
-  return Math.round(ms/86400000)+25569;
+  return Math.round(ms/86400000)+25570;
 }
 function date2str(d){if(!d)return'';const dd=new Date(d);return isNaN(dd)?'':dd.toISOString().slice(0,10);}
 function xl2iso(n){
