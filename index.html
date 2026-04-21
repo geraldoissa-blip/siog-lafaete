@@ -205,9 +205,31 @@ textarea{resize:vertical;min-height:68px}
 #user-info{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--bd);border-radius:20px;padding:3px 11px;font-size:12px;color:var(--tx2)}
 #user-av{width:20px;height:20px;border-radius:50%;background:var(--or);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0}
 .admin-badge{background:var(--or);color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;margin-left:2px}
+.viewer-badge{background:#3b82f6;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;margin-left:2px}
+.editor-badge{background:#22c55e;color:#fff;font-size:9px;padding:1px 5px;border-radius:8px;margin-left:2px}
 #logout-btn{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:11px;padding:2px 5px;border-radius:4px;font-family:inherit}
 #logout-btn:hover{color:var(--r2)}
 .non-admin .admin-only{display:none!important}
+.blocked-user #app{display:none!important}
+.access-modal{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:1001;display:none;align-items:center;justify-content:center;padding:18px}
+.access-modal.show{display:flex}
+.access-card{background:var(--bg2);border:1px solid var(--bd);border-radius:18px;max-width:860px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 70px rgba(0,0,0,.45);padding:22px}
+.access-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.access-title{font-size:20px;font-weight:700;color:var(--tx1)}
+.access-sub{font-size:12px;color:var(--tx3);line-height:1.5}
+.access-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.access-box{background:var(--bg3);border:1px solid var(--bd);border-radius:14px;padding:14px}
+.access-box h4{margin:0 0 10px 0;font-size:13px;color:var(--tx1)}
+.access-row{display:flex;gap:8px;margin-bottom:10px}
+.access-row input{flex:1;background:var(--bg1);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;color:var(--tx1);font-family:inherit}
+.access-list{display:flex;flex-wrap:wrap;gap:8px;min-height:34px}
+.access-pill{display:inline-flex;align-items:center;gap:8px;background:var(--bg1);border:1px solid var(--bd);border-radius:999px;padding:7px 10px;font-size:12px;color:var(--tx2)}
+.access-pill button{background:none;border:none;color:var(--r2);cursor:pointer;font-size:12px;padding:0;font-family:inherit}
+.access-note{font-size:11px;color:var(--tx3);line-height:1.5;margin-top:8px}
+.access-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.read-only-banner{display:none;position:fixed;left:16px;bottom:16px;z-index:1000;background:#0f172a;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 14px;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+.read-only .read-only-banner{display:block}
+@media(max-width:760px){.access-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -269,6 +291,53 @@ textarea{resize:vertical;min-height:68px}
     </div>
   </div>
 </div>
+
+<div id="access-modal" class="access-modal">
+  <div class="access-card">
+    <div class="access-head">
+      <div>
+        <div class="access-title">Controle de acessos</div>
+        <div class="access-sub">Somente o administrador pode manter a lista de e-mails com permissão de edição e de visualização.</div>
+      </div>
+      <button class="btn btn-sm" onclick="closeAccessModal()">Fechar</button>
+    </div>
+    <div class="access-grid">
+      <div class="access-box">
+        <h4>Administradores</h4>
+        <div class="access-list" id="admin-list"></div>
+        <div class="access-note">Administradores podem editar dados e também gerenciar as listas de acesso.</div>
+      </div>
+      <div class="access-box">
+        <h4>Editores</h4>
+        <div class="access-row">
+          <input id="editor-email-input" type="email" placeholder="nome@lafaete.com.br" autocomplete="off">
+          <button class="btn btn-sm" onclick="addAccessEmail('editors')">Adicionar</button>
+        </div>
+        <div class="access-list" id="editor-list"></div>
+        <div class="access-note">Editores podem atualizar as obras, mas não podem gerenciar as listas de acesso.</div>
+      </div>
+      <div class="access-box">
+        <h4>Visualizadores</h4>
+        <div class="access-row">
+          <input id="viewer-email-input" type="email" placeholder="nome@lafaete.com.br" autocomplete="off">
+          <button class="btn btn-sm" onclick="addAccessEmail('viewers')">Adicionar</button>
+        </div>
+        <div class="access-list" id="viewer-list"></div>
+        <div class="access-note">Visualizadores podem consultar os dashboards e módulos, mas não podem alterar dados.</div>
+      </div>
+      <div class="access-box">
+        <h4>Status atual</h4>
+        <div class="access-note" id="access-status-box">Nenhum usuário autenticado.</div>
+        <div class="access-note">Se um e-mail não estiver em nenhuma lista autorizada, o acesso ao sistema fica bloqueado.</div>
+      </div>
+    </div>
+    <div class="access-footer">
+      <button class="btn btn-sm" onclick="saveAccessControl(true)">Salvar lista</button>
+    </div>
+  </div>
+</div>
+
+<div class="read-only-banner">Modo visualização ativo — alterações estão bloqueadas para este usuário.</div>
 
 <div id="app">
 
@@ -339,6 +408,7 @@ textarea{resize:vertical;min-height:68px}
   <div id="user-info" style="display:none"><div id="user-av"></div><span id="user-name"></span><button id="logout-btn" onclick="doSignOut()">✕</button></div>
   <div id="sb-status" style="font-size:10px;color:var(--tx3);white-space:nowrap"></div>
   <div id="save-indicator" style="font-size:11px;color:var(--g2);opacity:0;transition:opacity 2s;white-space:nowrap"></div>
+  <button class="btn btn-sm admin-only" onclick="openAccessModal()" title="Gerenciar acessos">🔐 Acessos</button>
   <button class="btn btn-sm" onclick="exportBackup()" title="Backup JSON">⬇ Backup</button>
   <button class="btn btn-sm" onclick="importBackup()" title="Restaurar Backup">⬆ Restaurar</button>
   <button class="btn btn-sm" style="color:var(--r2)" onclick="clearStorage()" title="Resetar dados">🗑 Resetar</button>
@@ -6624,60 +6694,286 @@ const SUPABASE_URL = 'https://sgbmtkgzddalhxxgvygg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnYm10a2d6ZGRhbGh4eGd2eWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTgwNDEsImV4cCI6MjA5MjA5NDA0MX0.XrPs-0aUaOPtu-0dWfkMnNfkyoG5qs_9G00gMUHM4CE';
 let _sb = null;
 let _user = null;
-// Admin: true se localStorage tiver 'true' OU se não houver login configurado
-// Quando o Supabase conectar e identificar o usuário, atualiza dinamicamente
-let _isAdmin = localStorage.getItem('siog_is_admin') !== 'false'; // default = admin
+let _isAdmin = false;
+const ACCESS_CONTROL_KEY = 'siog_access_control_v1';
+const ACCESS_CONTROL_DEFAULT = {
+  admins: ['geraldo.issa@lafaete.com.br'],
+  editors: ['romersson.freitas@lafaete.com.br','john.barbosa@lafaete.com.br','daniel.prata@lafaete.com.br','victor.figueredo@lafaete.com.br'],
+  viewers: ['mariana.silva@lafaete.com.br']
+};
+let ACCESS_CONTROL = loadAccessControl();
 
-// Aplicar classe admin imediatamente
-if(_isAdmin) { document.body.classList.add('is-admin'); document.body.classList.remove('non-admin'); }
-else { document.body.classList.add('non-admin'); document.body.classList.remove('is-admin'); }
-
+function normalizeEmail(email){ return String(email||'').trim().toLowerCase(); }
+function uniqueEmails(list){ return [...new Set((Array.isArray(list)?list:[]).map(normalizeEmail).filter(Boolean))]; }
+function sanitizeAccessControl(cfg){
+  const base = cfg && typeof cfg === 'object' ? cfg : {};
+  const out = {
+    admins: uniqueEmails(base.admins && base.admins.length ? base.admins : ACCESS_CONTROL_DEFAULT.admins),
+    editors: uniqueEmails(base.editors && base.editors.length ? base.editors : ACCESS_CONTROL_DEFAULT.editors),
+    viewers: uniqueEmails(base.viewers && base.viewers.length ? base.viewers : ACCESS_CONTROL_DEFAULT.viewers)
+  };
+  out.editors = out.editors.filter(e => !out.admins.includes(e));
+  out.viewers = out.viewers.filter(e => !out.admins.includes(e) && !out.editors.includes(e));
+  if(!out.admins.length) out.admins = [...ACCESS_CONTROL_DEFAULT.admins];
+  return out;
+}
+function loadAccessControl(){
+  try {
+    const raw = localStorage.getItem(ACCESS_CONTROL_KEY);
+    if(raw) return sanitizeAccessControl(JSON.parse(raw));
+  } catch(e) { console.warn('Access control local:', e); }
+  return sanitizeAccessControl(ACCESS_CONTROL_DEFAULT);
+}
+function saveAccessControlLocal(){
+  ACCESS_CONTROL = sanitizeAccessControl(ACCESS_CONTROL);
+  localStorage.setItem(ACCESS_CONTROL_KEY, JSON.stringify(ACCESS_CONTROL));
+}
+function getUserEmail(){ return normalizeEmail(_user && _user.email); }
+function hasAdminAccess(email){ return ACCESS_CONTROL.admins.includes(normalizeEmail(email||getUserEmail())); }
+function hasEditAccess(email){ const em = normalizeEmail(email||getUserEmail()); return hasAdminAccess(em) || ACCESS_CONTROL.editors.includes(em); }
+function hasViewAccess(email){ const em = normalizeEmail(email||getUserEmail()); return hasEditAccess(em) || ACCESS_CONTROL.viewers.includes(em); }
+function getCurrentRole(email){ const em = normalizeEmail(email||getUserEmail()); if(hasAdminAccess(em)) return 'admin'; if(ACCESS_CONTROL.editors.includes(em)) return 'editor'; if(ACCESS_CONTROL.viewers.includes(em)) return 'viewer'; return 'blocked'; }
+function roleBadge(role){ if(role==='admin') return '<span class="admin-badge">ADMIN</span>'; if(role==='editor') return '<span class="editor-badge">EDITOR</span>'; if(role==='viewer') return '<span class="viewer-badge">VIEW</span>'; return ''; }
+function updateUserUI(){
+  const sbSt = document.getElementById('sb-status');
+  const ui = document.getElementById('user-info');
+  const av = document.getElementById('user-av');
+  const name = document.getElementById('user-name');
+  const email = getUserEmail();
+  const role = getCurrentRole();
+  if(!email){
+    if(sbSt) sbSt.textContent = '🔒 login necessário';
+    if(ui) ui.style.display = 'none';
+    return;
+  }
+  if(sbSt) sbSt.textContent = (hasViewAccess(email) ? '🟢 ' : '🔴 ') + email.split('@')[0];
+  if(av) av.textContent = email.charAt(0).toUpperCase();
+  if(name) name.innerHTML = email.split('@')[0] + ' ' + roleBadge(role);
+  if(ui) ui.style.display = 'flex';
+}
+function updateAccessStatusBox(){
+  const box = document.getElementById('access-status-box');
+  if(!box) return;
+  if(!_user || !_user.email) { box.textContent = 'Nenhum usuário autenticado.'; return; }
+  const role = getCurrentRole();
+  const labels = {admin:'Administrador',editor:'Editor',viewer:'Visualizador',blocked:'Sem autorização'};
+  box.textContent = 'Usuário atual: ' + _user.email + ' — perfil: ' + (labels[role] || role);
+}
+function applyAccessState(){
+  const canView = hasViewAccess();
+  const canEdit = hasEditAccess();
+  _isAdmin = hasAdminAccess();
+  document.body.classList.toggle('is-admin', _isAdmin);
+  document.body.classList.toggle('non-admin', !_isAdmin);
+  document.body.classList.toggle('read-only', canView && !canEdit);
+  document.body.classList.toggle('blocked-user', !!_user && !canView);
+  updateUserUI();
+  updateAccessStatusBox();
+}
+function showStep(n){
+  document.querySelectorAll('.auth-step').forEach(el => el.classList.remove('on'));
+  const target = document.getElementById('auth-s'+n);
+  if(target) target.classList.add('on');
+}
+function setAuthMessage(msg, ok){
+  const el = document.getElementById('auth-msg');
+  if(!el) return;
+  el.textContent = msg || '';
+  el.className = 'auth-msg ' + (ok ? 'auth-ok' : 'auth-err');
+}
+function showSetup(){
+  const s = document.getElementById('setup-screen');
+  if(s) s.classList.add('show');
+}
+function showAuth(message){
+  const s = document.getElementById('setup-screen');
+  const a = document.getElementById('auth-screen');
+  if(s) s.classList.remove('show');
+  if(a) a.classList.add('show');
+  showStep(1);
+  if(message) setAuthMessage(message, false);
+}
+function showApp(){
+  const s = document.getElementById('setup-screen');
+  const a = document.getElementById('auth-screen');
+  if(s) s.classList.remove('show');
+  if(a) a.classList.remove('show');
+}
+async function ensureSupabaseClient(){
+  if(!window.supabase){
+    await new Promise((res,rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  if(!_sb) _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  return _sb;
+}
+async function saveConfig(){
+  try{
+    const msg = document.getElementById('cfg-msg');
+    if(msg){ msg.textContent = 'Conectando...'; msg.className = 'auth-msg'; }
+    await ensureSupabaseClient();
+    if(msg){ msg.textContent = 'Conectado. Faça login com seu e-mail corporativo.'; msg.className = 'auth-msg auth-ok'; }
+    showAuth();
+  }catch(e){
+    const msg = document.getElementById('cfg-msg');
+    if(msg){ msg.textContent = 'Falha ao conectar: ' + e.message; msg.className = 'auth-msg auth-err'; }
+  }
+}
+async function doMagicLink(){
+  try{
+    const email = normalizeEmail(document.getElementById('auth-email').value);
+    if(!email){ setAuthMessage('Informe um e-mail corporativo válido.', false); return; }
+    if(!hasViewAccess(email)) { setAuthMessage('Este e-mail não está autorizado para acessar o sistema.', false); return; }
+    const btn = document.getElementById('auth-btn');
+    if(btn) btn.disabled = true;
+    setAuthMessage('Enviando link de acesso...', true);
+    await ensureSupabaseClient();
+    const { error } = await _sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: window.location.href } });
+    if(error) throw error;
+    const lbl = document.getElementById('auth-email-lbl');
+    if(lbl) lbl.textContent = email;
+    showStep(2);
+    setAuthMessage('', true);
+  } catch(e){
+    setAuthMessage('Não foi possível enviar o link: ' + e.message, false);
+  } finally {
+    const btn = document.getElementById('auth-btn');
+    if(btn) btn.disabled = false;
+  }
+}
+function bootSupabase(){ return initSupabase(); }
+async function loadAccessControlFromSupabase(){
+  if(!_sb) return false;
+  try{
+    const { data, error } = await _sb.from('app_settings').select('value').eq('key','access_control').maybeSingle();
+    if(error) throw error;
+    if(data && data.value){ ACCESS_CONTROL = sanitizeAccessControl(data.value); saveAccessControlLocal(); return true; }
+  } catch(e){ console.warn('Access control Supabase:', e.message || e); }
+  return false;
+}
+async function saveAccessControl(showOk){
+  if(!hasAdminAccess()) { alert('⛔ Apenas o administrador pode alterar a lista de acessos.'); return false; }
+  saveAccessControlLocal();
+  renderAccessLists();
+  applyAccessState();
+  if(_sb){
+    try{
+      const row = { key:'access_control', value:ACCESS_CONTROL, updated_at:new Date().toISOString(), updated_by:getUserEmail()||'sistema' };
+      const { error } = await _sb.from('app_settings').upsert(row, { onConflict:'key' });
+      if(error) throw error;
+    } catch(e){ console.warn('Access control save:', e.message || e); }
+  }
+  if(showOk) alert('Lista de acessos atualizada com sucesso.');
+  return true;
+}
+function renderRoleList(containerId, role){
+  const box = document.getElementById(containerId);
+  if(!box) return;
+  const roleMap = {admins:'admin', editors:'editors', viewers:'viewers'};
+  const key = roleMap[role] || role;
+  const arr = ACCESS_CONTROL[key] || [];
+  box.innerHTML = arr.map(email => {
+    const canRemove = key !== 'admins' || ACCESS_CONTROL.admins.length > 1;
+    return '<span class="access-pill">'+email+(hasAdminAccess() && canRemove ? '<button type="button" onclick="removeAccessEmail(\''+key+'\',\''+email+'\')">remover</button>' : '')+'</span>';
+  }).join('') || '<span class="access-note">Nenhum e-mail cadastrado.</span>';
+}
+function renderAccessLists(){
+  renderRoleList('admin-list','admins');
+  renderRoleList('editor-list','editors');
+  renderRoleList('viewer-list','viewers');
+  updateAccessStatusBox();
+}
+function openAccessModal(){
+  if(!hasAdminAccess()) { alert('⛔ Apenas o administrador pode gerenciar os acessos.'); return; }
+  renderAccessLists();
+  const modal = document.getElementById('access-modal');
+  if(modal) modal.classList.add('show');
+}
+function closeAccessModal(){ const modal = document.getElementById('access-modal'); if(modal) modal.classList.remove('show'); }
+function moveEmailBetweenRoles(email, targetRole){
+  const em = normalizeEmail(email);
+  ACCESS_CONTROL.admins = ACCESS_CONTROL.admins.filter(x => x !== em);
+  ACCESS_CONTROL.editors = ACCESS_CONTROL.editors.filter(x => x !== em);
+  ACCESS_CONTROL.viewers = ACCESS_CONTROL.viewers.filter(x => x !== em);
+  ACCESS_CONTROL[targetRole].push(em);
+  ACCESS_CONTROL = sanitizeAccessControl(ACCESS_CONTROL);
+}
+function addAccessEmail(role){
+  if(!hasAdminAccess()) { alert('⛔ Apenas o administrador pode alterar a lista de acessos.'); return; }
+  const inputId = role === 'editors' ? 'editor-email-input' : 'viewer-email-input';
+  const input = document.getElementById(inputId);
+  const email = normalizeEmail(input && input.value);
+  if(!email){ alert('Informe um e-mail válido.'); return; }
+  moveEmailBetweenRoles(email, role);
+  if(input) input.value = '';
+  saveAccessControl(false);
+}
+function removeAccessEmail(role, email){
+  if(!hasAdminAccess()) { alert('⛔ Apenas o administrador pode alterar a lista de acessos.'); return; }
+  const em = normalizeEmail(email);
+  if(role === 'admins' && ACCESS_CONTROL.admins.length <= 1){ alert('É necessário manter pelo menos um administrador.'); return; }
+  ACCESS_CONTROL[role] = (ACCESS_CONTROL[role] || []).filter(x => x !== em);
+  saveAccessControl(false);
+}
+function guardEdit(actionLabel){
+  if(!hasEditAccess()){
+    alert('⛔ Seu perfil está em modo somente visualização. Esta ação de ' + (actionLabel || 'edição') + ' está bloqueada.');
+    return false;
+  }
+  return true;
+}
+function checkAdminOrBlock() {
+  if(!hasAdminAccess()) {
+    alert('⛔ Apenas o administrador pode excluir registros ou alterar acessos críticos.');
+    return false;
+  }
+  return true;
+}
+function setCurrentUser(user){
+  _user = user || null;
+  applyAccessState();
+  if(_user && hasViewAccess()) showApp();
+  else if(_user && !hasViewAccess()) showAuth('Este e-mail não está autorizado para acessar o sistema.');
+}
 async function initSupabase() {
   try {
-    if(!window.supabase) {
-      await new Promise((res,rej) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-        s.onload = res; s.onerror = rej;
-        document.head.appendChild(s);
-      });
-    }
-    _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    await ensureSupabaseClient();
+    await loadAccessControlFromSupabase();
     const {data:{session}} = await _sb.auth.getSession();
-    if(session) {
-      _user = session.user;
-      _isAdmin = (_user.email === 'geraldo.issa@lafaete.com.br');
-      localStorage.setItem('siog_is_admin', _isAdmin ? 'true' : 'false');
-      if(_isAdmin) { document.body.classList.add('is-admin'); document.body.classList.remove('non-admin'); }
-      else { document.body.classList.add('non-admin'); document.body.classList.remove('is-admin'); }
-      const sbSt = document.getElementById('sb-status');
-      if(sbSt) sbSt.textContent = '🟢 ' + _user.email.split('@')[0];
-      const ui = document.getElementById('user-info');
-      if(ui) { ui.innerHTML = '<span style="font-size:12px;color:var(--tx2)">' + _user.email.split('@')[0] + (_isAdmin?' <b style=color:var(--or)>ADMIN</b>':'') + '</span><button onclick="doSignOut()" style="background:none;border:none;color:var(--tx3);cursor:pointer;font-size:11px">✕</button>'; ui.style.display='flex'; }
-    }
+    if(session) setCurrentUser(session.user);
+    else { _user = null; applyAccessState(); showAuth(); }
     _sb.auth.onAuthStateChange((event, session) => {
-      if(event==='SIGNED_IN' && session) {
-        _user = session.user;
-        _isAdmin = (_user.email === 'geraldo.issa@lafaete.com.br');
-        localStorage.setItem('siog_is_admin', _isAdmin ? 'true' : 'false');
-        if(_isAdmin) { document.body.classList.add('is-admin'); document.body.classList.remove('non-admin'); }
-        else { document.body.classList.add('non-admin'); document.body.classList.remove('is-admin'); }
-        // Don't sync FROM Supabase - use localStorage as source of truth
-        pushLocalDataToSupabase();
-        renderDashboard(); renderProjetos(); updateBadges(); populateAllSelects();
+      if(event === 'SIGNED_IN' && session) {
+        setCurrentUser(session.user);
+        if(hasViewAccess()) {
+          pushLocalDataToSupabase();
+          renderDashboard(); renderProjetos(); updateBadges(); populateAllSelects();
+        }
+      }
+      if(event === 'SIGNED_OUT') {
+        _user = null; _isAdmin = false; applyAccessState(); showAuth();
       }
     });
-    // ARQUITETURA: localStorage = fonte da verdade, Supabase = backup
-    // NUNCA sobrescrever dados locais com dados do Supabase automaticamente
-    // Isso garante que edições do usuário SEMPRE persistem
-    // Push para Supabase em background (para multi-device futuro)
-    await pushLocalDataToSupabase();
-    console.log('✅ SIOG Supabase backup conectado. P='+PROJETOS.length+' R='+RDO.length);
-  } catch(e) { console.warn('Supabase error:', e.message); }
+    if(session && hasViewAccess()) {
+      await pushLocalDataToSupabase();
+      console.log('✅ SIOG Supabase backup conectado. P='+PROJETOS.length+' R='+RDO.length);
+    }
+  } catch(e) {
+    console.warn('Supabase error:', e.message);
+    showAuth('Não foi possível conectar ao serviço de autenticação.');
+  }
 }
-
-async function doSignOut() { if(_sb) await _sb.auth.signOut(); _user=null; _isAdmin=false; localStorage.removeItem('siog_is_admin'); document.body.classList.add('non-admin'); }
-function showSetup(){} function showAuth(){} function showApp(){} function showStep(n){} function saveConfig(){} function bootSupabase(){ return initSupabase(); }
+async function doSignOut() {
+  if(_sb) await _sb.auth.signOut();
+  _user = null;
+  _isAdmin = false;
+  applyAccessState();
+  showAuth();
+}
 
 async function syncFromSupabase() {
   if(!_sb) return;
@@ -6864,6 +7160,29 @@ async function pushLocalDataToSupabase(){
     if(ind){clearTimeout(ind._t);ind._t=setTimeout(()=>{ind.style.opacity='0';},3000);}
   }catch(e){console.warn('Push error:',e);}
 }
+function installAccessGuards(){
+  const guarded = ['saveProjeto','saveRDO','saveGarantias','saveMed','delMed','saveSat','delSat','saveObs','delObs','saveCrono','savePesquisa','saveSatisfacao','clearStorage','importBackup'];
+  guarded.forEach(name => {
+    const original = window[name];
+    if(typeof original !== 'function' || original.__guarded) return;
+    const wrapped = function(...args){ if(!guardEdit(name)) return; return original.apply(this,args); };
+    wrapped.__guarded = true;
+    window[name] = wrapped;
+  });
+  document.addEventListener('click', function(e){
+    if(hasEditAccess()) return;
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const txt = ((btn.textContent||'') + ' ' + (btn.getAttribute('title')||'') + ' ' + (btn.getAttribute('onclick')||'')).toLowerCase();
+    const protectedAction = /(novo|editar|salvar|lançar|lancar|excluir|remover|apagar|restaurar|resetar|import|backup|adicionar|delet|save)/.test(txt);
+    if(protectedAction && !/theme|print|showmodule|toggle(sidebar|theme)|closeaccessmodal|dosignout|openaccessmodal/.test(txt)){
+      e.preventDefault();
+      e.stopPropagation();
+      guardEdit('alteração');
+    }
+  }, true);
+}
+
 // ── INIT ─────────────────────────────────────────────────
 window.addEventListener('load', () => {
   // Step 1: Try localStorage; if absent/corrupt, keep embedded Excel seed data
@@ -6872,6 +7191,10 @@ window.addEventListener('load', () => {
   if(!loaded) {
     try { saveToStorage(); } catch(e) { console.warn('Initial seed save error:', e); }
   }
+
+  installAccessGuards();
+  renderAccessLists();
+  applyAccessState();
 
   // Step 2: Render data from current in-memory arrays
   try { renderProjetos(); } catch(e) { console.warn('Render projetos:', e); }
