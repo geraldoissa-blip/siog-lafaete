@@ -6823,16 +6823,25 @@ async function saveConfig(){
     if(msg){ msg.textContent = 'Falha ao conectar: ' + e.message; msg.className = 'auth-msg auth-err'; }
   }
 }
+function getMagicLinkRedirectUrl(){
+  if(window.location.protocol === 'file:') return null;
+  return window.location.origin + window.location.pathname;
+}
 async function doMagicLink(){
   try{
     const email = normalizeEmail(document.getElementById('auth-email').value);
     if(!email){ setAuthMessage('Informe um e-mail corporativo válido.', false); return; }
     if(!hasViewAccess(email)) { setAuthMessage('Este e-mail não está autorizado para acessar o sistema.', false); return; }
+    const redirectUrl = getMagicLinkRedirectUrl();
+    if(!redirectUrl){
+      setAuthMessage('Este login não funciona em arquivo baixado no computador. Abra o sistema pelo link publicado no Netlify para receber o acesso corretamente.', false);
+      return;
+    }
     const btn = document.getElementById('auth-btn');
     if(btn) btn.disabled = true;
     setAuthMessage('Enviando link de acesso...', true);
     await ensureSupabaseClient();
-    const { error } = await _sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: window.location.href } });
+    const { error } = await _sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: redirectUrl } });
     if(error) throw error;
     const lbl = document.getElementById('auth-email-lbl');
     if(lbl) lbl.textContent = email;
