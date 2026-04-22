@@ -656,19 +656,19 @@ textarea{resize:vertical;min-height:68px}
     <div style="margin-bottom:12px">
       <label style="font-size:12px;font-weight:600;color:var(--tx2);display:block;margin-bottom:8px">Módulos a incluir</label>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-crono" checked style="width:auto"> Cronograma</label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-rdo" checked style="width:auto"> RDO</label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-docs" checked style="width:auto"> Documentação</label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-med" checked style="width:auto"> Medições</label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-sat" checked style="width:auto"> Satisfação</label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-obs" checked style="width:auto"> Comentários</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-crono" checked style="width:auto" onchange="try{if((document.getElementById('rel-preview')?.innerHTML||'').trim())gerarRelatorio();}catch(e){}"> Cronograma</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-rdo" checked style="width:auto" onchange="try{if((document.getElementById('rel-preview')?.innerHTML||'').trim())gerarRelatorio();}catch(e){}"> RDO</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-docs" checked style="width:auto" onchange="try{if((document.getElementById('rel-preview')?.innerHTML||'').trim())gerarRelatorio();}catch(e){}"> Documentação</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-med" checked style="width:auto" onchange="try{if((document.getElementById('rel-preview')?.innerHTML||'').trim())gerarRelatorio();}catch(e){}"> Medições</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-sat" checked style="width:auto" onchange="try{if((document.getElementById('rel-preview')?.innerHTML||'').trim())gerarRelatorio();}catch(e){}"> Satisfação</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-obs" checked style="width:auto" onchange="try{if((document.getElementById('rel-preview')?.innerHTML||'').trim())gerarRelatorio();}catch(e){}"> Comentários</label>
       </div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-or" onclick="gerarRelatorio()">👁 Visualizar</button>
       <button class="btn btn-g" onclick="exportarPDF()">⬇ PDF</button>
       <button class="btn btn-bl" onclick="exportarPPTX()">📊 PowerPoint</button>
-      <button class="btn" onclick="window.print()">🖨 Imprimir</button>
+      <button class="btn" onclick="printReportPreview()">🖨 Imprimir</button>
     </div>
   </div>
   <div id="rel-preview"></div>
@@ -6103,6 +6103,46 @@ function initRelatorio(){
   const fri=new Date(d);fri.setDate(d.getDate()-diff);
   document.getElementById('rel-corte').value=fri.toISOString().slice(0,10);
 }
+
+function getSelectedReportModules(){
+  return {
+    crono: !!document.getElementById('ri-crono')?.checked,
+    rdo: !!document.getElementById('ri-rdo')?.checked,
+    docs: !!document.getElementById('ri-docs')?.checked,
+    med: !!document.getElementById('ri-med')?.checked,
+    sat: !!document.getElementById('ri-sat')?.checked,
+    obs: !!document.getElementById('ri-obs')?.checked,
+  };
+}
+function wrapReportSection(code,title,content){
+  return `<section class="report-section" data-code="${code}" data-title="${title}" style="background:#111;border-bottom:1px solid #333">${content}</section>`;
+}
+function getReportHeaderMeta(){
+  return {
+    semana: document.getElementById('rel-semana')?.value||'Relatório',
+    corte: document.getElementById('rel-corte')?.value ? new Date(document.getElementById('rel-corte').value).toLocaleDateString('pt-BR') : '—',
+    emissor: document.getElementById('rel-emissor')?.value||'Diretoria de Projetos Especiais',
+    emissao: new Date().toLocaleDateString('pt-BR')
+  };
+}
+function buildPrintHtmlFromPreview(){
+  const report=document.getElementById('report-content');
+  if(!report) return '';
+  const meta=getReportHeaderMeta();
+  const sections=[...report.querySelectorAll('.report-section')];
+  const pages=sections.map(sec=>`<div class="print-page"><div class="print-hdr"><div><div class="tag">${sec.dataset.title||'Relatório'}</div><div class="sub">${meta.semana} · Corte: ${meta.corte}</div></div><div class="rhs"><div>${meta.emissor}</div><div>Emissão: ${meta.emissao}</div></div></div><div class="print-body">${sec.innerHTML}</div></div>`).join('');
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${meta.semana}</title><style>
+  @page{size:A4 landscape;margin:10mm;} body{font-family:Arial,sans-serif;background:#fff;color:#111;margin:0} .print-page{page-break-after:always;} .print-page:last-child{page-break-after:auto} .print-hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #E87722;padding-bottom:8px;margin-bottom:10px} .tag{font-size:16px;font-weight:800;color:#E87722}.sub,.rhs{font-size:11px;color:#555}.print-body{zoom:.92} table{width:100%!important;border-collapse:collapse} th,td{page-break-inside:avoid} .print-body *{background-image:none!important;box-shadow:none!important} .print-body div[style*="background:#111"],.print-body div[style*="background:#1a1a1a"]{background:#fff!important;color:#111!important}.print-body td,.print-body th,.print-body div,.print-body span{color:#111!important} .print-body th{font-size:9px!important;background:#f3f3f3!important;color:#555!important;border-bottom:1px solid #ccc!important} .print-body td{font-size:10px!important;border-bottom:1px solid #ddd!important} </style></head><body>${pages}</body></html>`;
+}
+function printReportPreview(){
+  const html=buildPrintHtmlFromPreview();
+  if(!html){alert('Clique em "Visualizar" primeiro.');return;}
+  const w=window.open('','_blank');
+  if(!w){alert('Não foi possível abrir a janela de impressão.');return;}
+  w.document.open(); w.document.write(html); w.document.close();
+  w.focus(); setTimeout(()=>w.print(),400);
+}
+
 function gerarRelatorio(){
   const semana=document.getElementById('rel-semana').value;
   const corte=new Date(document.getElementById('rel-corte').value).toLocaleDateString('pt-BR');
@@ -6133,7 +6173,7 @@ function gerarRelatorio(){
   </div>`;
 
   if(document.getElementById('ri-rdo').checked){
-    html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+    html+=wrapReportSection('rdo','RDO — Status das Obras',`<div style="padding:16px 28px">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">RDO</span>Status das Obras</div>
     <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a1a1a">
       ${['ID','Obra','Última Atualiz.','⬤','Enviado','⬤','Assinado','⬤','Responsável','Modelo','Status'].map(TH).join('')}
@@ -6154,7 +6194,7 @@ function gerarRelatorio(){
       const a=fd(r.atualizacao),e=fd(r.enviado),s=fdAssinado(r);
       return`<tr style="border-bottom:1px solid #222">${TD(r.id,'color:#d7d7d7;font-family:monospace;font-size:10px;font-weight:600')}${TD(r.obra,'font-weight:800;color:#ffffff') }<td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${a.txt}</td><td style="padding:6px 10px;text-align:center">${a.dot}</td><td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${e.txt}</td><td style="padding:6px 10px;text-align:center">${e.dot}</td><td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${s.txt}</td><td style="padding:6px 10px;text-align:center">${s.dot}</td>${TD(r.resp||'—','color:#e2e2e2')}${TD(r.modelo||'—','color:#e2e2e2')}<td style="padding:6px 10px;color:${c};font-weight:800">${st}</td></tr>`;
     }).join('')}
-    </tbody></table></div>`;
+    </tbody></table></div>`);
   }
 
   if(document.getElementById('ri-docs').checked){
@@ -6162,7 +6202,7 @@ function gerarRelatorio(){
     const artsEmit=DOCUMENTACAO.filter(d=>d.art_st==='Emitida').length;
     const ctosVenc=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0&&d.status==='Ativo').length;
     const ctosOk=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)>=0&&d.status==='Ativo').length;
-    html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+    html+=wrapReportSection('docs','Documentação — Seguros, ARTs e Conformidade',`<div style="padding:16px 28px">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">DOCUMENTAÇÃO</span>Seguros, ARTs e Conformidade</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
       ${[['#4a9eff','Cadastrados',DOCUMENTACAO.length],['#ff6b6b','Pendências',docsPend],['#48c774','ARTs Emitidas',artsEmit],['#ff6b6b','Contratos Vencidos',ctosVenc]].map(([c,l,v])=>`<div style="background:#1a1a1a;border-radius:8px;padding:12px;border-top:3px solid ${c}"><div style="font-size:10px;color:#888;text-transform:uppercase">${l}</div><div style="font-size:22px;font-weight:700;color:${c};margin-top:4px">${v}</div></div>`).join('')}
@@ -6170,7 +6210,7 @@ function gerarRelatorio(){
     <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a1a1a">
       ${['ID','Obra','Status','ART','Seg./Gar.','Crono.','Chk.Int','Chk.Ext','Termo','Atestado','Vigência Cto.','Dias'].map(h=>`<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #333;color:#888;font-size:9px;text-transform:uppercase;white-space:nowrap">${h}</th>`).join('')}
     </tr></thead><tbody>
-    ${(()=>{function fSt(s){if(!s||s==='-'||s==='N/A')return'<span style=\"color:#555\">N/A</span>';if(s==='Pendente')return'<span style=\"color:#ff6b6b;font-weight:700\">Pend.</span>';if(s==='Contratado'||s==='Emitida'||s==='Concluído'||s==='Assinado')return'<span style=\"color:#48c774\">✓</span>';return'<span style=\"color:#ffc107\">'+s+'</span>';}
+    ${document.getElementById('ri-docs').checked?(()=>{function fSt(s){if(!s||s==='-'||s==='N/A')return'<span style=\"color:#555\">N/A</span>';if(s==='Pendente')return'<span style=\"color:#ff6b6b;font-weight:700\">Pend.</span>';if(s==='Contratado'||s==='Emitida'||s==='Concluído'||s==='Assinado')return'<span style=\"color:#48c774\">✓</span>';return'<span style=\"color:#ffc107\">'+s+'</span>';}
       return DOCUMENTACAO.filter(d=>d.status==='Ativo').map(d=>{
         const dias=d.vig_cto?daysFromToday(d.vig_cto):null;
         const dC=dias===null?'#888':dias<0?'#ff6b6b':dias<=30?'#ffc107':'#48c774';
@@ -6193,11 +6233,11 @@ function gerarRelatorio(){
           +'<td style="padding:4px 8px;color:'+dC+';font-weight:700">'+dT+'</td>'
           +'</tr>';
       }).join('');})()}
-    </tbody></table></div>`;
+    </tbody></table></div>`);
   }
   if(document.getElementById('ri-crono').checked){
     const noPrazo=PROJETOS.filter(p=>cronoFarol(p)==='g').length;
-    html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+    html+=wrapReportSection('crono','Cronograma — Prazos, Tendências e Avanços',`<div style="padding:16px 28px">
     <div style="display:grid;grid-template-columns:1fr 400px;gap:16px">
       <div>
         <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:8px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">CRONOGRAMA</span>Prazos, Tendências e Avanços
@@ -6223,13 +6263,13 @@ function gerarRelatorio(){
             <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap">${o.texto}</div>
           </div>`).join('')}
       </div>
-    </div></div>`;
+    </div></div>`);
   }
 
   if(document.getElementById('ri-med').checked){
     const c2=getMedCons();
     const tots=c2.reduce((s,m)=>({c:s.c+(m.contrato||0),m:s.m+m.med,f:s.f+m.fat,r:s.r+m.rec,nv:s.nv+m.nfv,ar:s.ar+m.ar}),{c:0,m:0,f:0,r:0,nv:0,ar:0});
-    html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+    html+=wrapReportSection('med','Financeiro — Medições, Faturamentos e Recebimentos',`<div style="padding:16px 28px">
     <div style="display:grid;grid-template-columns:1fr 340px;gap:16px">
       <div>
         <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:10px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">FINANCEIRO</span>Medições, Faturamentos e Recebimentos</div>
@@ -6253,12 +6293,12 @@ function gerarRelatorio(){
             <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap">${o.texto}</div>
           </div>`).join('')}
       </div>
-    </div></div>`;
+    </div></div>`);
   }
 
   if(document.getElementById('ri-sat').checked){
     const satToShow=PESQUISAS.filter(p=>p.incl_rel);
-    html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+    html+=wrapReportSection('sat','Satisfação — Avaliação de Satisfação',`<div style="padding:16px 28px">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">SATISFAÇÃO</span>Avaliação de Satisfação</div>
     <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a1a1a">
       ${['Data','ID','Cliente','Geral','Comentário / Dimensões'].map(TH).join('')}
@@ -6267,13 +6307,13 @@ function gerarRelatorio(){
       const comment=satComentarioHtml(p,true);
       return`<tr style="border-bottom:1px solid #222">${TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#e0e0e0;font-weight:600')}${TD(p.id,'color:#c8c8c8;font-family:monospace;font-size:10px')}${TD(p.cliente,'font-weight:700;color:#f3f3f3')}<td style="padding:6px 10px;color:${c};font-weight:700">${f.e} ${f.l}</td><td style="padding:6px 10px;color:#d8d8d8;max-width:300px;font-size:11px">${comment}</td></tr>`;
     }).join('')}
-    </tbody></table></div>`;
+    </tbody></table></div>`);
   }
 
   if(document.getElementById('ri-obs').checked){
     const obs16=OBSERVACOES.filter(o=>o.semana===16);
     if(obs16.length){
-      html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+      html+=wrapReportSection('obs','Comentários — Observações e Destaques',`<div style="padding:16px 28px">
       <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:14px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">COMENTÁRIOS</span>Observações e Destaques</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
         ${obs16.map(o=>{const corBd=o.cor==='g'?'#28c76f':o.cor==='y'?'#ffc107':o.cor==='r'?'#ea5455':'#444';
@@ -6281,43 +6321,58 @@ function gerarRelatorio(){
             <div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:6px">${o.obra?o.obra+' — ':''}${o.titulo||'Comentário Geral'}</div>
             <div style="font-size:11px;color:#b0b0b0;line-height:1.7;white-space:pre-wrap">${o.texto}</div>
           </div>`;}).join('')}
-      </div></div>`;
+      </div></div>`);
     }
   }
 
   html+=`<div style="background:#1a1a1a;padding:12px 28px;text-align:center;font-size:11px;color:#555;border-top:1px solid #333">SIOG — Grupo Lafaete · ${semana} · Emissão: ${now}</div></div>`;
-  document.getElementById('rel-preview').innerHTML=`<div class="card" style="padding:0;overflow:hidden">${html}</div>`;
+  document.getElementById('rel-preview').innerHTML=`<div style="display:flex;justify-content:flex-end;gap:8px;margin:0 0 10px 0"><button class="btn btn-g" onclick="exportarPDF()">⬇ PDF da visualização</button><button class="btn" onclick="printReportPreview()">🖨 Imprimir visualização</button></div><div class="card" style="padding:0;overflow:hidden">${html}</div>`;
 }
 
+
 function exportarPDF(){
-  const el=document.getElementById('report-content');
-  if(!el){alert('Clique em "Visualizar" primeiro.');return;}
-  if(typeof html2canvas==='undefined'||typeof window.jspdf==='undefined'){window.print();return;}
+  const report=document.getElementById('report-content');
+  if(!report){alert('Clique em "Visualizar" primeiro.');return;}
+  if(typeof html2canvas==='undefined'||typeof window.jspdf==='undefined'){printReportPreview();return;}
+  const sections=[...report.querySelectorAll('.report-section')];
+  if(!sections.length){alert('Selecione ao menos um módulo para exportar.');return;}
+  const meta=getReportHeaderMeta();
   const {jsPDF}=window.jspdf;
-  const A4_W=210, A4_H=297, MARGIN=8; // mm, portrait A4
+  const pdf=new jsPDF('l','mm','a4');
+  const PAGE_W=297, PAGE_H=210, MARGIN=8, HEADER_H=18, FOOT_H=8;
+  const usableW=PAGE_W-(MARGIN*2), usableH=PAGE_H-(MARGIN*2)-HEADER_H-FOOT_H;
   const pxPerMm=3.7795;
-  const contentWidthPx=(A4_W-MARGIN*2)*pxPerMm;
-  html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true,width:el.scrollWidth,windowWidth:el.scrollWidth}).then(canvas=>{
-    const pdf=new jsPDF('p','mm','a4');
-    const imgW=A4_W-MARGIN*2;
-    const imgH=canvas.height*imgW/canvas.width;
-    const pageContentH=A4_H-MARGIN*2;
-    const pagesNeeded=Math.ceil(imgH/pageContentH);
-    for(let pg=0;pg<pagesNeeded;pg++){
-      if(pg>0)pdf.addPage();
-      const srcY=pg*(canvas.height/pagesNeeded);
-      const srcH=canvas.height/pagesNeeded;
-      const c2=document.createElement('canvas');
-      c2.width=canvas.width;c2.height=Math.ceil(srcH);
-      c2.getContext('2d').drawImage(canvas,0,srcY,canvas.width,srcH,0,0,canvas.width,Math.ceil(srcH));
-      pdf.addImage(c2.toDataURL('image/jpeg',0.92),'JPEG',MARGIN,MARGIN,imgW,pageContentH);
-      // Page number
-      pdf.setFontSize(8);pdf.setTextColor(150);
-      pdf.text(`${pg+1} / ${pagesNeeded}`,A4_W-MARGIN,A4_H-3,'right');
-    }
-    const semana=(document.getElementById('rel-semana')?.value||'relatorio').replace(/\s+/g,'-');
+  const tasks=sections.map(sec=>html2canvas(sec,{scale:2,backgroundColor:'#ffffff',useCORS:true,width:sec.scrollWidth,windowWidth:sec.scrollWidth}));
+  Promise.all(tasks).then(canvases=>{
+    let pageNum=0;
+    canvases.forEach((canvas,idx)=>{
+      const title=sections[idx].dataset.title||'Relatório';
+      const imgW=usableW;
+      const imgH=canvas.height*imgW/canvas.width;
+      const pages=Math.max(1,Math.ceil(imgH/usableH));
+      for(let pg=0; pg<pages; pg++){
+        if(pageNum>0) pdf.addPage('a4','l');
+        pageNum++;
+        pdf.setFillColor(26,26,26); pdf.rect(0,0,PAGE_W,HEADER_H+MARGIN,'F');
+        pdf.setTextColor(232,119,34); pdf.setFont('helvetica','bold'); pdf.setFontSize(14);
+        pdf.text(meta.semana, MARGIN, 10);
+        pdf.setTextColor(255,255,255); pdf.setFontSize(11); pdf.text(title, MARGIN, 17);
+        pdf.setTextColor(120); pdf.setFont('helvetica','normal'); pdf.setFontSize(9);
+        pdf.text(`Corte: ${meta.corte} · Emissão: ${meta.emissao}`, PAGE_W-MARGIN, 10, {align:'right'});
+        pdf.text(meta.emissor, PAGE_W-MARGIN, 17, {align:'right'});
+        const srcY=pg*(canvas.height/pages);
+        const srcH=canvas.height/pages;
+        const c2=document.createElement('canvas');
+        c2.width=canvas.width; c2.height=Math.ceil(srcH);
+        c2.getContext('2d').drawImage(canvas,0,srcY,canvas.width,srcH,0,0,canvas.width,Math.ceil(srcH));
+        pdf.addImage(c2.toDataURL('image/jpeg',0.95),'JPEG',MARGIN,MARGIN+HEADER_H,imgW,usableH);
+        pdf.setTextColor(140); pdf.setFontSize(8);
+        pdf.text(`${pageNum}`, PAGE_W-MARGIN, PAGE_H-3, {align:'right'});
+      }
+    });
+    const semana=(meta.semana||'relatorio').replace(/\s+/g,'-');
     pdf.save(`Relatorio-GrupoLafaete-${semana}.pdf`);
-  });
+  }).catch(err=>{console.error(err); alert('Não foi possível gerar o PDF.');});
 }
 
 function exportarPPTX(){
@@ -6456,7 +6511,7 @@ function exportarPPTX(){
   </div>
 
   <!-- RDO -->
-  ${SLIDE('RDO — STATUS DAS OBRAS','Relatório Diário de Obra — '+semana,`
+  ${document.getElementById('ri-rdo').checked?SLIDE('RDO — STATUS DAS OBRAS','Relatório Diário de Obra — '+semana,`
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
       ${S(BL,'Total em Campo',RDO.length)}${S(G,'✅ Atualizadas',RDO.filter(r=>getRdoStatus(r)==='Atualizado').length,'≤7 dias')}${S(R,'⚠ Pendentes',RDO.filter(r=>getRdoStatus(r)==='Pendente').length,'>7 dias')}${S(Y,'Não Iniciadas',RDO.filter(r=>getRdoStatus(r)==='Não Iniciado').length)}
     </div>
@@ -6466,10 +6521,10 @@ function exportarPPTX(){
       const a=fd(r.atualizacao),e=fd(r.enviado),s=fd(r.assinado);
       return`<tr><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;font-family:monospace;color:#888">${r.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${r.obra}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${a.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${a.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${e.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${e.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${s.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${s.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${r.resp||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${r.modelo||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:${cl};font-weight:700">${st}</td></tr>`;}).join('')}
     </tbody></table>
-  `)}
+  `):''}
 
   <!-- CRONOGRAMA -->
-  ${SLIDE('CRONOGRAMA, PRAZOS E AVANÇOS','',`
+  ${document.getElementById('ri-crono').checked?SLIDE('CRONOGRAMA, PRAZOS E AVANÇOS','',`
     <div style="display:grid;grid-template-columns:1fr 320px;gap:16px">
       <div>
         <div style="margin-bottom:8px;font-size:11px"><span style="color:${G};font-weight:600">🟢 ${noPrazo} No Prazo</span> &nbsp; <span style="color:${R};font-weight:600">🔴 ${ativos-noPrazo} Atrasadas</span></div>
@@ -6485,10 +6540,10 @@ function exportarPPTX(){
           <div class="obs-c" style="margin-bottom:8px"><div class="obs-ct">${o.obra?o.obra+' — ':''}${o.titulo||''}</div><div class="obs-cb">${o.texto}</div></div>`).join('')||'<div style="color:#999;font-size:11px">Sem comentários.</div>'}
       </div>
     </div>
-  `)}
+  `):''}
 
   <!-- MEDIÇÕES -->
-  ${medSlide}
+  ${document.getElementById('ri-med').checked?medSlide:''}
 
   <!-- DOCUMENTAÇÃO -->
   ${(()=>{
@@ -6558,10 +6613,10 @@ function exportarPPTX(){
         <tbody>${rows}</tbody>
       </table>
     `);
-  })()}
+  })():''}
 
   <!-- SATISFAÇÃO -->
-  ${SLIDE('SATISFAÇÃO DO CLIENTE','',`
+  ${document.getElementById('ri-sat').checked?SLIDE('SATISFAÇÃO DO CLIENTE','',`
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
       ${S(BL,'Total',PESQUISAS.length)}${S(G,'😊 Satisfeitos',PESQUISAS.filter(p=>p.nivel==='Satisfeito').length)}${S(Y,'😐 Parcialmente',PESQUISAS.filter(p=>p.nivel==='Parcialmente Satisfeito').length)}${S(R,'😞 Insatisfeitos',PESQUISAS.filter(p=>p.nivel==='Insatisfeito').length)}
     </div>
@@ -6569,15 +6624,15 @@ function exportarPPTX(){
     <tbody>${PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?G:p.nivel==='Insatisfeito'?R:Y;const com=satComentarioHtml(p,true);
       return`<tr><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${new Date(p.data).toLocaleDateString('pt-BR')}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;font-family:monospace;color:#888">${p.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${p.cliente}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;color:${cl};font-weight:700;font-size:12px">${f.e} ${f.l}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#555;max-width:400px;line-height:1.45">${com}</td></tr>`;}).join('')}
     </tbody></table>
-  `)}
+  `):''}
 
   <!-- COMENTÁRIOS -->
-  ${SLIDE('COMENTÁRIOS & OBSERVAÇÕES',semana,`
+  ${document.getElementById('ri-obs').checked?SLIDE('COMENTÁRIOS & OBSERVAÇÕES',semana,`
     <div class="obs-g">
       ${OBSERVACOES.filter(o=>o.semana===16).map(o=>{const corBd=o.cor==='g'?'#1a7a30':o.cor==='y'?'#a07800':o.cor==='r'?'#c0392b':'#999';
         return`<div class="obs-c" style="border-left-color:${corBd}"><div class="obs-ct" style="color:${corBd}">${o.obra?o.obra+' — ':''}${o.titulo||'Comentário Geral'}</div><div class="obs-cb">${o.texto}</div></div>`;}).join('')}
     </div>
-  `)}
+  `):''}
 
   </body></html>`;
 
@@ -6829,12 +6884,7 @@ let _pendingRecovery = false;
 function isRecoveryUrl(){
   const hash = (window.location.hash || '').toLowerCase();
   const search = (window.location.search || '').toLowerCase();
-  return hash.includes('type=recovery') ||
-         search.includes('type=recovery') ||
-         search.includes('reset=1') ||
-         hash.includes('reset=1') ||
-         search.includes('recovery=1') ||
-         hash.includes('recovery=1');
+  return hash.includes('type=recovery') || search.includes('type=recovery');
 }
 function clearAuthParams(){
   try{
@@ -6878,11 +6928,9 @@ async function saveConfig(){
     if(msg){ msg.textContent = 'Falha ao conectar: ' + e.message; msg.className = 'auth-msg auth-err'; }
   }
 }
-function getAuthRedirectUrl(mode){
+function getAuthRedirectUrl(){
   if(window.location.protocol === 'file:') return null;
-  const base = window.location.origin + window.location.pathname;
-  if(mode === 'recovery') return base + '?reset=1';
-  return base;
+  return window.location.origin + window.location.pathname;
 }
 function setStepMessage(step, msg, ok){
   const idMap = {2:'auth-create-msg',3:'auth-reset-msg',4:'auth-new-password-msg'};
@@ -6948,7 +6996,7 @@ async function doResetPassword(){
     const email = normalizeEmail(document.getElementById('auth-reset-email').value);
     if(!email){ setStepMessage(3, 'Informe um e-mail corporativo válido.', false); return; }
     if(!hasViewAccess(email)) { setStepMessage(3, 'Este e-mail não está autorizado para acessar o sistema.', false); return; }
-    const redirectUrl = getAuthRedirectUrl('recovery');
+    const redirectUrl = getAuthRedirectUrl();
     if(!redirectUrl){
       setStepMessage(3, 'Abra o sistema pelo link publicado para receber a redefinição corretamente.', false);
       return;
@@ -7094,8 +7142,8 @@ async function initSupabase() {
     await loadAccessControlFromSupabase();
     _pendingRecovery = isRecoveryUrl();
     const {data:{session}} = await _sb.auth.getSession();
-    if(_pendingRecovery){
-      _user = session?.user || null;
+    if(_pendingRecovery && session){
+      _user = session.user || null;
       applyAccessState();
       enterRecoveryMode('Defina sua nova senha para concluir a recuperação.');
     } else if(session) setCurrentUser(session.user);
