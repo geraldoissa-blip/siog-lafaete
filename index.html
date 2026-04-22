@@ -303,6 +303,18 @@ textarea{resize:vertical;min-height:68px}
       <div class="auth-note">O e-mail de redefinição só é enviado para usuários já cadastrados e autorizados.</div>
       <button style="background:none;border:none;color:#555;font-size:12px;cursor:pointer;width:100%;margin-top:8px;font-family:inherit" onclick="showStep(1)">← Voltar ao login</button>
     </div>
+
+    <div id="auth-s4" class="auth-step">
+      <label class="auth-lbl">Nova senha</label>
+      <input class="auth-inp" type="password" id="auth-new-password" placeholder="Mínimo de 6 caracteres"
+        onkeydown="if(event.key==='Enter')doSetNewPassword()"/>
+      <label class="auth-lbl" style="margin-top:12px">Confirmar nova senha</label>
+      <input class="auth-inp" type="password" id="auth-new-password2" placeholder="Repita a nova senha"
+        onkeydown="if(event.key==='Enter')doSetNewPassword()"/>
+      <button class="auth-btn" id="auth-new-password-btn" onclick="doSetNewPassword()">🔐 Salvar nova senha</button>
+      <div id="auth-new-password-msg" class="auth-msg"></div>
+      <div class="auth-note">Você chegou aqui por um link seguro de redefinição. Após salvar a nova senha, faça o login normalmente.</div>
+    </div>
   </div>
 </div>
 
@@ -6813,6 +6825,30 @@ function showApp(){
   if(s) s.classList.remove('show');
   if(a) a.classList.remove('show');
 }
+let _pendingRecovery = false;
+function isRecoveryUrl(){
+  const hash = (window.location.hash || '').toLowerCase();
+  const search = (window.location.search || '').toLowerCase();
+  return hash.includes('type=recovery') || search.includes('type=recovery');
+}
+function clearAuthParams(){
+  try{
+    if(window.history && window.history.replaceState){
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }catch(e){}
+}
+function enterRecoveryMode(message){
+  _pendingRecovery = true;
+  showAuth();
+  showStep(4);
+  const email = normalizeEmail((document.getElementById('auth-email')||{}).value || '');
+  const createEmail = document.getElementById('auth-create-email');
+  const resetEmail = document.getElementById('auth-reset-email');
+  if(createEmail && email) createEmail.value = email;
+  if(resetEmail && email) resetEmail.value = email;
+  setStepMessage(4, message || 'Defina sua nova senha para concluir a recuperação.', true);
+}
 async function ensureSupabaseClient(){
   if(!window.supabase){
     await new Promise((res,rej) => {
@@ -6842,8 +6878,8 @@ function getAuthRedirectUrl(){
   return window.location.origin + window.location.pathname;
 }
 function setStepMessage(step, msg, ok){
-  const id = step === 2 ? 'auth-create-msg' : 'auth-reset-msg';
-  const el = document.getElementById(id);
+  const idMap = {2:'auth-create-msg',3:'auth-reset-msg',4:'auth-new-password-msg'};
+  const el = document.getElementById(idMap[step] || '');
   if(!el) return;
   el.textContent = msg || '';
   el.className = 'auth-msg ' + (ok ? 'auth-ok' : 'auth-err');
@@ -6921,6 +6957,32 @@ async function doResetPassword(){
     setStepMessage(3, 'Não foi possível enviar a redefinição: ' + e.message, false);
   } finally {
     const btn = document.getElementById('auth-reset-btn');
+    if(btn) btn.disabled = false;
+  }
+}
+async function doSetNewPassword(){
+  try{
+    const password = (document.getElementById('auth-new-password').value || '').trim();
+    const confirm = (document.getElementById('auth-new-password2').value || '').trim();
+    if(password.length < 6){ setStepMessage(4, 'A senha precisa ter pelo menos 6 caracteres.', false); return; }
+    if(password !== confirm){ setStepMessage(4, 'A confirmação da senha não confere.', false); return; }
+    const btn = document.getElementById('auth-new-password-btn');
+    if(btn) btn.disabled = true;
+    setStepMessage(4, 'Salvando nova senha...', true);
+    await ensureSupabaseClient();
+    const { error } = await _sb.auth.updateUser({ password });
+    if(error) throw error;
+    _pendingRecovery = false;
+    clearAuthParams();
+    document.getElementById('auth-new-password').value = '';
+    document.getElementById('auth-new-password2').value = '';
+    showStep(1);
+    setAuthMessage('Senha atualizada com sucesso. Entre com seu e-mail e a nova senha.', true);
+    await _sb.auth.signOut();
+  } catch(e){
+    setStepMessage(4, 'Não foi possível atualizar a senha: ' + e.message, false);
+  } finally {
+    const btn = document.getElementById('auth-new-password-btn');
     if(btn) btn.disabled = false;
   }
 }
@@ -7023,11 +7085,28 @@ async function initSupabase() {
   try {
     await ensureSupabaseClient();
     await loadAccessControlFromSupabase();
+    _pendingRecovery = isRecoveryUrl();
     const {data:{session}} = await _sb.auth.getSession();
-    if(session) setCurrentUser(session.user);
+    if(_pendingRecovery && session){
+      _user = session.user || null;
+      applyAccessState();
+      enterRecoveryMode('Defina sua nova senha para concluir a recuperação.');
+    } else if(session) setCurrentUser(session.user);
     else { _user = null; applyAccessState(); showAuth(); }
     _sb.auth.onAuthStateChange((event, session) => {
+      if(event === 'PASSWORD_RECOVERY') {
+        _user = session?.user || _user || null;
+        applyAccessState();
+        enterRecoveryMode('Defina sua nova senha para concluir a recuperação.');
+        return;
+      }
       if(event === 'SIGNED_IN' && session) {
+        if(_pendingRecovery || isRecoveryUrl()){
+          _user = session.user || null;
+          applyAccessState();
+          enterRecoveryMode('Defina sua nova senha para concluir a recuperação.');
+          return;
+        }
         setCurrentUser(session.user);
         if(hasViewAccess()) {
           pushLocalDataToSupabase();
@@ -7038,7 +7117,7 @@ async function initSupabase() {
         _user = null; _isAdmin = false; applyAccessState(); showAuth();
       }
     });
-    if(session && hasViewAccess()) {
+    if(session && hasViewAccess() && !_pendingRecovery) {
       await pushLocalDataToSupabase();
       console.log('✅ SIOG Supabase backup conectado. P='+PROJETOS.length+' R='+RDO.length);
     }
