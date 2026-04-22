@@ -6829,7 +6829,12 @@ let _pendingRecovery = false;
 function isRecoveryUrl(){
   const hash = (window.location.hash || '').toLowerCase();
   const search = (window.location.search || '').toLowerCase();
-  return hash.includes('type=recovery') || search.includes('type=recovery');
+  return hash.includes('type=recovery') ||
+         search.includes('type=recovery') ||
+         search.includes('reset=1') ||
+         hash.includes('reset=1') ||
+         search.includes('recovery=1') ||
+         hash.includes('recovery=1');
 }
 function clearAuthParams(){
   try{
@@ -6873,9 +6878,11 @@ async function saveConfig(){
     if(msg){ msg.textContent = 'Falha ao conectar: ' + e.message; msg.className = 'auth-msg auth-err'; }
   }
 }
-function getAuthRedirectUrl(){
+function getAuthRedirectUrl(mode){
   if(window.location.protocol === 'file:') return null;
-  return window.location.origin + window.location.pathname;
+  const base = window.location.origin + window.location.pathname;
+  if(mode === 'recovery') return base + '?reset=1';
+  return base;
 }
 function setStepMessage(step, msg, ok){
   const idMap = {2:'auth-create-msg',3:'auth-reset-msg',4:'auth-new-password-msg'};
@@ -6941,7 +6948,7 @@ async function doResetPassword(){
     const email = normalizeEmail(document.getElementById('auth-reset-email').value);
     if(!email){ setStepMessage(3, 'Informe um e-mail corporativo válido.', false); return; }
     if(!hasViewAccess(email)) { setStepMessage(3, 'Este e-mail não está autorizado para acessar o sistema.', false); return; }
-    const redirectUrl = getAuthRedirectUrl();
+    const redirectUrl = getAuthRedirectUrl('recovery');
     if(!redirectUrl){
       setStepMessage(3, 'Abra o sistema pelo link publicado para receber a redefinição corretamente.', false);
       return;
@@ -7087,8 +7094,8 @@ async function initSupabase() {
     await loadAccessControlFromSupabase();
     _pendingRecovery = isRecoveryUrl();
     const {data:{session}} = await _sb.auth.getSession();
-    if(_pendingRecovery && session){
-      _user = session.user || null;
+    if(_pendingRecovery){
+      _user = session?.user || null;
       applyAccessState();
       enterRecoveryMode('Defina sua nova senha para concluir a recuperação.');
     } else if(session) setCurrentUser(session.user);
