@@ -882,7 +882,7 @@ textarea{resize:vertical;min-height:68px}
   <div class="charts-grid">
     <div class="chart-card"><div class="chart-title">Status da Carteira</div><div style="height:190px;position:relative"><canvas id="ch-status"></canvas></div></div>
     <div class="chart-card"><div class="chart-title">Financeiro (R$ milhões)</div><div style="height:190px"><canvas id="ch-fin"></canvas></div></div>
-    <div class="chart-card" style="grid-column:1/-1"><div class="chart-title">Avanço Físico — Previsto vs Realizado</div><div id="ch-av-wrap" style="height:280px"><canvas id="ch-av"></canvas></div></div>
+    <div class="chart-card" style="grid-column:1/-1"><div class="chart-title">Avanço Físico — Previsto vs Realizado</div><div id="ch-av-wrap" style="height:720px;overflow-y:auto"><canvas id="ch-av"></canvas></div></div>
   </div>
   <div class="card"><div class="card-title">⚠ Alertas Críticos</div><div id="dash-alertas"></div></div>
 </div>
@@ -5276,8 +5276,8 @@ function calcMedFarol(m){
   if(m.data_rec_prev){const prev=xl2iso(m.data_rec_prev);if(prev&&prev<hoje)return'r';}
   return'y';
 }
-function medPrev7(){const t=new Date();t.setDate(t.getDate()+7);const s=t.toISOString().slice(0,10);return MEDICOES.filter(m=>!m.data_rec_real&&m.data_rec_prev&&xl2iso(m.data_rec_prev)<=s).reduce((a,m)=>a+m.valor,0);}
-function medPrev30(){const t=new Date();t.setDate(t.getDate()+30);const s=t.toISOString().slice(0,10);return MEDICOES.filter(m=>!m.data_rec_real&&m.data_rec_prev&&xl2iso(m.data_rec_prev)<=s).reduce((a,m)=>a+m.valor,0);}
+function medPrev7(){const t=new Date();t.setDate(t.getDate()+7);const s=t.toISOString();return MEDICOES.filter(m=>!m.data_rec_real&&m.data_rec_prev&&xl2iso(m.data_rec_prev)<=s).reduce((a,m)=>a+m.valor,0);}
+function medPrev30(){const t=new Date();t.setDate(t.getDate()+30);const s=t.toISOString();return MEDICOES.filter(m=>!m.data_rec_real&&m.data_rec_prev&&xl2iso(m.data_rec_prev)<=s).reduce((a,m)=>a+m.valor,0);}
 
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
 const PAGE_TITLES={dashboard:'Dashboard Geral',projetos:'Base de Projetos',cronograma:'Cronograma & Prazos',rdo:'RDO — Relatório Diário de Obra',seguros:'Seguros & Garantias',arts:'ARTs & Documentos',medicoes:'Medições & Financeiro',satisfacao:'Pesquisa de Satisfação',observacoes:'Observações Livres',relatorios:'Gerar Relatório Executivo'};
@@ -6048,7 +6048,7 @@ function openMedicaoModal(idx){
 function calcPrevRec(){
   const nf=document.getElementById('fm-data-nf').value;
   const prazo=parseInt(document.getElementById('fm-prazo').value)||30;
-  if(nf){const d=new Date(nf);d.setDate(d.getDate()+prazo);document.getElementById('fm-prev-rec').value=d.toISOString().slice(0,10);}
+  if(nf){const d=new Date(nf);d.setDate(d.getDate()+prazo);document.getElementById('fm-prev-rec').value=d.toISOString();}
 }
 function calcFarolMed(){
   const real=document.getElementById('fm-real-rec').value;
@@ -6475,7 +6475,7 @@ function renderDashboard(){
   _charts.fin=new Chart(document.getElementById('ch-fin'),{type:'bar',
     data:{labels:['Carteira','Medido','Faturado','Recebido'],datasets:[{data:[tC/1e6,tM/1e6,tF/1e6,tR/1e6],backgroundColor:['#E87722aa','#28a745aa','#1a6fdbaa','#28c76faa'],borderColor:['#E87722','#28a745','#1a6fdb','#28c76f'],borderWidth:1}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>v.toFixed(1)+'M',color:tc},grid:{color:gc}},x:{ticks:{color:tc},grid:{display:false}}}}});
-  const avd=Object.entries(AVANCOS).filter(([k,v])=>v.prev!=null&&v.real!=null).slice(0,10);
+  const avd=Object.entries(AVANCOS).filter(([k,v])=>v.prev!=null&&v.real!=null);
   const avH=Math.max(280,avd.length*50);
   document.getElementById('ch-av-wrap').style.height=avH+'px';
   _charts.av=new Chart(document.getElementById('ch-av'),{type:'bar',
