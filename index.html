@@ -92,7 +92,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incCrono){
-    const cronComments=OBSERVACOES.filter(o=>o.tipo==='Cronograma'&&o.semana===16);
+    const cronComments=OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16);
     const commentChunks=__chunkComments(cronComments,4);
     const tableHtml=`<table><thead><tr>${['ID','Obra / Entrega','Início','Prazo Contr.','Prazo Cliente','Tendência','⬤','% Prev.','% Real.','Ader.'].map(__TH).join('')}</tr></thead><tbody>${PROJETOS.filter(p=>p.status==='Ativo').map(p=>{const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const cl=f==='g'?'#1a7a30':f==='y'?'#a07800':'#c0392b';const base=`<tr><td class="mono muted">${p.id}</td><td style="font-weight:700">${p.obra}</td><td>${xl2str(p.inicio)}</td><td style="color:#c0392b">${xl2str(p.prazo_cont)}</td><td style="color:#c0392b">${xl2str(p.prazo_cli)}</td><td style="color:${cl};font-weight:700">${xl2str(p.tendencia)}</td><td style="text-align:center">${f==='g'?'🟢':f==='y'?'🟡':'🔴'}</td><td style="text-align:right">${fmtPct(av.prev||0)}</td><td style="text-align:right">${fmtPct(av.real||0)}</td><td style="text-align:right;color:${cl};font-weight:700">${((av.real||0)-(av.prev||0)).toFixed(1)} p.p.</td></tr>`;const pars=(p.parciais||[]).map(par=>`<tr style="background:#fafafa"><td></td><td style="padding-left:18px;color:#E87722">↳ ${par.nome}</td><td>${xl2str(par.inicio)}</td><td style="color:#c0392b">${xl2str(par.prazo_cont)}</td><td style="color:#c0392b">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="color:#E87722">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`).join('');return base+pars;}).join('')}</tbody></table>`;
     slides += __SLIDE(meta,'CRONOGRAMA, PRAZOS E AVANÇOS','Tabela + comentários cronograma',`<div class="split-2"><div><div class="krow krow-4">${__S('#1a7a30','No Prazo',noPrazo)}${__S('#c0392b','Atrasadas',Math.max(ativos-noPrazo,0))}${__S('#4a9eff','Projetos Ativos',ativos)}${__S('#E87722','Carteira',fmtR(tC))}</div>${tableHtml}</div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div>${__commentCards(commentChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
@@ -110,7 +110,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incMed){
-    const medComments=OBSERVACOES.filter(o=>o.tipo==='Financeiro'&&o.semana===16);
+    const medComments=OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16);
     const medChunks=__chunkComments(medComments,4);
     const rows=cons.map(m=>{const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—'; return `<tr>${__TD(m.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(m.cliente,'font-weight:700')}${__TD(fmtR(m.contrato),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.med),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.fat),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.rec),'text-align:right;color:#1a7a30;font-weight:700;white-space:nowrap')}${__TD(pct,'text-align:right')}${__TD(m.nfv>0?fmtR(m.nfv):'—','text-align:right;color:#c0392b;white-space:nowrap')}${__TD(m.ar>0?fmtR(m.ar):'—','text-align:right;white-space:nowrap')}</tr>`;}).join('');
     slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO','Medições, faturamentos e recebimentos',`<div class="split-2"><div><div class="krow krow-4">${__S('#1558c0','Carteira',fmtR(tC))}${__S('#1a7a30','Medido',fmtR(tM))}${__S('#E87722','Faturado',fmtR(tF))}${__S('#1a7a30','Recebido',fmtR(tR))}${__S('#c0392b','NF Vencidas',fmtR(tNV))}${__S('#a07800','A Receber',fmtR(tAR))}${__S('#888','Prev. 7 dias',fmtR(medPrev7()))}${__S('#888','Prev. 30 dias',fmtR(medPrev30()))}</div><table><thead><tr>${['ID','Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table></div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div>${__commentCards(medChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
@@ -236,7 +236,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incCrono){
-    const cronComments=OBSERVACOES.filter(o=>o.tipo==='Cronograma'&&o.semana===16);
+    const cronComments=OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16);
     const commentChunks=__chunkComments(cronComments,4);
     const tableHtml=`<table><thead><tr>${['ID','Obra / Entrega','Início','Prazo Contr.','Prazo Cliente','Tendência','⬤','% Prev.','% Real.','Ader.'].map(__TH).join('')}</tr></thead><tbody>${PROJETOS.filter(p=>p.status==='Ativo').map(p=>{const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const cl=f==='g'?'#1a7a30':f==='y'?'#a07800':'#c0392b';const base=`<tr><td class="mono muted">${p.id}</td><td style="font-weight:700">${p.obra}</td><td>${xl2str(p.inicio)}</td><td style="color:#c0392b">${xl2str(p.prazo_cont)}</td><td style="color:#c0392b">${xl2str(p.prazo_cli)}</td><td style="color:${cl};font-weight:700">${xl2str(p.tendencia)}</td><td style="text-align:center">${f==='g'?'🟢':f==='y'?'🟡':'🔴'}</td><td style="text-align:right">${fmtPct(av.prev||0)}</td><td style="text-align:right">${fmtPct(av.real||0)}</td><td style="text-align:right;color:${cl};font-weight:700">${((av.real||0)-(av.prev||0)).toFixed(1)} p.p.</td></tr>`;const pars=(p.parciais||[]).map(par=>`<tr style="background:#fafafa"><td></td><td style="padding-left:18px;color:#E87722">↳ ${par.nome}</td><td>${xl2str(par.inicio)}</td><td style="color:#c0392b">${xl2str(par.prazo_cont)}</td><td style="color:#c0392b">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="color:#E87722">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`).join('');return base+pars;}).join('')}</tbody></table>`;
     slides += __SLIDE(meta,'CRONOGRAMA, PRAZOS E AVANÇOS','Tabela + comentários cronograma',`<div class="split-2"><div><div class="krow krow-4">${__S('#1a7a30','No Prazo',noPrazo)}${__S('#c0392b','Atrasadas',Math.max(ativos-noPrazo,0))}${__S('#4a9eff','Projetos Ativos',ativos)}${__S('#E87722','Carteira',fmtR(tC))}</div>${tableHtml}</div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div>${__commentCards(commentChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
@@ -254,7 +254,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incMed){
-    const medComments=OBSERVACOES.filter(o=>o.tipo==='Financeiro'&&o.semana===16);
+    const medComments=OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16);
     const medChunks=__chunkComments(medComments,4);
     const rows=cons.map(m=>{const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—'; return `<tr>${__TD(m.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(m.cliente,'font-weight:700')}${__TD(fmtR(m.contrato),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.med),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.fat),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.rec),'text-align:right;color:#1a7a30;font-weight:700;white-space:nowrap')}${__TD(pct,'text-align:right')}${__TD(m.nfv>0?fmtR(m.nfv):'—','text-align:right;color:#c0392b;white-space:nowrap')}${__TD(m.ar>0?fmtR(m.ar):'—','text-align:right;white-space:nowrap')}</tr>`;}).join('');
     slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO','Medições, faturamentos e recebimentos',`<div class="split-2"><div><div class="krow krow-4">${__S('#1558c0','Carteira',fmtR(tC))}${__S('#1a7a30','Medido',fmtR(tM))}${__S('#E87722','Faturado',fmtR(tF))}${__S('#1a7a30','Recebido',fmtR(tR))}${__S('#c0392b','NF Vencidas',fmtR(tNV))}${__S('#a07800','A Receber',fmtR(tAR))}${__S('#888','Prev. 7 dias',fmtR(medPrev7()))}${__S('#888','Prev. 30 dias',fmtR(medPrev30()))}</div><table><thead><tr>${['ID','Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table></div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div>${__commentCards(medChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
@@ -380,7 +380,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incCrono){
-    const cronComments=OBSERVACOES.filter(o=>o.tipo==='Cronograma'&&o.semana===16);
+    const cronComments=OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16);
     const commentChunks=__chunkComments(cronComments,4);
     const tableHtml=`<table><thead><tr>${['ID','Obra / Entrega','Início','Prazo Contr.','Prazo Cliente','Tendência','⬤','% Prev.','% Real.','Ader.'].map(__TH).join('')}</tr></thead><tbody>${PROJETOS.filter(p=>p.status==='Ativo').map(p=>{const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const cl=f==='g'?'#1a7a30':f==='y'?'#a07800':'#c0392b';const base=`<tr><td class="mono muted">${p.id}</td><td style="font-weight:700">${p.obra}</td><td>${xl2str(p.inicio)}</td><td style="color:#c0392b">${xl2str(p.prazo_cont)}</td><td style="color:#c0392b">${xl2str(p.prazo_cli)}</td><td style="color:${cl};font-weight:700">${xl2str(p.tendencia)}</td><td style="text-align:center">${f==='g'?'🟢':f==='y'?'🟡':'🔴'}</td><td style="text-align:right">${fmtPct(av.prev||0)}</td><td style="text-align:right">${fmtPct(av.real||0)}</td><td style="text-align:right;color:${cl};font-weight:700">${((av.real||0)-(av.prev||0)).toFixed(1)} p.p.</td></tr>`;const pars=(p.parciais||[]).map(par=>`<tr style="background:#fafafa"><td></td><td style="padding-left:18px;color:#E87722">↳ ${par.nome}</td><td>${xl2str(par.inicio)}</td><td style="color:#c0392b">${xl2str(par.prazo_cont)}</td><td style="color:#c0392b">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="color:#E87722">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`).join('');return base+pars;}).join('')}</tbody></table>`;
     slides += __SLIDE(meta,'CRONOGRAMA, PRAZOS E AVANÇOS','Tabela + comentários cronograma',`<div class="split-2"><div><div class="krow krow-4">${__S('#1a7a30','No Prazo',noPrazo)}${__S('#c0392b','Atrasadas',Math.max(ativos-noPrazo,0))}${__S('#4a9eff','Projetos Ativos',ativos)}${__S('#E87722','Carteira',fmtR(tC))}</div>${tableHtml}</div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div>${__commentCards(commentChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
@@ -398,7 +398,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incMed){
-    const medComments=OBSERVACOES.filter(o=>o.tipo==='Financeiro'&&o.semana===16);
+    const medComments=OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16);
     const medChunks=__chunkComments(medComments,4);
     const rows=cons.map(m=>{const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—'; return `<tr>${__TD(m.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(m.cliente,'font-weight:700')}${__TD(fmtR(m.contrato),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.med),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.fat),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.rec),'text-align:right;color:#1a7a30;font-weight:700;white-space:nowrap')}${__TD(pct,'text-align:right')}${__TD(m.nfv>0?fmtR(m.nfv):'—','text-align:right;color:#c0392b;white-space:nowrap')}${__TD(m.ar>0?fmtR(m.ar):'—','text-align:right;white-space:nowrap')}</tr>`;}).join('');
     slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO','Medições, faturamentos e recebimentos',`<div class="split-2"><div><div class="krow krow-4">${__S('#1558c0','Carteira',fmtR(tC))}${__S('#1a7a30','Medido',fmtR(tM))}${__S('#E87722','Faturado',fmtR(tF))}${__S('#1a7a30','Recebido',fmtR(tR))}${__S('#c0392b','NF Vencidas',fmtR(tNV))}${__S('#a07800','A Receber',fmtR(tAR))}${__S('#888','Prev. 7 dias',fmtR(medPrev7()))}${__S('#888','Prev. 30 dias',fmtR(medPrev30()))}</div><table><thead><tr>${['ID','Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table></div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div>${__commentCards(medChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
@@ -6650,7 +6650,7 @@ function gerarRelatorio(){
       </div>
       <div>
         <div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários</div>
-        ${OBSERVACOES.filter(o=>o.tipo==='Cronograma'&&o.semana===16).map(o=>`
+        ${OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16).map(o=>`
           <div style="border-left:3px solid #E87722;padding:8px 12px;margin-bottom:10px;background:#1a1a1a;border-radius:0 6px 6px 0">
             <div style="font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px">${o.obra?o.obra+' — ':''}${o.titulo||''}</div>
             <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap">${o.texto}</div>
@@ -6680,7 +6680,7 @@ function gerarRelatorio(){
       </div>
       <div>
         <div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários</div>
-        ${OBSERVACOES.filter(o=>o.tipo==='Financeiro'&&o.semana===16).map(o=>`
+        ${OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16).map(o=>`
           <div style="border-left:3px solid #E87722;padding:8px 12px;margin-bottom:10px;background:#1a1a1a;border-radius:0 6px 6px 0">
             <div style="font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px">${o.obra?o.obra+' — ':''}${o.titulo||''}</div>
             <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap">${o.texto}</div>
@@ -6838,11 +6838,11 @@ function exportarPPTX(){
       </tr>
       </tbody>
     </table>
-    ${OBSERVACOES.filter(o=>o.tipo==='Financeiro'&&o.semana===16).length?`
+    ${OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16).length?`
     <div style="margin-top:14px">
       <div style="font-size:11px;font-weight:700;color:${OR};margin-bottom:8px">💬 Comentários</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      ${OBSERVACOES.filter(o=>o.tipo==='Financeiro'&&o.semana===16).map(o=>`
+      ${OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16).map(o=>`
         <div style="border-left:3px solid ${OR};padding:8px 10px;background:#fafafa;border-radius:0 4px 4px 0">
           <div style="font-size:10px;font-weight:700;color:${OR};margin-bottom:3px">${o.obra?o.obra+' — ':''}${o.titulo||''}</div>
           <div style="font-size:10px;color:#555;line-height:1.6;white-space:pre-wrap">${o.texto}</div>
@@ -6920,7 +6920,7 @@ function exportarPPTX(){
       </div>
       <div>
         <div style="font-size:11px;font-weight:700;color:${OR};margin-bottom:8px">💬 Comentários</div>
-        ${OBSERVACOES.filter(o=>o.tipo==='Cronograma'&&o.semana===16).map(o=>`
+        ${OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16).map(o=>`
           <div class="obs-c" style="margin-bottom:8px"><div class="obs-ct">${o.obra?o.obra+' — ':''}${o.titulo||''}</div><div class="obs-cb">${o.texto}</div></div>`).join('')||'<div style="color:#999;font-size:11px">Sem comentários.</div>'}
       </div>
     </div>
@@ -7895,7 +7895,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incCrono){
-    const cronComments=OBSERVACOES.filter(o=>o.tipo==='Cronograma'&&o.semana===16);
+    const cronComments=OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16);
     const commentChunks=__chunkComments(cronComments,4);
     const tableHtml=`<table><thead><tr>${['ID','Obra / Entrega','Início','Prazo Contr.','Prazo Cliente','Tendência','⬤','% Prev.','% Real.','Ader.'].map(__TH).join('')}</tr></thead><tbody>${PROJETOS.filter(p=>p.status==='Ativo').map(p=>{const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const cl=f==='g'?'#1a7a30':f==='y'?'#a07800':'#c0392b';const base=`<tr><td class="mono muted">${p.id}</td><td style="font-weight:700">${p.obra}</td><td>${xl2str(p.inicio)}</td><td style="color:#c0392b">${xl2str(p.prazo_cont)}</td><td style="color:#c0392b">${xl2str(p.prazo_cli)}</td><td style="color:${cl};font-weight:700">${xl2str(p.tendencia)}</td><td style="text-align:center">${f==='g'?'🟢':f==='y'?'🟡':'🔴'}</td><td style="text-align:right">${fmtPct(av.prev||0)}</td><td style="text-align:right">${fmtPct(av.real||0)}</td><td style="text-align:right;color:${cl};font-weight:700">${((av.real||0)-(av.prev||0)).toFixed(1)} p.p.</td></tr>`;const pars=(p.parciais||[]).map(par=>`<tr style="background:#fafafa"><td></td><td style="padding-left:18px;color:#E87722">↳ ${par.nome}</td><td>${xl2str(par.inicio)}</td><td style="color:#c0392b">${xl2str(par.prazo_cont)}</td><td style="color:#c0392b">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="color:#E87722">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`).join('');return base+pars;}).join('')}</tbody></table>`;
     slides += __SLIDE(meta,'CRONOGRAMA, PRAZOS E AVANÇOS','Tabela + comentários cronograma',`<div class="split-2"><div><div class="krow krow-4">${__S('#1a7a30','No Prazo',noPrazo)}${__S('#c0392b','Atrasadas',Math.max(ativos-noPrazo,0))}${__S('#4a9eff','Projetos Ativos',ativos)}${__S('#E87722','Carteira',fmtR(tC))}</div>${tableHtml}</div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div>${__commentCards(commentChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
@@ -7913,7 +7913,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incMed){
-    const medComments=OBSERVACOES.filter(o=>o.tipo==='Financeiro'&&o.semana===16);
+    const medComments=OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16);
     const medChunks=__chunkComments(medComments,4);
     const rows=cons.map(m=>{const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—'; return `<tr>${__TD(m.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(m.cliente,'font-weight:700')}${__TD(fmtR(m.contrato),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.med),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.fat),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.rec),'text-align:right;color:#1a7a30;font-weight:700;white-space:nowrap')}${__TD(pct,'text-align:right')}${__TD(m.nfv>0?fmtR(m.nfv):'—','text-align:right;color:#c0392b;white-space:nowrap')}${__TD(m.ar>0?fmtR(m.ar):'—','text-align:right;white-space:nowrap')}</tr>`;}).join('');
     slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO','Medições, faturamentos e recebimentos',`<div class="split-2"><div><div class="krow krow-4">${__S('#1558c0','Carteira',fmtR(tC))}${__S('#1a7a30','Medido',fmtR(tM))}${__S('#E87722','Faturado',fmtR(tF))}${__S('#1a7a30','Recebido',fmtR(tR))}${__S('#c0392b','NF Vencidas',fmtR(tNV))}${__S('#a07800','A Receber',fmtR(tAR))}${__S('#888','Prev. 7 dias',fmtR(medPrev7()))}${__S('#888','Prev. 30 dias',fmtR(medPrev30()))}</div><table><thead><tr>${['ID','Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table></div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div>${__commentCards(medChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
