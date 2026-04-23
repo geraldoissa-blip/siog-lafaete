@@ -59,7 +59,7 @@ function __chunkComments(list,maxPerPage=4){
 function __deckStyles(){ return `
 <style>
   #rel-preview .deck-wrap{margin-top:16px}
-  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:hidden;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
+  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
   .s-hdr{background:#1a1a1a;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
   .s-tag{font-size:18px;font-weight:800;color:#E87722;font-family:Arial,sans-serif}
   .s-sub{font-size:11px;color:#aaa;margin-top:2px;font-family:Arial,sans-serif}
@@ -83,6 +83,20 @@ function __deckStyles(){ return `
     .slide{width:100%;min-height:auto;aspect-ratio:16/9;box-shadow:none;margin:0 0 12px 0;page-break-after:always;break-after:page;border-radius:0}
     .slide:last-child{page-break-after:auto;break-after:auto}
   }
+
+.rel-table tr,.rel-table td,.rel-table th{break-inside:avoid;page-break-inside:avoid}
+.rel-page.sat-page .rel-body{overflow:visible!important}
+.rel-page.sat-page .rel-table td{font-size:9px!important;line-height:1.35!important}
+.rel-page.sat-page .rel-sat-emoji{font-size:20px!important}
+@media print{
+  .rel-table tr,.rel-table td,.rel-table th{break-inside:avoid;page-break-inside:avoid}
+  .rel-page.sat-page{height:auto!important;overflow:visible!important}
+  .rel-page.sat-page .rel-body{overflow:visible!important}
+  .rel-page.sat-page .rel-table td{font-size:8.4px!important;line-height:1.28!important;padding:4px 6px!important}
+  .rel-page.sat-page .rel-table th{font-size:7.8px!important;padding:5px 6px!important}
+  .rel-page.sat-page .rel-sat-emoji{font-size:18px!important}
+}
+
 </style>`; }
 function __TH(h){return `<th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">${h}</th>`;}
 function __TD(v,s=''){return `<td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;${s}">${v}</td>`;}
@@ -143,7 +157,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incSat){
-    const rows=PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:400px;line-height:1.45')}</tr>`;}).join('');
+    const rows=PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:none;line-height:1.35;white-space:normal;word-break:break-word')}</tr>`;}).join('');
     slides += __SLIDE(meta,'SATISFAÇÃO DO CLIENTE','Avaliação de Satisfação',`<div class="krow krow-4">${__S('#1558c0','Total',PESQUISAS.length)}${__S('#1a7a30','😊 Satisfeitos',PESQUISAS.filter(p=>p.nivel==='Satisfeito').length)}${__S('#a07800','😐 Parcialmente',PESQUISAS.filter(p=>p.nivel==='Parcialmente Satisfeito').length)}${__S('#c0392b','😞 Insatisfeitos',PESQUISAS.filter(p=>p.nivel==='Insatisfeito').length)}</div><table><thead><tr>${['Data','ID','Cliente','Satisfação','Comentário'].map(__TH).join('')}</tr></thead><tbody>${rows||'<tr><td colspan="5" style="padding:16px;text-align:center;color:#777">Nenhuma avaliação marcada.</td></tr>'}</tbody></table>`);
   }
 
@@ -204,7 +218,7 @@ function __chunkComments(list,maxPerPage=4){
 function __deckStyles(){ return `
 <style>
   #rel-preview .deck-wrap{margin-top:16px}
-  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:hidden;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
+  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
   .s-hdr{background:#1a1a1a;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
   .s-tag{font-size:18px;font-weight:800;color:#E87722;font-family:Arial,sans-serif}
   .s-sub{font-size:11px;color:#aaa;margin-top:2px;font-family:Arial,sans-serif}
@@ -288,7 +302,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incSat){
-    const rows=PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:400px;line-height:1.45')}</tr>`;}).join('');
+    const rows=PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:none;line-height:1.35;white-space:normal;word-break:break-word')}</tr>`;}).join('');
     slides += __SLIDE(meta,'SATISFAÇÃO DO CLIENTE','Avaliação de Satisfação',`<div class="krow krow-4">${__S('#1558c0','Total',PESQUISAS.length)}${__S('#1a7a30','😊 Satisfeitos',PESQUISAS.filter(p=>p.nivel==='Satisfeito').length)}${__S('#a07800','😐 Parcialmente',PESQUISAS.filter(p=>p.nivel==='Parcialmente Satisfeito').length)}${__S('#c0392b','😞 Insatisfeitos',PESQUISAS.filter(p=>p.nivel==='Insatisfeito').length)}</div><table><thead><tr>${['Data','ID','Cliente','Satisfação','Comentário'].map(__TH).join('')}</tr></thead><tbody>${rows||'<tr><td colspan="5" style="padding:16px;text-align:center;color:#777">Nenhuma avaliação marcada.</td></tr>'}</tbody></table>`);
   }
 
@@ -348,7 +362,7 @@ function __chunkComments(list,maxPerPage=4){
 function __deckStyles(){ return `
 <style>
   #rel-preview .deck-wrap{margin-top:16px}
-  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:hidden;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
+  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
   .s-hdr{background:#1a1a1a;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
   .s-tag{font-size:18px;font-weight:800;color:#E87722;font-family:Arial,sans-serif}
   .s-sub{font-size:11px;color:#aaa;margin-top:2px;font-family:Arial,sans-serif}
@@ -432,7 +446,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incSat){
-    const rows=PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:400px;line-height:1.45')}</tr>`;}).join('');
+    const rows=PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:none;line-height:1.35;white-space:normal;word-break:break-word')}</tr>`;}).join('');
     slides += __SLIDE(meta,'SATISFAÇÃO DO CLIENTE','Avaliação de Satisfação',`<div class="krow krow-4">${__S('#1558c0','Total',PESQUISAS.length)}${__S('#1a7a30','😊 Satisfeitos',PESQUISAS.filter(p=>p.nivel==='Satisfeito').length)}${__S('#a07800','😐 Parcialmente',PESQUISAS.filter(p=>p.nivel==='Parcialmente Satisfeito').length)}${__S('#c0392b','😞 Insatisfeitos',PESQUISAS.filter(p=>p.nivel==='Insatisfeito').length)}</div><table><thead><tr>${['Data','ID','Cliente','Satisfação','Comentário'].map(__TH).join('')}</tr></thead><tbody>${rows||'<tr><td colspan="5" style="padding:16px;text-align:center;color:#777">Nenhuma avaliação marcada.</td></tr>'}</tbody></table>`);
   }
 
@@ -6733,7 +6747,7 @@ function gerarRelatorio(){
     </tr></thead><tbody>
     ${satToShow.map(p=>{const f=satFace(p.nivel);const c=p.nivel==='Satisfeito'?'#48c774':p.nivel==='Insatisfeito'?'#ff6b6b':'#ffc107';
       const comment=satComentarioHtml(p,true);
-      return`<tr style="border-bottom:1px solid #222">${TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#e0e0e0;font-weight:600')}${TD(p.id,'color:#c8c8c8;font-family:monospace;font-size:10px')}${TD(p.cliente,'font-weight:700;color:#f3f3f3')}<td style="padding:6px 10px;color:${c};font-weight:700">${f.e} ${f.l}</td><td style="padding:6px 10px;color:#d8d8d8;max-width:300px;font-size:11px">${comment}</td></tr>`;
+      return`<tr style="border-bottom:1px solid #222">${TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#e0e0e0;font-weight:600')}${TD(p.id,'color:#c8c8c8;font-family:monospace;font-size:10px')}${TD(p.cliente,'font-weight:700;color:#f3f3f3')}<td style="padding:6px 10px;color:${c};font-weight:700">${f.e} ${f.l}</td><td style="padding:6px 10px;color:#d8d8d8;max-width:none;font-size:10px;line-height:1.35;white-space:normal;word-break:break-word">${comment}</td></tr>`;
     }).join('')}
     </tbody></table></div>`;
   }
@@ -6891,10 +6905,10 @@ function exportarPPTX(){
   <style>
   *{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
   body{background:#e8e8e8;padding:20px}
-  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:hidden;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column}
+  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column}
   .s-hdr{background:#1a1a1a;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
   .s-tag{font-size:18px;font-weight:800;color:#E87722;font-family:Arial,sans-serif}
-  .s-body{padding:20px 32px;flex:1;overflow:hidden}
+  .s-body{padding:20px 32px;flex:1;overflow:visible}
   .krow{display:grid;gap:10px;margin-bottom:14px}
   .krow-4{grid-template-columns:repeat(4,1fr)}
   .krow-8{grid-template-columns:repeat(4,1fr)}
@@ -6906,7 +6920,7 @@ function exportarPPTX(){
   @media print{
     @page{size:1280px 720px landscape;margin:0}
     body{background:none;padding:0}
-    .slide{box-shadow:none;margin:0;page-break-after:always}
+    .slide{box-shadow:none;margin:0;min-height:auto!important;height:auto!important;overflow:visible!important;page-break-after:always}
   }
   </style></head><body>
 
@@ -7041,7 +7055,7 @@ function exportarPPTX(){
     </div>
     <table><thead><tr>${['Data','ID','Cliente','Satisfação','Comentário'].map(TH).join('')}</tr></thead>
     <tbody>${PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?G:p.nivel==='Insatisfeito'?R:Y;const com=satComentarioHtml(p,true);
-      return`<tr><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${new Date(p.data).toLocaleDateString('pt-BR')}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;font-family:monospace;color:#888">${p.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${p.cliente}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;color:${cl};font-weight:700;font-size:12px">${f.e} ${f.l}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#555;max-width:400px;line-height:1.45">${com}</td></tr>`;}).join('')}
+      return`<tr><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${new Date(p.data).toLocaleDateString('pt-BR')}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;font-family:monospace;color:#888">${p.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${p.cliente}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;color:${cl};font-weight:700;font-size:12px">${f.e} ${f.l}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#555;max-width:none;line-height:1.35;white-space:normal;word-break:break-word">${com}</td></tr>`;}).join('')}
     </tbody></table>
   `) : ''}
 
@@ -7874,7 +7888,7 @@ function __chunkComments(list,maxPerPage=4){
 function __deckStyles(){ return `
 <style>
   #rel-preview .deck-wrap{margin-top:16px}
-  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:hidden;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
+  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
   .s-hdr{background:#1a1a1a;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
   .s-tag{font-size:18px;font-weight:800;color:#E87722;font-family:Arial,sans-serif}
   .s-sub{font-size:11px;color:#aaa;margin-top:2px;font-family:Arial,sans-serif}
@@ -7958,7 +7972,7 @@ function __buildDeckHTML(embedOnly=false){
   }
 
   if(flags.incSat){
-    const rows=PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:400px;line-height:1.45')}</tr>`;}).join('');
+    const rows=PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:none;line-height:1.35;white-space:normal;word-break:break-word')}</tr>`;}).join('');
     slides += __SLIDE(meta,'SATISFAÇÃO DO CLIENTE','Avaliação de Satisfação',`<div class="krow krow-4">${__S('#1558c0','Total',PESQUISAS.length)}${__S('#1a7a30','😊 Satisfeitos',PESQUISAS.filter(p=>p.nivel==='Satisfeito').length)}${__S('#a07800','😐 Parcialmente',PESQUISAS.filter(p=>p.nivel==='Parcialmente Satisfeito').length)}${__S('#c0392b','😞 Insatisfeitos',PESQUISAS.filter(p=>p.nivel==='Insatisfeito').length)}</div><table><thead><tr>${['Data','ID','Cliente','Satisfação','Comentário'].map(__TH).join('')}</tr></thead><tbody>${rows||'<tr><td colspan="5" style="padding:16px;text-align:center;color:#777">Nenhuma avaliação marcada.</td></tr>'}</tbody></table>`);
   }
 
