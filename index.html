@@ -157,7 +157,7 @@ textarea{resize:vertical;min-height:68px}
 .chk-item:has(input:checked){border-color:var(--or);background:rgba(232,119,34,.08)}
 /* PRINT / PDF */
 @media print{
-  @page{size:A4 portrait;margin:8mm}
+  @page{size:A4 landscape;margin:8mm}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   #sb,.filter-bar,.btn-xs,.btn-sm,.btn,.mo,#hdr,.theme-btn,#menu-btn,.comments-panel>div:last-child{display:none!important}
   #main{margin-left:0!important;padding:0}
@@ -172,6 +172,11 @@ textarea{resize:vertical;min-height:68px}
   .split-layout{grid-template-columns:1fr!important}
   .comments-panel{display:none!important}
   .tw{overflow-x:visible!important}
+  #report-content{width:100%!important;max-width:none!important}
+  #report-content table{width:100%!important;table-layout:auto!important}
+  #report-content thead{display:table-header-group!important}
+  #report-content tr, #report-content .card{break-inside:avoid!important;page-break-inside:avoid!important}
+  #report-content img{max-width:100%!important;height:auto!important;object-fit:contain!important}
 }
 @media(max-width:900px){
   #sb{width:min(86vw,320px);transform:translateX(-100%);box-shadow:8px 0 28px rgba(0,0,0,.35)}
@@ -438,7 +443,7 @@ textarea{resize:vertical;min-height:68px}
   <button class="btn btn-sm" onclick="exportBackup()" title="Backup JSON">⬇ Backup</button>
   <button class="btn btn-sm" onclick="importBackup()" title="Restaurar Backup">⬆ Restaurar</button>
   <button class="btn btn-sm" style="color:var(--r2)" onclick="clearStorage()" title="Resetar dados">🗑 Resetar</button>
-  <button class="btn btn-sm" onclick="window.print()">🖨 Imprimir / PDF</button>
+  <button class="btn btn-sm" onclick="window.print()">🖨 Imprimir</button>
   <button class="btn btn-or btn-sm" onclick="openProjModal(null)">＋ Novo Projeto</button>
 </header>
 <div id="content">
@@ -4884,7 +4889,6 @@ let _editProjIdx=null;
 function openProjModal(idx){
   _editProjIdx=idx;
   document.getElementById('mo-proj-title').textContent=idx===null?'Novo Projeto':'Editar Projeto';
-  ['pp-id','pp-obra','pp-resp','pp-inicio','pp-prazo-cont','pp-prazo-cli','pp-tend','pp-valor','pp-obs','pp-parcial'].forEach(fid=>{const el=document.getElementById(fid); if(el){el.disabled=false; el.readOnly=false;}});
   if(idx===null){
     ['pp-id','pp-obra','pp-resp','pp-valor','pp-obs'].forEach(id=>document.getElementById(id).value='');
     ['pp-inicio','pp-prazo-cont','pp-prazo-cli','pp-tend'].forEach(id=>document.getElementById(id).value='');
@@ -4920,7 +4924,6 @@ function openProjModal(idx){
     toggleParcial();
   }
   openMo('mo-proj');
-  setTimeout(()=>{const f=document.getElementById(idx===null?'pp-obra':'pp-obra'); if(f) f.focus();}, 30);
 }
 function toggleParcial(){document.getElementById('pp-parcial-sec').style.display=document.getElementById('pp-parcial').value==='sim'?'block':'none';}
 function addParcialRow(){
@@ -6295,11 +6298,11 @@ function exportarPDF(){
   if(!el){alert('Clique em "Visualizar" primeiro.');return;}
   if(typeof html2canvas==='undefined'||typeof window.jspdf==='undefined'){window.print();return;}
   const {jsPDF}=window.jspdf;
-  const A4_W=210, A4_H=297, MARGIN=8; // mm, portrait A4
+  const A4_W=297, A4_H=210, MARGIN=8; // mm, landscape A4
   const pxPerMm=3.7795;
   const contentWidthPx=(A4_W-MARGIN*2)*pxPerMm;
   html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true,width:el.scrollWidth,windowWidth:el.scrollWidth}).then(canvas=>{
-    const pdf=new jsPDF('p','mm','a4');
+    const pdf=new jsPDF('l','mm','a4');
     const imgW=A4_W-MARGIN*2;
     const imgH=canvas.height*imgW/canvas.width;
     const pageContentH=A4_H-MARGIN*2;
@@ -6334,6 +6337,12 @@ function exportarPPTX(){
   const tF=cons.reduce((s,m)=>s+m.fat,0);
   const tNV=cons.reduce((s,m)=>s+m.nfv,0);
   const tAR=cons.reduce((s,m)=>s+m.ar,0);
+  const incCrono=!!document.getElementById('ri-crono')?.checked;
+  const incRdo=!!document.getElementById('ri-rdo')?.checked;
+  const incDocs=!!document.getElementById('ri-docs')?.checked;
+  const incMed=!!document.getElementById('ri-med')?.checked;
+  const incSat=!!document.getElementById('ri-sat')?.checked;
+  const incObs=!!document.getElementById('ri-obs')?.checked;
 
   // Light theme palette
   const BG='#ffffff', BG2='#f5f5f5', BG3='#eeeeee';
@@ -6457,7 +6466,7 @@ function exportarPPTX(){
   </div>
 
   <!-- RDO -->
-  ${SLIDE('RDO — STATUS DAS OBRAS','Relatório Diário de Obra — '+semana,`
+  ${incRdo ? SLIDE('RDO — STATUS DAS OBRAS','Relatório Diário de Obra — '+semana,`
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
       ${S(BL,'Total em Campo',RDO.length)}${S(G,'✅ Atualizadas',RDO.filter(r=>getRdoStatus(r)==='Atualizado').length,'≤7 dias')}${S(R,'⚠ Pendentes',RDO.filter(r=>getRdoStatus(r)==='Pendente').length,'>7 dias')}${S(Y,'Não Iniciadas',RDO.filter(r=>getRdoStatus(r)==='Não Iniciado').length)}
     </div>
@@ -6467,10 +6476,10 @@ function exportarPPTX(){
       const a=fd(r.atualizacao),e=fd(r.enviado),s=fd(r.assinado);
       return`<tr><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;font-family:monospace;color:#888">${r.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${r.obra}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${a.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${a.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${e.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${e.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${s.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${s.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${r.resp||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${r.modelo||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:${cl};font-weight:700">${st}</td></tr>`;}).join('')}
     </tbody></table>
-  `)}
+  `) : ''}
 
   <!-- CRONOGRAMA -->
-  ${SLIDE('CRONOGRAMA, PRAZOS E AVANÇOS','',`
+  ${incCrono ? SLIDE('CRONOGRAMA, PRAZOS E AVANÇOS','',`
     <div style="display:grid;grid-template-columns:1fr 320px;gap:16px">
       <div>
         <div style="margin-bottom:8px;font-size:11px"><span style="color:${G};font-weight:600">🟢 ${noPrazo} No Prazo</span> &nbsp; <span style="color:${R};font-weight:600">🔴 ${ativos-noPrazo} Atrasadas</span></div>
@@ -6486,10 +6495,10 @@ function exportarPPTX(){
           <div class="obs-c" style="margin-bottom:8px"><div class="obs-ct">${o.obra?o.obra+' — ':''}${o.titulo||''}</div><div class="obs-cb">${o.texto}</div></div>`).join('')||'<div style="color:#999;font-size:11px">Sem comentários.</div>'}
       </div>
     </div>
-  `)}
+  `) : ''}
 
   <!-- MEDIÇÕES -->
-  ${medSlide}
+  ${incMed ? medSlide : ''}
 
   <!-- DOCUMENTAÇÃO -->
   ${(()=>{
@@ -6528,7 +6537,7 @@ function exportarPPTX(){
         +'<td style="padding:3px 6px;font-size:9px;font-weight:700;color:'+dC+'">'+dT+'</td>'
         +'</tr>';
     }).join('');
-    return SLIDE('DOCUMENTAÇÃO, SEGUROS & CONFORMIDADE','Situação Documental por Projeto',`
+    return incDocs ? SLIDE('DOCUMENTAÇÃO, SEGUROS & CONFORMIDADE','Situação Documental por Projeto',`
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
         ${[['#1558c0','Cadastrados',DOCUMENTACAO.length],['#c0392b','Pendências',docsPend],['#1a7a30','ARTs Emitidas',artsEmit],['#c0392b','Contratos Vencidos',ctosVenc]].map(([col,lbl,val])=>'<div style="background:#f8f8f8;border-radius:6px;padding:10px 12px;border-top:3px solid '+col+';border:1px solid #e0e0e0"><div style="font-size:9px;color:#888;text-transform:uppercase">'+lbl+'</div><div style="font-size:22px;font-weight:800;color:'+col+';margin-top:3px">'+val+'</div></div>').join('')}
         <div style="background:#f8f8f8;border-radius:6px;padding:10px 12px;border-top:3px solid #a07800;border:1px solid #e0e0e0"><div style="font-size:9px;color:#888;text-transform:uppercase">Cto. Vencem ≤30d</div><div style="font-size:22px;font-weight:800;color:#a07800;margin-top:3px">${ctosProx}</div></div>
@@ -6558,11 +6567,11 @@ function exportarPPTX(){
         </thead>
         <tbody>${rows}</tbody>
       </table>
-    `);
+    `) : '';
   })()}
 
   <!-- SATISFAÇÃO -->
-  ${SLIDE('SATISFAÇÃO DO CLIENTE','',`
+  ${incSat ? SLIDE('SATISFAÇÃO DO CLIENTE','',`
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
       ${S(BL,'Total',PESQUISAS.length)}${S(G,'😊 Satisfeitos',PESQUISAS.filter(p=>p.nivel==='Satisfeito').length)}${S(Y,'😐 Parcialmente',PESQUISAS.filter(p=>p.nivel==='Parcialmente Satisfeito').length)}${S(R,'😞 Insatisfeitos',PESQUISAS.filter(p=>p.nivel==='Insatisfeito').length)}
     </div>
@@ -6570,15 +6579,15 @@ function exportarPPTX(){
     <tbody>${PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?G:p.nivel==='Insatisfeito'?R:Y;const com=satComentarioHtml(p,true);
       return`<tr><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${new Date(p.data).toLocaleDateString('pt-BR')}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;font-family:monospace;color:#888">${p.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${p.cliente}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;color:${cl};font-weight:700;font-size:12px">${f.e} ${f.l}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#555;max-width:400px;line-height:1.45">${com}</td></tr>`;}).join('')}
     </tbody></table>
-  `)}
+  `) : ''}
 
   <!-- COMENTÁRIOS -->
-  ${SLIDE('COMENTÁRIOS & OBSERVAÇÕES',semana,`
+  ${incObs ? SLIDE('COMENTÁRIOS & OBSERVAÇÕES',semana,`
     <div class="obs-g">
       ${OBSERVACOES.filter(o=>o.semana===16).map(o=>{const corBd=o.cor==='g'?'#1a7a30':o.cor==='y'?'#a07800':o.cor==='r'?'#c0392b':'#999';
         return`<div class="obs-c" style="border-left-color:${corBd}"><div class="obs-ct" style="color:${corBd}">${o.obra?o.obra+' — ':''}${o.titulo||'Comentário Geral'}</div><div class="obs-cb">${o.texto}</div></div>`;}).join('')}
     </div>
-  `)}
+  `) : ''}
 
   </body></html>`;
 
@@ -6587,7 +6596,7 @@ function exportarPPTX(){
   const a=document.createElement('a');a.href=url;
   a.download=`Relatorio-GrupoLafaete-${semana.replace(/\s+/g,'-')}.html`;
   a.click();URL.revokeObjectURL(url);
-  alert('✅ Apresentação exportada! Abra o .html no Chrome → Ctrl+P → Salvar como PDF (modo paisagem 1280×720).');
+  alert('✅ Apresentação exportada! A capa completa foi mantida e os módulos seguem apenas o que estiver marcado. Abra o .html no Chrome e imprima em modo paisagem.');
 }
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
