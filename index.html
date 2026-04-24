@@ -232,12 +232,13 @@ textarea{resize:vertical;min-height:68px}
 @media(max-width:760px){.access-grid{grid-template-columns:1fr}}
 </style>
 <!-- Correção: dados do primeiro arquivo + exportação por módulos selecionados v8 -->
-<!-- Versão v10: dados idênticos ao index_relatorio_exportes_dados_preservados + exportação por módulos selecionados + chave local nova -->
+<!-- Versão v12: inclui opção de tonalidade clara/escura para PDF/PowerPoint, mantendo configurações anteriores -->
 <!-- FINAL: configuração do segundo arquivo + dados/chave de salvamento do primeiro arquivo -->
 <!-- Correção v12: salvamento dos comentários de Cronograma/Financeiro e destaque apagado para pesquisas antigas -->
 <!-- Correção v13: Observações Livres separadas dos comentários de Cronograma e Medições -->
 <!-- Correção v14: Comentários de Cronograma, Financeiro e Observações Livres totalmente independentes, sem vínculo por obra -->
 <!-- Versão: exclusão independente de projetos por aba, mantendo demais dados preservados -->
+<!-- Correção v16: quebra automática de texto longo nos comentários exportados para PowerPoint/PDF -->
 </head>
 <body>
 
@@ -676,6 +677,15 @@ textarea{resize:vertical;min-height:68px}
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-med" checked style="width:auto"> Medições</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-sat" checked style="width:auto"> Satisfação</label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="ri-obs" checked style="width:auto"> Comentários</label>
+      </div>
+    </div>
+    <div class="fr" style="margin-bottom:12px">
+      <div class="fg">
+        <label>Tonalidade do fundo na exportação</label>
+        <select id="rel-tonalidade">
+          <option value="dark" selected>Escura / padrão atual</option>
+          <option value="light">Clara / fundo branco</option>
+        </select>
       </div>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -6354,9 +6364,9 @@ function gerarRelatorio(){
       <div>
         <div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários</div>
         ${OBSERVACOES.filter(o=>o.tipo==='Cronograma'&&o.semana===16).map(o=>`
-          <div style="border-left:3px solid #E87722;padding:8px 12px;margin-bottom:10px;background:#1a1a1a;border-radius:0 6px 6px 0">
+          <div style="border-left:3px solid #E87722;padding:8px 12px;margin-bottom:10px;background:#1a1a1a;border-radius:0 6px 6px 0;overflow:hidden;max-width:100%">
             <div style="font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px">${o.obra?o.obra+' — ':''}${o.titulo||''}</div>
-            <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap">${o.texto}</div>
+            <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%">${o.texto}</div>
           </div>`).join('')}
       </div>
     </div></div></section>`;
@@ -6384,9 +6394,9 @@ function gerarRelatorio(){
       <div>
         <div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários</div>
         ${OBSERVACOES.filter(o=>o.tipo==='Financeiro'&&o.semana===16).map(o=>`
-          <div style="border-left:3px solid #E87722;padding:8px 12px;margin-bottom:10px;background:#1a1a1a;border-radius:0 6px 6px 0">
+          <div style="border-left:3px solid #E87722;padding:8px 12px;margin-bottom:10px;background:#1a1a1a;border-radius:0 6px 6px 0;overflow:hidden;max-width:100%">
             <div style="font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px">${o.obra?o.obra+' — ':''}${o.titulo||''}</div>
-            <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap">${o.texto}</div>
+            <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%">${o.texto}</div>
           </div>`).join('')}
       </div>
     </div></div></section>`;
@@ -6415,7 +6425,7 @@ function gerarRelatorio(){
         ${obs16.map(o=>{const corBd=o.cor==='g'?'#28c76f':o.cor==='y'?'#ffc107':o.cor==='r'?'#ea5455':'#444';
           return`<div style="background:#1a1a1a;border-left:3px solid ${corBd};border-radius:0 6px 6px 0;padding:12px">
             <div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:6px">${o.obra?o.obra+' — ':''}${o.titulo||'Comentário Geral'}</div>
-            <div style="font-size:11px;color:#b0b0b0;line-height:1.7;white-space:pre-wrap">${o.texto}</div>
+            <div style="font-size:11px;color:#b0b0b0;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%">${o.texto}</div>
           </div>`;}).join('')}
       </div></div></section>`;
     }
@@ -6425,6 +6435,47 @@ function gerarRelatorio(){
   document.getElementById('rel-preview').innerHTML=`<div class="toolbar" style="display:flex;justify-content:flex-end;gap:10px;margin:0 0 12px 0"><button class="btn btn-g" onclick="exportarPDF()">⬇ PDF</button><button class="btn btn-bl" onclick="exportarPPTX()">📊 PowerPoint</button><button class="btn" onclick="printRelatorio()">🖨 Imprimir visualização</button></div><div class="card" style="padding:0;overflow:hidden">${html}</div>`;
 }
 
+
+function getRelTonalidade(){
+  return document.getElementById('rel-tonalidade')?.value || 'dark';
+}
+function relThemeColors(){
+  const light=getRelTonalidade()==='light';
+  return light ? {
+    page:'#f7f8fa', slide:'#ffffff', hdr:'#ffffff', text:'#1f2933', muted:'#667085', shadow:'0 2px 12px rgba(0,0,0,.10)'
+  } : {
+    page:'#e8e8e8', slide:'#ffffff', hdr:'#1a1a1a', text:'#111', muted:'#cfcfcf', shadow:'0 2px 12px rgba(0,0,0,.15)'
+  };
+}
+function themeReportHtml(html){
+  if(getRelTonalidade()!=='light') return html;
+  return (html||'')
+    .replaceAll('background:#111','background:#ffffff')
+    .replaceAll('background:#1a1a1a','background:#f7f8fa')
+    .replaceAll('background:#1A1A1A','background:#f7f8fa')
+    .replaceAll('border-bottom:1px solid #333','border-bottom:1px solid #d9dde3')
+    .replaceAll('border-bottom:1px solid #222','border-bottom:1px solid #e5e7eb')
+    .replaceAll('border-top:1px solid #333','border-top:1px solid #d9dde3')
+    .replaceAll('border-left:3px solid #444','border-left:3px solid #cbd5e1')
+    .replaceAll('color:#f0f0f0','color:#1f2933')
+    .replaceAll('color:#ececec','color:#1f2933')
+    .replaceAll('color:#ffffff','color:#111827')
+    .replaceAll('color:#fff','color:#111827')
+    .replaceAll('color:#f4f4f4','color:#1f2933')
+    .replaceAll('color:#f3f3f3','color:#1f2933')
+    .replaceAll('color:#d7d7d7','color:#344054')
+    .replaceAll('color:#d8d8d8','color:#344054')
+    .replaceAll('color:#e2e2e2','color:#344054')
+    .replaceAll('color:#b0b0b0','color:#667085')
+    .replaceAll('color:#bdbdbd','color:#667085')
+    .replaceAll('color:#aaa','color:#667085')
+    .replaceAll('color:#999','color:#667085')
+    .replaceAll('color:#888','color:#667085')
+    .replaceAll('color:#808080','color:#667085')
+    .replaceAll('color:#555','color:#667085')
+    .replaceAll('color:#333','color:#344054')
+    .replaceAll('background:#E87722;color:#111827','background:#E87722;color:#fff');
+}
 
 function exportarPDF(){
   printRelatorio();
@@ -6443,8 +6494,10 @@ function exportarPPTX(){
   const sections=[...content.querySelectorAll('.rel-module')];
   if(!sections.length){alert('Nenhum módulo selecionado para exportar.');return;}
   if(sections.length < checkedMods.length){console.warn('A exportação encontrou menos módulos do que quadrinhos marcados.', {checkedMods, sections:sections.map(s=>s.dataset.title)});}
-  const slides=sections.map(sec=>`<div class="slide"><div class="s-hdr"><div><div class="s-tag">${sec.dataset.title||'Módulo'}</div><div class="s-sub">${semana}</div></div><div style="text-align:right;font-size:11px;color:#cfcfcf"><div style="color:#E87722;font-weight:800">${semana}</div><div>Corte: ${corteDate}</div><div>${emissor}</div></div></div><div class="s-body">${sec.innerHTML}</div></div>`).join('');
-  const pptHtml=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório ${semana} — Grupo Lafaete</title><style>*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}body{background:#e8e8e8;padding:20px}.slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);display:flex;flex-direction:column}.s-hdr{background:#1a1a1a;padding:18px 32px;display:flex;align-items:center;justify-content:space-between}.s-tag{font-size:20px;font-weight:800;color:#E87722}.s-sub{font-size:12px;color:#bdbdbd;margin-top:3px}.s-body{padding:20px 32px;flex:1;overflow:visible}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #eee;padding:5px 8px;vertical-align:top;font-size:10px;color:#111;line-height:1.35}th{background:#f0f0f0;color:#555;font-size:9px;text-transform:uppercase} .money{white-space:nowrap} @media print{@page{size:1280px 720px landscape;margin:0}body{background:none;padding:0}.slide{box-shadow:none;margin:0;page-break-after:always}}</style></head><body><div class="slide"><div style="background:#1a1a1a;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px"><img src="${LOGO_URI}" style="height:80px;object-fit:contain;margin-bottom:36px" alt="Grupo Lafaete"><div style="font-size:48px;font-weight:900;color:#E87722;text-align:center;line-height:1.1">Relatório Semanal</div><div style="font-size:24px;font-weight:600;color:#ffffff;margin:10px 0 4px">Gestão de Projetos Especiais</div><div style="font-size:18px;color:#E87722;font-weight:800;margin:16px 0 6px">${semana}</div><div style="font-size:14px;color:#d0d0d0">Data de Corte: ${corteDate} · Emissão: ${new Date().toLocaleDateString('pt-BR')}</div><div style="font-size:13px;color:#999;margin-top:8px">${emissor}</div></div></div>${slides}</body></html>`;
+  const theme=relThemeColors();
+  const isLight=getRelTonalidade()==='light';
+  const slides=sections.map(sec=>`<div class="slide"><div class="s-hdr"><div><div class="s-tag">${sec.dataset.title||'Módulo'}</div><div class="s-sub">${semana}</div></div><div style="text-align:right;font-size:11px;color:${isLight?'#667085':'#cfcfcf'}"><div style="color:#E87722;font-weight:800">${semana}</div><div>Corte: ${corteDate}</div><div>${emissor}</div></div></div><div class="s-body">${themeReportHtml(sec.innerHTML)}</div></div>`).join('');
+  const pptHtml=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório ${semana} — Grupo Lafaete</title><style>*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}body{background:${theme.page};padding:20px}.slide{width:1280px;min-height:720px;background:${theme.slide};margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:${theme.shadow};display:flex;flex-direction:column}.s-hdr{background:${theme.hdr};padding:18px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #E87722}.s-tag{font-size:20px;font-weight:800;color:#E87722}.s-sub{font-size:12px;color:${theme.muted};margin-top:3px}.s-body{padding:20px 32px;flex:1;overflow:visible;color:${theme.text}}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #eee;padding:5px 8px;vertical-align:top;font-size:10px;color:#111;line-height:1.35;overflow-wrap:anywhere;word-break:break-word}th{background:#f0f0f0;color:#555;font-size:9px;text-transform:uppercase}.s-body div,.s-body span{max-width:100%;overflow-wrap:anywhere;word-break:break-word}.s-body [style*=\"white-space:pre-wrap\"]{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.money{white-space:nowrap} @media print{@page{size:1280px 720px landscape;margin:0}body{background:none;padding:0}.slide{box-shadow:none;margin:0;page-break-after:always}}</style></head><body><div class="slide"><div style="background:${isLight?'#ffffff':'#1a1a1a'};border:1px solid ${isLight?'#e5e7eb':'#1a1a1a'};flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px"><img src="${LOGO_URI}" style="height:80px;object-fit:contain;margin-bottom:36px" alt="Grupo Lafaete"><div style="font-size:48px;font-weight:900;color:#E87722;text-align:center;line-height:1.1">Relatório Semanal</div><div style="font-size:24px;font-weight:600;color:${isLight?'#111827':'#ffffff'};margin:10px 0 4px">Gestão de Projetos Especiais</div><div style="font-size:18px;color:#E87722;font-weight:800;margin:16px 0 6px">${semana}</div><div style="font-size:14px;color:${isLight?'#344054':'#d0d0d0'}">Data de Corte: ${corteDate} · Emissão: ${new Date().toLocaleDateString('pt-BR')}</div><div style="font-size:13px;color:${isLight?'#667085':'#999'};margin-top:8px">${emissor}</div></div></div>${slides}</body></html>`;
   const blob=new Blob([pptHtml],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url; a.download=`Relatorio-GrupoLafaete-${semana.replace(/\s+/g,'-')}.html`; a.click(); URL.revokeObjectURL(url);
@@ -6463,8 +6516,10 @@ function printRelatorio(){
   const checkedMods=[...document.querySelectorAll('#page-relatorios input[id^=ri-][type=checkbox]:checked')].map(x=>x.id);
   const sections=[...content.querySelectorAll('.rel-module')];
   if(sections.length < checkedMods.length){console.warn('A impressão encontrou menos módulos do que quadrinhos marcados.', {checkedMods, sections:sections.map(s=>s.dataset.title)});}
-  const slides=sections.map(sec=>`<section class="slide"><div class="s-hdr"><div><div class="s-tag">${sec.dataset.title||'Módulo'}</div><div class="s-sub">${semana}</div></div><div style="text-align:right;font-size:11px;color:#cfcfcf"><div style="color:#E87722;font-weight:800">${semana}</div><div>Corte: ${corteDate}</div><div>${emissor}</div></div></div><div class="s-body">${sec.innerHTML}</div></section>`).join('');
-  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${semana}</title><style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{margin:0;background:#fff}.slide{page-break-after:always;break-after:page;background:#fff;overflow:visible}.s-hdr{background:#1a1a1a;padding:12px 18px;display:flex;align-items:center;justify-content:space-between}.s-tag{font-size:16px;font-weight:800;color:#E87722}.s-sub{font-size:10px;color:#bdbdbd;margin-top:2px}.s-body{padding:14px 18px;overflow:visible}table{width:100%!important;border-collapse:collapse;table-layout:auto}thead{display:table-header-group}th,td{border-bottom:1px solid #ddd;padding:4px 6px;vertical-align:top;font-size:9px;color:#111;line-height:1.28;word-break:break-word}th{background:#f0f0f0!important;color:#555!important;font-size:8px;text-transform:uppercase}.money{white-space:nowrap}</style></head><body><section class="slide"><div style="background:#1a1a1a;min-height:180mm;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px"><img src="${LOGO_URI}" style="height:64px;object-fit:contain;margin-bottom:28px"><div style="font-size:38px;font-weight:900;color:#E87722;line-height:1.1;text-align:center">Relatório Semanal</div><div style="font-size:20px;font-weight:600;color:#fff;margin-top:8px">Gestão de Projetos Especiais</div><div style="font-size:16px;color:#E87722;font-weight:800;margin-top:14px">${semana}</div><div style="font-size:12px;color:#ddd;margin-top:8px">Data de Corte: ${corteDate} · Emissão: ${new Date().toLocaleDateString('pt-BR')}</div><div style="font-size:11px;color:#aaa;margin-top:8px">${emissor}</div></div></section>${slides}</body></html>`;
+  const theme=relThemeColors();
+  const isLight=getRelTonalidade()==='light';
+  const slides=sections.map(sec=>`<section class="slide"><div class="s-hdr"><div><div class="s-tag">${sec.dataset.title||'Módulo'}</div><div class="s-sub">${semana}</div></div><div style="text-align:right;font-size:11px;color:${isLight?'#667085':'#cfcfcf'}"><div style="color:#E87722;font-weight:800">${semana}</div><div>Corte: ${corteDate}</div><div>${emissor}</div></div></div><div class="s-body">${themeReportHtml(sec.innerHTML)}</div></section>`).join('');
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${semana}</title><style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{margin:0;background:${theme.slide}}.slide{page-break-after:always;break-after:page;background:${theme.slide};overflow:visible}.s-hdr{background:${theme.hdr};padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #E87722}.s-tag{font-size:16px;font-weight:800;color:#E87722}.s-sub{font-size:10px;color:${theme.muted};margin-top:2px}.s-body{padding:14px 18px;overflow:visible;color:${theme.text}}table{width:100%!important;border-collapse:collapse;table-layout:auto}thead{display:table-header-group}th,td{border-bottom:1px solid #ddd;padding:4px 6px;vertical-align:top;font-size:9px;color:#111;line-height:1.28;overflow-wrap:anywhere;word-break:break-word}th{background:#f0f0f0!important;color:#555!important;font-size:8px;text-transform:uppercase}.s-body div,.s-body span{max-width:100%;overflow-wrap:anywhere;word-break:break-word}.s-body [style*=\"white-space:pre-wrap\"]{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.money{white-space:nowrap}</style></head><body><section class="slide"><div style="background:${isLight?'#ffffff':'#1a1a1a'};border:1px solid ${isLight?'#e5e7eb':'#1a1a1a'};min-height:180mm;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px"><img src="${LOGO_URI}" style="height:64px;object-fit:contain;margin-bottom:28px"><div style="font-size:38px;font-weight:900;color:#E87722;line-height:1.1;text-align:center">Relatório Semanal</div><div style="font-size:20px;font-weight:600;color:${isLight?'#111827':'#fff'};margin-top:8px">Gestão de Projetos Especiais</div><div style="font-size:16px;color:#E87722;font-weight:800;margin-top:14px">${semana}</div><div style="font-size:12px;color:${isLight?'#344054':'#ddd'};margin-top:8px">Data de Corte: ${corteDate} · Emissão: ${new Date().toLocaleDateString('pt-BR')}</div><div style="font-size:11px;color:${isLight?'#667085':'#aaa'};margin-top:8px">${emissor}</div></div></section>${slides}</body></html>`;
   const w=window.open('','_blank'); w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),300);
 }
 // ─── INIT ────────────────────────────────────────────────────────────────────
