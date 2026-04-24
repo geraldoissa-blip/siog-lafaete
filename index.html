@@ -4,462 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SIOG — Grupo Lafaete</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
-
-// ===== Overrides: relatório/visualização/PDF espelhando o PowerPoint =====
-function __reportMeta(){
-  const semana=document.getElementById('rel-semana')?.value||'Semana 16';
-  const corteStr=document.getElementById('rel-corte')?.value||'';
-  const corteDate=corteStr?new Date(corteStr).toLocaleDateString('pt-BR'):'—';
-  const emissor=document.getElementById('rel-emissor')?.value||'Diretoria de Projetos Especiais';
-  const now=new Date().toLocaleDateString('pt-BR');
-  return {semana,corteDate,emissor,now};
-}
-function __reportFlags(){
-  return {
-    incCrono:!!document.getElementById('ri-crono')?.checked,
-    incRdo:!!document.getElementById('ri-rdo')?.checked,
-    incDocs:!!document.getElementById('ri-docs')?.checked,
-    incMed:!!document.getElementById('ri-med')?.checked,
-    incSat:!!document.getElementById('ri-sat')?.checked,
-    incObs:!!document.getElementById('ri-obs')?.checked,
-  };
-}
-function __commentColor(cor){return cor==='g'?'#1a7a30':cor==='y'?'#a07800':cor==='r'?'#c0392b':'#999';}
-function __commentCards(list){
-  return list.map(o=>`<div class="obs-c" style="border-left-color:${__commentColor(o.cor)}"><div class="obs-ct" style="color:${__commentColor(o.cor)}">${o.obra?o.obra+' — ':''}${o.titulo||'Comentário Geral'}</div><div class="obs-cb">${o.texto}</div></div>`).join('');
-}
-function __chunkComments(list,maxPerPage=4){
-  const chunks=[]; for(let i=0;i<list.length;i+=maxPerPage) chunks.push(list.slice(i,i+maxPerPage));
-  return chunks.length?chunks:[[]];
-}
-function __deckStyles(){ return `
-<style>
-  #rel-preview .deck-wrap{margin-top:16px}
-  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
-  .s-hdr{background:#1a1a1a;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-  .s-tag{font-size:18px;font-weight:800;color:#E87722}
-  .s-sub{font-size:11px;color:#aaa;margin-top:2px}
-  .s-body{padding:20px 32px;flex:1;overflow:visible;color:#1a1a1a}
-  .krow{display:grid;gap:10px;margin-bottom:14px}.krow-4{grid-template-columns:repeat(4,1fr)}
-  table{width:100%;border-collapse:collapse}.obs-g{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .obs-c{border-left:3px solid #E87722;padding:10px 12px;background:#fafafa;border-radius:0 4px 4px 0}
-  .obs-ct{font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px}.obs-cb{font-size:10px;color:#555;line-height:1.55;white-space:pre-wrap}.slide table td,.slide table th{font-family:Arial,sans-serif}.slide table td{font-size:10px;line-height:1.35}.slide table th{font-size:8px}
-  .split-2{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
-  .muted{color:#888}.mono{font-family:monospace}
-  .sat-big{font-size:24px;line-height:1}
-  .val-nowrap{white-space:nowrap;line-height:1.1}
-  @media print{
-    @page{size:A4 landscape;margin:8mm}
-    body{background:none!important}
-    #sb,#hdr,.filter-bar,.btn,.theme-btn,.mo,.comments-panel,.access-modal,.read-only-banner{display:none!important}
-    #main{margin-left:0!important} #content{padding:0!important}
-    #page-relatorios{display:block!important}
-    .card.mb16{display:none!important}
-    #rel-preview .deck-wrap{margin-top:0}
-    .slide{width:100%;min-height:auto;box-shadow:none;margin:0 0 12px 0;page-break-after:always;break-after:page;border-radius:0;overflow:visible!important}
-    .slide:last-child{page-break-after:auto;break-after:auto}
-  }
-</style>`; }
-function __TH(h){return `<th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">${h}</th>`;}
-function __TD(v,s=''){return `<td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;${s}">${v}</td>`;}
-function __S(c,l,v,sub=''){return `<div style="background:#f8f8f8;border-radius:6px;padding:12px 14px;border-top:3px solid ${c};border:1px solid #e0e0e0"><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px">${l}</div><div class="val-nowrap" style="font-size:18px;font-weight:800;color:${c};margin:3px 0">${v}</div>${sub?`<div style="font-size:10px;color:#888">${sub}</div>`:''}</div>`;}
-function __SLIDE(meta,title,sub,body){
-  return `<div class="slide"><div class="s-hdr"><div><div class="s-tag">${title}</div>${sub?`<div class="s-sub">${sub}</div>`:''}</div><div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_URI}" style="height:36px;object-fit:contain" alt="Grupo Lafaete"><div style="text-align:right;font-size:10px;color:#aaa"><div style="color:#E87722;font-weight:700">${meta.semana}</div><div>Corte: ${meta.corteDate}</div><div>${meta.now}</div></div></div></div><div class="s-body">${body}</div></div>`;
-}
-function __buildDeckHTML(embedOnly=false){
-  const meta=__reportMeta();
-  const flags=__reportFlags();
-  const cons=getMedCons();
-  const tC=cons.reduce((s,m)=>s+(m.contrato||0),0);
-  const tR=cons.reduce((s,m)=>s+m.rec,0);
-  const tM=cons.reduce((s,m)=>s+m.med,0);
-  const tF=cons.reduce((s,m)=>s+m.fat,0);
-  const tNV=cons.reduce((s,m)=>s+m.nfv,0);
-  const tAR=cons.reduce((s,m)=>s+m.ar,0);
-  const ativos=PROJETOS.filter(p=>p.status==='Ativo').length;
-  const atrasados=PROJETOS.filter(p=>p.alerta==='⚠ Atraso').length;
-  const noPrazo=PROJETOS.filter(p=>cronoFarol(p)==='g').length;
-  let slides='';
-  slides += `<div class="slide"><div style="background:#1a1a1a;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px"><img src="${LOGO_URI}" style="height:80px;object-fit:contain;margin-bottom:36px" alt="Grupo Lafaete"><div style="font-size:48px;font-weight:900;color:#E87722;text-align:center;line-height:1.1">Relatório Semanal</div><div style="font-size:24px;font-weight:600;color:#ffffff;margin:10px 0 4px">Gestão de Projetos Especiais</div><div style="font-size:16px;color:#E87722;font-weight:700;margin:16px 0 6px">${meta.semana}</div><div style="font-size:14px;color:#888">Data de Corte: ${meta.corteDate} &nbsp;·&nbsp; Emissão: ${meta.now}</div><div style="font-size:13px;color:#666;margin-top:8px">${meta.emissor}</div><div style="display:grid;grid-template-columns:repeat(4,160px);gap:12px;margin-top:36px">${[['#4a9eff','Projetos Ativos',ativos],['#ff6b6b','Atrasados',atrasados],['#E87722','Carteira',fmtR(tC)],['#48c774','Recebido',fmtR(tR)]].map(([col,lbl,val])=>`<div style="background:rgba(255,255,255,.08);border-top:3px solid ${col};border-radius:6px;padding:14px;text-align:center"><div style="font-size:9px;color:#888;text-transform:uppercase">${lbl}</div><div class="val-nowrap" style="font-size:18px;font-weight:800;color:${col};margin-top:4px">${val}</div></div>`).join('')}</div></div></div>`;
-
-  if(flags.incRdo){
-    const rows=RDO.map(r=>{const st=getRdoStatus(r);const cl=st==='Atualizado'?'#1a7a30':st==='Pendente'?'#c0392b':'#a07800';
-      const fd=v=>{if(!v||isNaN(v))return{t:v||'—',d:'🟡'};const dd=TODAY_XL-v;return{t:xl2str(v),d:dd<=7?'🟢':'🔴'};};
-      const a=fd(r.atualizacao),e=fd(r.enviado),s=fd(r.assinado);
-      return `<tr><td class="mono muted" style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px">${r.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${r.obra}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${a.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${a.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${e.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${e.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${s.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${s.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${r.resp||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${r.modelo||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:${cl};font-weight:700">${st}</td></tr>`;}).join('');
-    slides += __SLIDE(meta,'RDO — STATUS DAS OBRAS','Relatório Diário de Obra',`<div class="krow krow-4">${__S('#4a9eff','Total em Campo',RDO.length)}${__S('#1a7a30','Atualizadas',RDO.filter(r=>getRdoStatus(r)==='Atualizado').length,'≤7 dias')}${__S('#c0392b','Pendentes',RDO.filter(r=>getRdoStatus(r)==='Pendente').length,'>7 dias')}${__S('#a07800','Não Iniciadas',RDO.filter(r=>getRdoStatus(r)==='Não Iniciado').length)}</div><table><thead><tr>${['ID','Obra','Última Atualiz.','⬤','Enviado','⬤','Assinado','⬤','Responsável','Modelo','Status'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table>`);
-  }
-
-  if(flags.incCrono){
-    const cronComments=OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16);
-    const commentChunks=__chunkComments(cronComments,4);
-    const tableHtml=`<table><thead><tr>${['ID','Obra / Entrega','Início','Prazo Contr.','Prazo Cliente','Tendência','⬤','% Prev.','% Real.','Ader.'].map(__TH).join('')}</tr></thead><tbody>${PROJETOS.filter(p=>p.status==='Ativo').map(p=>{const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const cl=f==='g'?'#1a7a30':f==='y'?'#a07800':'#c0392b';const base=`<tr><td class="mono muted">${p.id}</td><td style="font-weight:700">${p.obra}</td><td>${xl2str(p.inicio)}</td><td style="color:#c0392b">${xl2str(p.prazo_cont)}</td><td style="color:#c0392b">${xl2str(p.prazo_cli)}</td><td style="color:${cl};font-weight:700">${xl2str(p.tendencia)}</td><td style="text-align:center">${f==='g'?'🟢':f==='y'?'🟡':'🔴'}</td><td style="text-align:right">${fmtPct(av.prev||0)}</td><td style="text-align:right">${fmtPct(av.real||0)}</td><td style="text-align:right;color:${cl};font-weight:700">${((av.real||0)-(av.prev||0)).toFixed(1)} p.p.</td></tr>`;const pars=(p.parciais||[]).map(par=>`<tr style="background:#fafafa"><td></td><td style="padding-left:18px;color:#E87722">↳ ${par.nome}</td><td>${xl2str(par.inicio)}</td><td style="color:#c0392b">${xl2str(par.prazo_cont)}</td><td style="color:#c0392b">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="color:#E87722">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`).join('');return base+pars;}).join('')}</tbody></table>`;
-    slides += __SLIDE(meta,'CRONOGRAMA, PRAZOS E AVANÇOS','Tabela + comentários cronograma',`<div class="split-2"><div><div class="krow krow-4">${__S('#1a7a30','No Prazo',noPrazo)}${__S('#c0392b','Atrasadas',Math.max(ativos-noPrazo,0))}${__S('#4a9eff','Projetos Ativos',ativos)}${__S('#E87722','Carteira',fmtR(tC))}</div>${tableHtml}</div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div>${__commentCards(commentChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
-    for(let i=1;i<commentChunks.length;i++){
-      slides += __SLIDE(meta,'CRONOGRAMA — CONTINUAÇÃO','Comentários cronograma',`<div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div><div class="obs-g">${__commentCards(commentChunks[i])}</div></div>`);
-    }
-  }
-
-  if(flags.incDocs){
-    const rows=DOCUMENTACAO.filter(d=>d.status==='Ativo').map(d=>{function fSt(s){if(!s||s==='-'||s==='N/A')return'<span class="muted">N/A</span>';if(s==='Pendente')return'<span style="color:#c0392b;font-weight:700">Pend.</span>';if(s==='Contratado'||s==='Emitida'||s==='Concluído'||s==='Assinado')return'<span style="color:#1a7a30">✓</span>';return'<span style="color:#a07800">'+s+'</span>';} const dias=d.vig_cto?daysFromToday(d.vig_cto):null; const dC=dias===null?'#888':dias<0?'#c0392b':dias<=30?'#a07800':'#1a7a30'; const dT=dias===null?'—':dias+'d'; const sg=[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st]; const sC=sg.some(s=>s==='Pendente')?'#c0392b':sg.some(s=>s==='Contratado')?'#1a7a30':'#555'; const sT=sg.some(s=>s==='Pendente')?'Pend.':sg.some(s=>s==='Contratado')?'Contr.':'N/A'; return `<tr><td class="mono muted">${d.id}</td><td style="font-weight:700">${d.obra}</td><td>${fSt(d.art_st)}</td><td style="color:${sC}">${sT}</td><td>${fSt(d.crono_st)}</td><td>${fSt(d.chi)}</td><td>${fSt(d.che)}</td><td>${fSt(d.te)}</td><td>${fSt(d.atc)}</td><td style="color:${dC}">${d.vig_cto?new Date(d.vig_cto).toLocaleDateString('pt-BR'):'—'}</td><td style="color:${dC};font-weight:700">${dT}</td></tr>`;}).join('');
-    const docsPend=DOCUMENTACAO.filter(d=>d.status==='Ativo'&&(d.art_st==='Pendente'||[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st].some(s=>s==='Pendente'))).length;
-    const artsEmit=DOCUMENTACAO.filter(d=>d.art_st==='Emitida').length;
-    const ctosVenc=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0&&d.status==='Ativo').length;
-    slides += __SLIDE(meta,'DOCUMENTAÇÃO','Seguros, ARTs e Conformidade',`<div class="krow krow-4">${__S('#4a9eff','Cadastrados',DOCUMENTACAO.length)}${__S('#c0392b','Pendências',docsPend)}${__S('#1a7a30','ARTs Emitidas',artsEmit)}${__S('#c0392b','Contratos Vencidos',ctosVenc)}</div><table><thead><tr>${['ID','Obra','ART','Seg./Gar.','Crono.','Chk.Int','Chk.Ext','Termo','Atestado','Vig. Cto.','Dias'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table>`);
-  }
-
-  if(flags.incMed){
-    const medComments=OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16);
-    const medChunks=__chunkComments(medComments,4);
-    const rows=cons.map(m=>{const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—'; return `<tr>${__TD(m.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(m.cliente,'font-weight:700')}${__TD(fmtR(m.contrato),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.med),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.fat),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.rec),'text-align:right;color:#1a7a30;font-weight:700;white-space:nowrap')}${__TD(pct,'text-align:right')}${__TD(m.nfv>0?fmtR(m.nfv):'—','text-align:right;color:#c0392b;white-space:nowrap')}${__TD(m.ar>0?fmtR(m.ar):'—','text-align:right;white-space:nowrap')}</tr>`;}).join('');
-    slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO','Medições, faturamentos e recebimentos',`<div class="split-2"><div><div class="krow krow-4">${__S('#1558c0','Carteira',fmtR(tC))}${__S('#1a7a30','Medido',fmtR(tM))}${__S('#E87722','Faturado',fmtR(tF))}${__S('#1a7a30','Recebido',fmtR(tR))}${__S('#c0392b','NF Vencidas',fmtR(tNV))}${__S('#a07800','A Receber',fmtR(tAR))}${__S('#888','Prev. 7 dias',fmtR(medPrev7()))}${__S('#888','Prev. 30 dias',fmtR(medPrev30()))}</div><table><thead><tr>${['ID','Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table></div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div>${__commentCards(medChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
-    for(let i=1;i<medChunks.length;i++){
-      slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO — CONTINUAÇÃO','Comentários financeiro',`<div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div><div class="obs-g">${__commentCards(medChunks[i])}</div></div>`);
-    }
-  }
-
-  if(flags.incSat){
-    const satList=PESQUISAS.filter(p=>p.incl_rel);
-    const satChunks=__chunkComments(satList,6);
-    satChunks.forEach((chunk,idx)=>{
-      const rows=chunk.map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:none;line-height:1.4;white-space:normal;word-break:break-word')}</tr>`;}).join('');
-      slides += __SLIDE(meta,idx===0?'SATISFAÇÃO DO CLIENTE':'SATISFAÇÃO DO CLIENTE — CONTINUAÇÃO',idx===0?'Avaliação de Satisfação':'Continuação dos registros',`<div class="krow krow-4">${__S('#1558c0','Total',PESQUISAS.length)}${__S('#1a7a30','😊 Satisfeitos',PESQUISAS.filter(p=>p.nivel==='Satisfeito').length)}${__S('#a07800','😐 Parcialmente',PESQUISAS.filter(p=>p.nivel==='Parcialmente Satisfeito').length)}${__S('#c0392b','😞 Insatisfeitos',PESQUISAS.filter(p=>p.nivel==='Insatisfeito').length)}</div><table><thead><tr>${['Data','ID','Cliente','Satisfação','Comentário'].map(__TH).join('')}</tr></thead><tbody>${rows||'<tr><td colspan="5" style="padding:16px;text-align:center;color:#777">Nenhuma avaliação marcada.</td></tr>'}</tbody></table>`);
-    });
-  }
-
-  if(flags.incObs){
-    const obs16=OBSERVACOES.filter(o=>o.semana===16);
-    slides += __SLIDE(meta,'COMENTÁRIOS & OBSERVAÇÕES',meta.semana,`${obs16.length?`<div class="obs-g">${__commentCards(obs16)}</div>`:'<div class="muted">Nenhuma observação cadastrada para a semana.</div>'}`);
-  }
-
-  const inner = `${__deckStyles()}<div class="deck-wrap">${slides}</div>`;
-  if(embedOnly) return inner;
-  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório ${meta.semana} — Grupo Lafaete</title>${__deckStyles()}</head><body><div class="deck-wrap">${slides}</div></body></html>`;
-}
-function gerarRelatorio(){
-  document.getElementById('rel-preview').innerHTML = __buildDeckHTML(true);
-}
-function imprimirRelatorioSelecionado(){
-  gerarRelatorio();
-  setTimeout(()=>window.print(),120);
-}
-function exportarPPTX(){
-  const meta=__reportMeta();
-  const pptHtml=__buildDeckHTML(false);
-  const blob=new Blob([pptHtml],{type:'text/html;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;
-  a.download=`Relatorio-GrupoLafaete-${meta.semana.replace(/\s+/g,'-')}.html`;
-  a.click(); URL.revokeObjectURL(url);
-  alert('✅ Apresentação exportada! A visualização e a impressão em PDF agora espelham a mesma estrutura do PowerPoint.');
-}
-
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
-
-// ===== Overrides: relatório/visualização/PDF espelhando o PowerPoint =====
-function __reportMeta(){
-  const semana=document.getElementById('rel-semana')?.value||'Semana 16';
-  const corteStr=document.getElementById('rel-corte')?.value||'';
-  const corteDate=corteStr?new Date(corteStr).toLocaleDateString('pt-BR'):'—';
-  const emissor=document.getElementById('rel-emissor')?.value||'Diretoria de Projetos Especiais';
-  const now=new Date().toLocaleDateString('pt-BR');
-  return {semana,corteDate,emissor,now};
-}
-function __reportFlags(){
-  return {
-    incCrono:!!document.getElementById('ri-crono')?.checked,
-    incRdo:!!document.getElementById('ri-rdo')?.checked,
-    incDocs:!!document.getElementById('ri-docs')?.checked,
-    incMed:!!document.getElementById('ri-med')?.checked,
-    incSat:!!document.getElementById('ri-sat')?.checked,
-    incObs:!!document.getElementById('ri-obs')?.checked,
-  };
-}
-function __commentColor(cor){return cor==='g'?'#1a7a30':cor==='y'?'#a07800':cor==='r'?'#c0392b':'#999';}
-function __commentCards(list){
-  return list.map(o=>`<div class="obs-c" style="border-left-color:${__commentColor(o.cor)}"><div class="obs-ct" style="color:${__commentColor(o.cor)}">${o.obra?o.obra+' — ':''}${o.titulo||'Comentário Geral'}</div><div class="obs-cb">${o.texto}</div></div>`).join('');
-}
-function __chunkComments(list,maxPerPage=4){
-  const chunks=[]; for(let i=0;i<list.length;i+=maxPerPage) chunks.push(list.slice(i,i+maxPerPage));
-  return chunks.length?chunks:[[]];
-}
-function __deckStyles(){ return `
-<style>
-  #rel-preview .deck-wrap{margin-top:16px}
-  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
-  .s-hdr{background:#1a1a1a;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-  .s-tag{font-size:18px;font-weight:800;color:#E87722}
-  .s-sub{font-size:11px;color:#aaa;margin-top:2px}
-  .s-body{padding:20px 32px;flex:1;overflow:visible;color:#1a1a1a}
-  .krow{display:grid;gap:10px;margin-bottom:14px}.krow-4{grid-template-columns:repeat(4,1fr)}
-  table{width:100%;border-collapse:collapse}.obs-g{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .obs-c{border-left:3px solid #E87722;padding:10px 12px;background:#fafafa;border-radius:0 4px 4px 0}
-  .obs-ct{font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px}.obs-cb{font-size:10px;color:#555;line-height:1.55;white-space:pre-wrap}.slide table td,.slide table th{font-family:Arial,sans-serif}.slide table td{font-size:10px;line-height:1.35}.slide table th{font-size:8px}
-  .split-2{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
-  .muted{color:#888}.mono{font-family:monospace}
-  .sat-big{font-size:24px;line-height:1}
-  .val-nowrap{white-space:nowrap;line-height:1.1}
-  @media print{
-    @page{size:A4 landscape;margin:8mm}
-    body{background:none!important}
-    #sb,#hdr,.filter-bar,.btn,.theme-btn,.mo,.comments-panel,.access-modal,.read-only-banner{display:none!important}
-    #main{margin-left:0!important} #content{padding:0!important}
-    #page-relatorios{display:block!important}
-    .card.mb16{display:none!important}
-    #rel-preview .deck-wrap{margin-top:0}
-    .slide{width:100%;min-height:auto;box-shadow:none;margin:0 0 12px 0;page-break-after:always;break-after:page;border-radius:0;overflow:visible!important}
-    .slide:last-child{page-break-after:auto;break-after:auto}
-  }
-</style>`; }
-function __TH(h){return `<th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">${h}</th>`;}
-function __TD(v,s=''){return `<td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;${s}">${v}</td>`;}
-function __S(c,l,v,sub=''){return `<div style="background:#f8f8f8;border-radius:6px;padding:12px 14px;border-top:3px solid ${c};border:1px solid #e0e0e0"><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px">${l}</div><div class="val-nowrap" style="font-size:18px;font-weight:800;color:${c};margin:3px 0">${v}</div>${sub?`<div style="font-size:10px;color:#888">${sub}</div>`:''}</div>`;}
-function __SLIDE(meta,title,sub,body){
-  return `<div class="slide"><div class="s-hdr"><div><div class="s-tag">${title}</div>${sub?`<div class="s-sub">${sub}</div>`:''}</div><div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_URI}" style="height:36px;object-fit:contain" alt="Grupo Lafaete"><div style="text-align:right;font-size:10px;color:#aaa"><div style="color:#E87722;font-weight:700">${meta.semana}</div><div>Corte: ${meta.corteDate}</div><div>${meta.now}</div></div></div></div><div class="s-body">${body}</div></div>`;
-}
-function __buildDeckHTML(embedOnly=false){
-  const meta=__reportMeta();
-  const flags=__reportFlags();
-  const cons=getMedCons();
-  const tC=cons.reduce((s,m)=>s+(m.contrato||0),0);
-  const tR=cons.reduce((s,m)=>s+m.rec,0);
-  const tM=cons.reduce((s,m)=>s+m.med,0);
-  const tF=cons.reduce((s,m)=>s+m.fat,0);
-  const tNV=cons.reduce((s,m)=>s+m.nfv,0);
-  const tAR=cons.reduce((s,m)=>s+m.ar,0);
-  const ativos=PROJETOS.filter(p=>p.status==='Ativo').length;
-  const atrasados=PROJETOS.filter(p=>p.alerta==='⚠ Atraso').length;
-  const noPrazo=PROJETOS.filter(p=>cronoFarol(p)==='g').length;
-  let slides='';
-  slides += `<div class="slide"><div style="background:#1a1a1a;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px"><img src="${LOGO_URI}" style="height:80px;object-fit:contain;margin-bottom:36px" alt="Grupo Lafaete"><div style="font-size:48px;font-weight:900;color:#E87722;text-align:center;line-height:1.1">Relatório Semanal</div><div style="font-size:24px;font-weight:600;color:#ffffff;margin:10px 0 4px">Gestão de Projetos Especiais</div><div style="font-size:16px;color:#E87722;font-weight:700;margin:16px 0 6px">${meta.semana}</div><div style="font-size:14px;color:#888">Data de Corte: ${meta.corteDate} &nbsp;·&nbsp; Emissão: ${meta.now}</div><div style="font-size:13px;color:#666;margin-top:8px">${meta.emissor}</div><div style="display:grid;grid-template-columns:repeat(4,160px);gap:12px;margin-top:36px">${[['#4a9eff','Projetos Ativos',ativos],['#ff6b6b','Atrasados',atrasados],['#E87722','Carteira',fmtR(tC)],['#48c774','Recebido',fmtR(tR)]].map(([col,lbl,val])=>`<div style="background:rgba(255,255,255,.08);border-top:3px solid ${col};border-radius:6px;padding:14px;text-align:center"><div style="font-size:9px;color:#888;text-transform:uppercase">${lbl}</div><div class="val-nowrap" style="font-size:18px;font-weight:800;color:${col};margin-top:4px">${val}</div></div>`).join('')}</div></div></div>`;
-
-  if(flags.incRdo){
-    const rows=RDO.map(r=>{const st=getRdoStatus(r);const cl=st==='Atualizado'?'#1a7a30':st==='Pendente'?'#c0392b':'#a07800';
-      const fd=v=>{if(!v||isNaN(v))return{t:v||'—',d:'🟡'};const dd=TODAY_XL-v;return{t:xl2str(v),d:dd<=7?'🟢':'🔴'};};
-      const a=fd(r.atualizacao),e=fd(r.enviado),s=fd(r.assinado);
-      return `<tr><td class="mono muted" style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px">${r.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${r.obra}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${a.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${a.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${e.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${e.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${s.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${s.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${r.resp||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${r.modelo||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:${cl};font-weight:700">${st}</td></tr>`;}).join('');
-    slides += __SLIDE(meta,'RDO — STATUS DAS OBRAS','Relatório Diário de Obra',`<div class="krow krow-4">${__S('#4a9eff','Total em Campo',RDO.length)}${__S('#1a7a30','Atualizadas',RDO.filter(r=>getRdoStatus(r)==='Atualizado').length,'≤7 dias')}${__S('#c0392b','Pendentes',RDO.filter(r=>getRdoStatus(r)==='Pendente').length,'>7 dias')}${__S('#a07800','Não Iniciadas',RDO.filter(r=>getRdoStatus(r)==='Não Iniciado').length)}</div><table><thead><tr>${['ID','Obra','Última Atualiz.','⬤','Enviado','⬤','Assinado','⬤','Responsável','Modelo','Status'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table>`);
-  }
-
-  if(flags.incCrono){
-    const cronComments=OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16);
-    const commentChunks=__chunkComments(cronComments,4);
-    const tableHtml=`<table><thead><tr>${['ID','Obra / Entrega','Início','Prazo Contr.','Prazo Cliente','Tendência','⬤','% Prev.','% Real.','Ader.'].map(__TH).join('')}</tr></thead><tbody>${PROJETOS.filter(p=>p.status==='Ativo').map(p=>{const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const cl=f==='g'?'#1a7a30':f==='y'?'#a07800':'#c0392b';const base=`<tr><td class="mono muted">${p.id}</td><td style="font-weight:700">${p.obra}</td><td>${xl2str(p.inicio)}</td><td style="color:#c0392b">${xl2str(p.prazo_cont)}</td><td style="color:#c0392b">${xl2str(p.prazo_cli)}</td><td style="color:${cl};font-weight:700">${xl2str(p.tendencia)}</td><td style="text-align:center">${f==='g'?'🟢':f==='y'?'🟡':'🔴'}</td><td style="text-align:right">${fmtPct(av.prev||0)}</td><td style="text-align:right">${fmtPct(av.real||0)}</td><td style="text-align:right;color:${cl};font-weight:700">${((av.real||0)-(av.prev||0)).toFixed(1)} p.p.</td></tr>`;const pars=(p.parciais||[]).map(par=>`<tr style="background:#fafafa"><td></td><td style="padding-left:18px;color:#E87722">↳ ${par.nome}</td><td>${xl2str(par.inicio)}</td><td style="color:#c0392b">${xl2str(par.prazo_cont)}</td><td style="color:#c0392b">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="color:#E87722">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`).join('');return base+pars;}).join('')}</tbody></table>`;
-    slides += __SLIDE(meta,'CRONOGRAMA, PRAZOS E AVANÇOS','Tabela + comentários cronograma',`<div class="split-2"><div><div class="krow krow-4">${__S('#1a7a30','No Prazo',noPrazo)}${__S('#c0392b','Atrasadas',Math.max(ativos-noPrazo,0))}${__S('#4a9eff','Projetos Ativos',ativos)}${__S('#E87722','Carteira',fmtR(tC))}</div>${tableHtml}</div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div>${__commentCards(commentChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
-    for(let i=1;i<commentChunks.length;i++){
-      slides += __SLIDE(meta,'CRONOGRAMA — CONTINUAÇÃO','Comentários cronograma',`<div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div><div class="obs-g">${__commentCards(commentChunks[i])}</div></div>`);
-    }
-  }
-
-  if(flags.incDocs){
-    const rows=DOCUMENTACAO.filter(d=>d.status==='Ativo').map(d=>{function fSt(s){if(!s||s==='-'||s==='N/A')return'<span class="muted">N/A</span>';if(s==='Pendente')return'<span style="color:#c0392b;font-weight:700">Pend.</span>';if(s==='Contratado'||s==='Emitida'||s==='Concluído'||s==='Assinado')return'<span style="color:#1a7a30">✓</span>';return'<span style="color:#a07800">'+s+'</span>';} const dias=d.vig_cto?daysFromToday(d.vig_cto):null; const dC=dias===null?'#888':dias<0?'#c0392b':dias<=30?'#a07800':'#1a7a30'; const dT=dias===null?'—':dias+'d'; const sg=[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st]; const sC=sg.some(s=>s==='Pendente')?'#c0392b':sg.some(s=>s==='Contratado')?'#1a7a30':'#555'; const sT=sg.some(s=>s==='Pendente')?'Pend.':sg.some(s=>s==='Contratado')?'Contr.':'N/A'; return `<tr><td class="mono muted">${d.id}</td><td style="font-weight:700">${d.obra}</td><td>${fSt(d.art_st)}</td><td style="color:${sC}">${sT}</td><td>${fSt(d.crono_st)}</td><td>${fSt(d.chi)}</td><td>${fSt(d.che)}</td><td>${fSt(d.te)}</td><td>${fSt(d.atc)}</td><td style="color:${dC}">${d.vig_cto?new Date(d.vig_cto).toLocaleDateString('pt-BR'):'—'}</td><td style="color:${dC};font-weight:700">${dT}</td></tr>`;}).join('');
-    const docsPend=DOCUMENTACAO.filter(d=>d.status==='Ativo'&&(d.art_st==='Pendente'||[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st].some(s=>s==='Pendente'))).length;
-    const artsEmit=DOCUMENTACAO.filter(d=>d.art_st==='Emitida').length;
-    const ctosVenc=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0&&d.status==='Ativo').length;
-    slides += __SLIDE(meta,'DOCUMENTAÇÃO','Seguros, ARTs e Conformidade',`<div class="krow krow-4">${__S('#4a9eff','Cadastrados',DOCUMENTACAO.length)}${__S('#c0392b','Pendências',docsPend)}${__S('#1a7a30','ARTs Emitidas',artsEmit)}${__S('#c0392b','Contratos Vencidos',ctosVenc)}</div><table><thead><tr>${['ID','Obra','ART','Seg./Gar.','Crono.','Chk.Int','Chk.Ext','Termo','Atestado','Vig. Cto.','Dias'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table>`);
-  }
-
-  if(flags.incMed){
-    const medComments=OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16);
-    const medChunks=__chunkComments(medComments,4);
-    const rows=cons.map(m=>{const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—'; return `<tr>${__TD(m.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(m.cliente,'font-weight:700')}${__TD(fmtR(m.contrato),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.med),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.fat),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.rec),'text-align:right;color:#1a7a30;font-weight:700;white-space:nowrap')}${__TD(pct,'text-align:right')}${__TD(m.nfv>0?fmtR(m.nfv):'—','text-align:right;color:#c0392b;white-space:nowrap')}${__TD(m.ar>0?fmtR(m.ar):'—','text-align:right;white-space:nowrap')}</tr>`;}).join('');
-    slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO','Medições, faturamentos e recebimentos',`<div class="split-2"><div><div class="krow krow-4">${__S('#1558c0','Carteira',fmtR(tC))}${__S('#1a7a30','Medido',fmtR(tM))}${__S('#E87722','Faturado',fmtR(tF))}${__S('#1a7a30','Recebido',fmtR(tR))}${__S('#c0392b','NF Vencidas',fmtR(tNV))}${__S('#a07800','A Receber',fmtR(tAR))}${__S('#888','Prev. 7 dias',fmtR(medPrev7()))}${__S('#888','Prev. 30 dias',fmtR(medPrev30()))}</div><table><thead><tr>${['ID','Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table></div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div>${__commentCards(medChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
-    for(let i=1;i<medChunks.length;i++){
-      slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO — CONTINUAÇÃO','Comentários financeiro',`<div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div><div class="obs-g">${__commentCards(medChunks[i])}</div></div>`);
-    }
-  }
-
-  if(flags.incSat){
-    const satList=PESQUISAS.filter(p=>p.incl_rel);
-    const satChunks=__chunkComments(satList,6);
-    satChunks.forEach((chunk,idx)=>{
-      const rows=chunk.map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:none;line-height:1.4;white-space:normal;word-break:break-word')}</tr>`;}).join('');
-      slides += __SLIDE(meta,idx===0?'SATISFAÇÃO DO CLIENTE':'SATISFAÇÃO DO CLIENTE — CONTINUAÇÃO',idx===0?'Avaliação de Satisfação':'Continuação dos registros',`<div class="krow krow-4">${__S('#1558c0','Total',PESQUISAS.length)}${__S('#1a7a30','😊 Satisfeitos',PESQUISAS.filter(p=>p.nivel==='Satisfeito').length)}${__S('#a07800','😐 Parcialmente',PESQUISAS.filter(p=>p.nivel==='Parcialmente Satisfeito').length)}${__S('#c0392b','😞 Insatisfeitos',PESQUISAS.filter(p=>p.nivel==='Insatisfeito').length)}</div><table><thead><tr>${['Data','ID','Cliente','Satisfação','Comentário'].map(__TH).join('')}</tr></thead><tbody>${rows||'<tr><td colspan="5" style="padding:16px;text-align:center;color:#777">Nenhuma avaliação marcada.</td></tr>'}</tbody></table>`);
-    });
-  }
-
-  if(flags.incObs){
-    const obs16=OBSERVACOES.filter(o=>o.semana===16);
-    slides += __SLIDE(meta,'COMENTÁRIOS & OBSERVAÇÕES',meta.semana,`${obs16.length?`<div class="obs-g">${__commentCards(obs16)}</div>`:'<div class="muted">Nenhuma observação cadastrada para a semana.</div>'}`);
-  }
-
-  const inner = `${__deckStyles()}<div class="deck-wrap">${slides}</div>`;
-  if(embedOnly) return inner;
-  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório ${meta.semana} — Grupo Lafaete</title>${__deckStyles()}</head><body><div class="deck-wrap">${slides}</div></body></html>`;
-}
-function gerarRelatorio(){
-  document.getElementById('rel-preview').innerHTML = __buildDeckHTML(true);
-}
-function imprimirRelatorioSelecionado(){
-  gerarRelatorio();
-  setTimeout(()=>window.print(),120);
-}
-function exportarPPTX(){
-  const meta=__reportMeta();
-  const pptHtml=__buildDeckHTML(false);
-  const blob=new Blob([pptHtml],{type:'text/html;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;
-  a.download=`Relatorio-GrupoLafaete-${meta.semana.replace(/\s+/g,'-')}.html`;
-  a.click(); URL.revokeObjectURL(url);
-  alert('✅ Apresentação exportada! A visualização e a impressão em PDF agora espelham a mesma estrutura do PowerPoint.');
-}
-
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">
-
-// ===== Overrides: relatório/visualização/PDF espelhando o PowerPoint =====
-function __reportMeta(){
-  const semana=document.getElementById('rel-semana')?.value||'Semana 16';
-  const corteStr=document.getElementById('rel-corte')?.value||'';
-  const corteDate=corteStr?new Date(corteStr).toLocaleDateString('pt-BR'):'—';
-  const emissor=document.getElementById('rel-emissor')?.value||'Diretoria de Projetos Especiais';
-  const now=new Date().toLocaleDateString('pt-BR');
-  return {semana,corteDate,emissor,now};
-}
-function __reportFlags(){
-  return {
-    incCrono:!!document.getElementById('ri-crono')?.checked,
-    incRdo:!!document.getElementById('ri-rdo')?.checked,
-    incDocs:!!document.getElementById('ri-docs')?.checked,
-    incMed:!!document.getElementById('ri-med')?.checked,
-    incSat:!!document.getElementById('ri-sat')?.checked,
-    incObs:!!document.getElementById('ri-obs')?.checked,
-  };
-}
-function __commentColor(cor){return cor==='g'?'#1a7a30':cor==='y'?'#a07800':cor==='r'?'#c0392b':'#999';}
-function __commentCards(list){
-  return list.map(o=>`<div class="obs-c" style="border-left-color:${__commentColor(o.cor)}"><div class="obs-ct" style="color:${__commentColor(o.cor)}">${o.obra?o.obra+' — ':''}${o.titulo||'Comentário Geral'}</div><div class="obs-cb">${o.texto}</div></div>`).join('');
-}
-function __chunkComments(list,maxPerPage=4){
-  const chunks=[]; for(let i=0;i<list.length;i+=maxPerPage) chunks.push(list.slice(i,i+maxPerPage));
-  return chunks.length?chunks:[[]];
-}
-function __deckStyles(){ return `
-<style>
-  #rel-preview .deck-wrap{margin-top:16px}
-  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
-  .s-hdr{background:#1a1a1a;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-  .s-tag{font-size:18px;font-weight:800;color:#E87722}
-  .s-sub{font-size:11px;color:#aaa;margin-top:2px}
-  .s-body{padding:20px 32px;flex:1;overflow:visible;color:#1a1a1a}
-  .krow{display:grid;gap:10px;margin-bottom:14px}.krow-4{grid-template-columns:repeat(4,1fr)}
-  table{width:100%;border-collapse:collapse}.obs-g{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .obs-c{border-left:3px solid #E87722;padding:10px 12px;background:#fafafa;border-radius:0 4px 4px 0}
-  .obs-ct{font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px}.obs-cb{font-size:10px;color:#555;line-height:1.55;white-space:pre-wrap}.slide table td,.slide table th{font-family:Arial,sans-serif}.slide table td{font-size:10px;line-height:1.35}.slide table th{font-size:8px}
-  .split-2{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
-  .muted{color:#888}.mono{font-family:monospace}
-  .sat-big{font-size:24px;line-height:1}
-  .val-nowrap{white-space:nowrap;line-height:1.1}
-  @media print{
-    @page{size:A4 landscape;margin:8mm}
-    body{background:none!important}
-    #sb,#hdr,.filter-bar,.btn,.theme-btn,.mo,.comments-panel,.access-modal,.read-only-banner{display:none!important}
-    #main{margin-left:0!important} #content{padding:0!important}
-    #page-relatorios{display:block!important}
-    .card.mb16{display:none!important}
-    #rel-preview .deck-wrap{margin-top:0}
-    .slide{width:100%;min-height:auto;box-shadow:none;margin:0 0 12px 0;page-break-after:always;break-after:page;border-radius:0;overflow:visible!important}
-    .slide:last-child{page-break-after:auto;break-after:auto}
-  }
-</style>`; }
-function __TH(h){return `<th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">${h}</th>`;}
-function __TD(v,s=''){return `<td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;${s}">${v}</td>`;}
-function __S(c,l,v,sub=''){return `<div style="background:#f8f8f8;border-radius:6px;padding:12px 14px;border-top:3px solid ${c};border:1px solid #e0e0e0"><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px">${l}</div><div class="val-nowrap" style="font-size:18px;font-weight:800;color:${c};margin:3px 0">${v}</div>${sub?`<div style="font-size:10px;color:#888">${sub}</div>`:''}</div>`;}
-function __SLIDE(meta,title,sub,body){
-  return `<div class="slide"><div class="s-hdr"><div><div class="s-tag">${title}</div>${sub?`<div class="s-sub">${sub}</div>`:''}</div><div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_URI}" style="height:36px;object-fit:contain" alt="Grupo Lafaete"><div style="text-align:right;font-size:10px;color:#aaa"><div style="color:#E87722;font-weight:700">${meta.semana}</div><div>Corte: ${meta.corteDate}</div><div>${meta.now}</div></div></div></div><div class="s-body">${body}</div></div>`;
-}
-function __buildDeckHTML(embedOnly=false){
-  const meta=__reportMeta();
-  const flags=__reportFlags();
-  const cons=getMedCons();
-  const tC=cons.reduce((s,m)=>s+(m.contrato||0),0);
-  const tR=cons.reduce((s,m)=>s+m.rec,0);
-  const tM=cons.reduce((s,m)=>s+m.med,0);
-  const tF=cons.reduce((s,m)=>s+m.fat,0);
-  const tNV=cons.reduce((s,m)=>s+m.nfv,0);
-  const tAR=cons.reduce((s,m)=>s+m.ar,0);
-  const ativos=PROJETOS.filter(p=>p.status==='Ativo').length;
-  const atrasados=PROJETOS.filter(p=>p.alerta==='⚠ Atraso').length;
-  const noPrazo=PROJETOS.filter(p=>cronoFarol(p)==='g').length;
-  let slides='';
-  slides += `<div class="slide"><div style="background:#1a1a1a;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px"><img src="${LOGO_URI}" style="height:80px;object-fit:contain;margin-bottom:36px" alt="Grupo Lafaete"><div style="font-size:48px;font-weight:900;color:#E87722;text-align:center;line-height:1.1">Relatório Semanal</div><div style="font-size:24px;font-weight:600;color:#ffffff;margin:10px 0 4px">Gestão de Projetos Especiais</div><div style="font-size:16px;color:#E87722;font-weight:700;margin:16px 0 6px">${meta.semana}</div><div style="font-size:14px;color:#888">Data de Corte: ${meta.corteDate} &nbsp;·&nbsp; Emissão: ${meta.now}</div><div style="font-size:13px;color:#666;margin-top:8px">${meta.emissor}</div><div style="display:grid;grid-template-columns:repeat(4,160px);gap:12px;margin-top:36px">${[['#4a9eff','Projetos Ativos',ativos],['#ff6b6b','Atrasados',atrasados],['#E87722','Carteira',fmtR(tC)],['#48c774','Recebido',fmtR(tR)]].map(([col,lbl,val])=>`<div style="background:rgba(255,255,255,.08);border-top:3px solid ${col};border-radius:6px;padding:14px;text-align:center"><div style="font-size:9px;color:#888;text-transform:uppercase">${lbl}</div><div class="val-nowrap" style="font-size:18px;font-weight:800;color:${col};margin-top:4px">${val}</div></div>`).join('')}</div></div></div>`;
-
-  if(flags.incRdo){
-    const rows=RDO.map(r=>{const st=getRdoStatus(r);const cl=st==='Atualizado'?'#1a7a30':st==='Pendente'?'#c0392b':'#a07800';
-      const fd=v=>{if(!v||isNaN(v))return{t:v||'—',d:'🟡'};const dd=TODAY_XL-v;return{t:xl2str(v),d:dd<=7?'🟢':'🔴'};};
-      const a=fd(r.atualizacao),e=fd(r.enviado),s=fd(r.assinado);
-      return `<tr><td class="mono muted" style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px">${r.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${r.obra}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${a.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${a.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${e.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${e.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${s.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${s.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${r.resp||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${r.modelo||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:${cl};font-weight:700">${st}</td></tr>`;}).join('');
-    slides += __SLIDE(meta,'RDO — STATUS DAS OBRAS','Relatório Diário de Obra',`<div class="krow krow-4">${__S('#4a9eff','Total em Campo',RDO.length)}${__S('#1a7a30','Atualizadas',RDO.filter(r=>getRdoStatus(r)==='Atualizado').length,'≤7 dias')}${__S('#c0392b','Pendentes',RDO.filter(r=>getRdoStatus(r)==='Pendente').length,'>7 dias')}${__S('#a07800','Não Iniciadas',RDO.filter(r=>getRdoStatus(r)==='Não Iniciado').length)}</div><table><thead><tr>${['ID','Obra','Última Atualiz.','⬤','Enviado','⬤','Assinado','⬤','Responsável','Modelo','Status'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table>`);
-  }
-
-  if(flags.incCrono){
-    const cronComments=OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16);
-    const commentChunks=__chunkComments(cronComments,4);
-    const tableHtml=`<table><thead><tr>${['ID','Obra / Entrega','Início','Prazo Contr.','Prazo Cliente','Tendência','⬤','% Prev.','% Real.','Ader.'].map(__TH).join('')}</tr></thead><tbody>${PROJETOS.filter(p=>p.status==='Ativo').map(p=>{const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const cl=f==='g'?'#1a7a30':f==='y'?'#a07800':'#c0392b';const base=`<tr><td class="mono muted">${p.id}</td><td style="font-weight:700">${p.obra}</td><td>${xl2str(p.inicio)}</td><td style="color:#c0392b">${xl2str(p.prazo_cont)}</td><td style="color:#c0392b">${xl2str(p.prazo_cli)}</td><td style="color:${cl};font-weight:700">${xl2str(p.tendencia)}</td><td style="text-align:center">${f==='g'?'🟢':f==='y'?'🟡':'🔴'}</td><td style="text-align:right">${fmtPct(av.prev||0)}</td><td style="text-align:right">${fmtPct(av.real||0)}</td><td style="text-align:right;color:${cl};font-weight:700">${((av.real||0)-(av.prev||0)).toFixed(1)} p.p.</td></tr>`;const pars=(p.parciais||[]).map(par=>`<tr style="background:#fafafa"><td></td><td style="padding-left:18px;color:#E87722">↳ ${par.nome}</td><td>${xl2str(par.inicio)}</td><td style="color:#c0392b">${xl2str(par.prazo_cont)}</td><td style="color:#c0392b">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="color:#E87722">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`).join('');return base+pars;}).join('')}</tbody></table>`;
-    slides += __SLIDE(meta,'CRONOGRAMA, PRAZOS E AVANÇOS','Tabela + comentários cronograma',`<div class="split-2"><div><div class="krow krow-4">${__S('#1a7a30','No Prazo',noPrazo)}${__S('#c0392b','Atrasadas',Math.max(ativos-noPrazo,0))}${__S('#4a9eff','Projetos Ativos',ativos)}${__S('#E87722','Carteira',fmtR(tC))}</div>${tableHtml}</div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div>${__commentCards(commentChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
-    for(let i=1;i<commentChunks.length;i++){
-      slides += __SLIDE(meta,'CRONOGRAMA — CONTINUAÇÃO','Comentários cronograma',`<div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div><div class="obs-g">${__commentCards(commentChunks[i])}</div></div>`);
-    }
-  }
-
-  if(flags.incDocs){
-    const rows=DOCUMENTACAO.filter(d=>d.status==='Ativo').map(d=>{function fSt(s){if(!s||s==='-'||s==='N/A')return'<span class="muted">N/A</span>';if(s==='Pendente')return'<span style="color:#c0392b;font-weight:700">Pend.</span>';if(s==='Contratado'||s==='Emitida'||s==='Concluído'||s==='Assinado')return'<span style="color:#1a7a30">✓</span>';return'<span style="color:#a07800">'+s+'</span>';} const dias=d.vig_cto?daysFromToday(d.vig_cto):null; const dC=dias===null?'#888':dias<0?'#c0392b':dias<=30?'#a07800':'#1a7a30'; const dT=dias===null?'—':dias+'d'; const sg=[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st]; const sC=sg.some(s=>s==='Pendente')?'#c0392b':sg.some(s=>s==='Contratado')?'#1a7a30':'#555'; const sT=sg.some(s=>s==='Pendente')?'Pend.':sg.some(s=>s==='Contratado')?'Contr.':'N/A'; return `<tr><td class="mono muted">${d.id}</td><td style="font-weight:700">${d.obra}</td><td>${fSt(d.art_st)}</td><td style="color:${sC}">${sT}</td><td>${fSt(d.crono_st)}</td><td>${fSt(d.chi)}</td><td>${fSt(d.che)}</td><td>${fSt(d.te)}</td><td>${fSt(d.atc)}</td><td style="color:${dC}">${d.vig_cto?new Date(d.vig_cto).toLocaleDateString('pt-BR'):'—'}</td><td style="color:${dC};font-weight:700">${dT}</td></tr>`;}).join('');
-    const docsPend=DOCUMENTACAO.filter(d=>d.status==='Ativo'&&(d.art_st==='Pendente'||[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st].some(s=>s==='Pendente'))).length;
-    const artsEmit=DOCUMENTACAO.filter(d=>d.art_st==='Emitida').length;
-    const ctosVenc=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0&&d.status==='Ativo').length;
-    slides += __SLIDE(meta,'DOCUMENTAÇÃO','Seguros, ARTs e Conformidade',`<div class="krow krow-4">${__S('#4a9eff','Cadastrados',DOCUMENTACAO.length)}${__S('#c0392b','Pendências',docsPend)}${__S('#1a7a30','ARTs Emitidas',artsEmit)}${__S('#c0392b','Contratos Vencidos',ctosVenc)}</div><table><thead><tr>${['ID','Obra','ART','Seg./Gar.','Crono.','Chk.Int','Chk.Ext','Termo','Atestado','Vig. Cto.','Dias'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table>`);
-  }
-
-  if(flags.incMed){
-    const medComments=OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16);
-    const medChunks=__chunkComments(medComments,4);
-    const rows=cons.map(m=>{const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—'; return `<tr>${__TD(m.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(m.cliente,'font-weight:700')}${__TD(fmtR(m.contrato),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.med),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.fat),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.rec),'text-align:right;color:#1a7a30;font-weight:700;white-space:nowrap')}${__TD(pct,'text-align:right')}${__TD(m.nfv>0?fmtR(m.nfv):'—','text-align:right;color:#c0392b;white-space:nowrap')}${__TD(m.ar>0?fmtR(m.ar):'—','text-align:right;white-space:nowrap')}</tr>`;}).join('');
-    slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO','Medições, faturamentos e recebimentos',`<div class="split-2"><div><div class="krow krow-4">${__S('#1558c0','Carteira',fmtR(tC))}${__S('#1a7a30','Medido',fmtR(tM))}${__S('#E87722','Faturado',fmtR(tF))}${__S('#1a7a30','Recebido',fmtR(tR))}${__S('#c0392b','NF Vencidas',fmtR(tNV))}${__S('#a07800','A Receber',fmtR(tAR))}${__S('#888','Prev. 7 dias',fmtR(medPrev7()))}${__S('#888','Prev. 30 dias',fmtR(medPrev30()))}</div><table><thead><tr>${['ID','Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table></div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div>${__commentCards(medChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
-    for(let i=1;i<medChunks.length;i++){
-      slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO — CONTINUAÇÃO','Comentários financeiro',`<div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div><div class="obs-g">${__commentCards(medChunks[i])}</div></div>`);
-    }
-  }
-
-  if(flags.incSat){
-    const satList=PESQUISAS.filter(p=>p.incl_rel);
-    const satChunks=__chunkComments(satList,6);
-    satChunks.forEach((chunk,idx)=>{
-      const rows=chunk.map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:none;line-height:1.4;white-space:normal;word-break:break-word')}</tr>`;}).join('');
-      slides += __SLIDE(meta,idx===0?'SATISFAÇÃO DO CLIENTE':'SATISFAÇÃO DO CLIENTE — CONTINUAÇÃO',idx===0?'Avaliação de Satisfação':'Continuação dos registros',`<div class="krow krow-4">${__S('#1558c0','Total',PESQUISAS.length)}${__S('#1a7a30','😊 Satisfeitos',PESQUISAS.filter(p=>p.nivel==='Satisfeito').length)}${__S('#a07800','😐 Parcialmente',PESQUISAS.filter(p=>p.nivel==='Parcialmente Satisfeito').length)}${__S('#c0392b','😞 Insatisfeitos',PESQUISAS.filter(p=>p.nivel==='Insatisfeito').length)}</div><table><thead><tr>${['Data','ID','Cliente','Satisfação','Comentário'].map(__TH).join('')}</tr></thead><tbody>${rows||'<tr><td colspan="5" style="padding:16px;text-align:center;color:#777">Nenhuma avaliação marcada.</td></tr>'}</tbody></table>`);
-    });
-  }
-
-  if(flags.incObs){
-    const obs16=OBSERVACOES.filter(o=>o.semana===16);
-    slides += __SLIDE(meta,'COMENTÁRIOS & OBSERVAÇÕES',meta.semana,`${obs16.length?`<div class="obs-g">${__commentCards(obs16)}</div>`:'<div class="muted">Nenhuma observação cadastrada para a semana.</div>'}`);
-  }
-
-  const inner = `${__deckStyles()}<div class="deck-wrap">${slides}</div>`;
-  if(embedOnly) return inner;
-  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório ${meta.semana} — Grupo Lafaete</title>${__deckStyles()}</head><body><div class="deck-wrap">${slides}</div></body></html>`;
-}
-function gerarRelatorio(){
-  document.getElementById('rel-preview').innerHTML = __buildDeckHTML(true);
-}
-function imprimirRelatorioSelecionado(){
-  gerarRelatorio();
-  setTimeout(()=>window.print(),120);
-}
-function exportarPPTX(){
-  const meta=__reportMeta();
-  const pptHtml=__buildDeckHTML(false);
-  const blob=new Blob([pptHtml],{type:'text/html;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;
-  a.download=`Relatorio-GrupoLafaete-${meta.semana.replace(/\s+/g,'-')}.html`;
-  a.click(); URL.revokeObjectURL(url);
-  alert('✅ Apresentação exportada! A visualização e a impressão em PDF agora espelham a mesma estrutura do PowerPoint.');
-}
-
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 :root{
   --or:#E87722;--or2:#F5923E;--bg:#141414;--bg2:#1e1e1e;--bg3:#262626;
@@ -590,7 +137,7 @@ textarea{resize:vertical;min-height:68px}
 .obs-body{font-size:13px;color:var(--tx);line-height:1.7;white-space:pre-wrap}
 /* SATISFACTION */
 .sat-row-new td,.sat-row-new td *{color:var(--tx)!important;font-style:normal!important}
-.sat-row-old td,.sat-row-old td *{color:var(--tx3)!important;font-style:normal!important}
+.sat-row-old{opacity:.45}.sat-row-old:hover{opacity:.72}.sat-row-old td,.sat-row-old td *{color:var(--tx3)!important;font-style:normal!important}
 /* CHARTS */
 .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;min-height:240px}
 .chart-card{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad2);padding:14px 18px}
@@ -625,11 +172,6 @@ textarea{resize:vertical;min-height:68px}
   .split-layout{grid-template-columns:1fr!important}
   .comments-panel{display:none!important}
   .tw{overflow-x:visible!important}
-  #report-content{width:100%!important;max-width:none!important}
-  #report-content table{width:100%!important;table-layout:auto!important}
-  #report-content thead{display:table-header-group!important}
-  #report-content tr, #report-content .card{break-inside:avoid!important;page-break-inside:avoid!important}
-  #report-content img{max-width:100%!important;height:auto!important;object-fit:contain!important}
 }
 @media(max-width:900px){
   #sb{width:min(86vw,320px);transform:translateX(-100%);box-shadow:8px 0 28px rgba(0,0,0,.35)}
@@ -689,6 +231,12 @@ textarea{resize:vertical;min-height:68px}
 .read-only .read-only-banner{display:block}
 @media(max-width:760px){.access-grid{grid-template-columns:1fr}}
 </style>
+<!-- Correção: dados do primeiro arquivo + exportação por módulos selecionados v8 -->
+<!-- Versão v10: dados idênticos ao index_relatorio_exportes_dados_preservados + exportação por módulos selecionados + chave local nova -->
+<!-- FINAL: configuração do segundo arquivo + dados/chave de salvamento do primeiro arquivo -->
+<!-- Correção v12: salvamento dos comentários de Cronograma/Financeiro e destaque apagado para pesquisas antigas -->
+<!-- Correção v13: Observações Livres separadas dos comentários de Cronograma e Medições -->
+<!-- Correção v14: Comentários de Cronograma, Financeiro e Observações Livres totalmente independentes, sem vínculo por obra -->
 </head>
 <body>
 
@@ -906,7 +454,7 @@ textarea{resize:vertical;min-height:68px}
   <div class="charts-grid">
     <div class="chart-card"><div class="chart-title">Status da Carteira</div><div style="height:190px;position:relative"><canvas id="ch-status"></canvas></div></div>
     <div class="chart-card"><div class="chart-title">Financeiro (R$ milhões)</div><div style="height:190px"><canvas id="ch-fin"></canvas></div></div>
-    <div class="chart-card" style="grid-column:1/-1"><div class="chart-title">Avanço Físico — Previsto vs Realizado</div><div id="ch-av-wrap" style="height:720px;overflow-y:auto"><canvas id="ch-av"></canvas></div></div>
+    <div class="chart-card" style="grid-column:1/-1"><div class="chart-title">Avanço Físico — Previsto vs Realizado</div><div id="ch-av-wrap" style="height:280px"><canvas id="ch-av"></canvas></div></div>
   </div>
   <div class="card"><div class="card-title">⚠ Alertas Críticos</div><div id="dash-alertas"></div></div>
 </div>
@@ -1089,12 +637,12 @@ textarea{resize:vertical;min-height:68px}
 <div id="page-observacoes" class="page">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
     <div><div style="font-size:16px;font-weight:600">Observações & Comentários por Obra</div>
-    <div style="font-size:12px;color:var(--tx3);margin-top:2px">Cada bloco víncula uma obra + título chamativo + cor de destaque + texto livre</div></div>
-    <button class="btn btn-or" onclick="openObsModal(null)">＋ Novo Bloco</button>
+    <div style="font-size:12px;color:var(--tx3);margin-top:2px">Área independente para comentários livres. Não repete comentários lançados em Cronograma ou Medições.</div></div>
+    <button class="btn btn-or" onclick="openObsModal(null,'livre')">＋ Novo Bloco</button>
   </div>
   <div class="filter-bar">
     <select id="obs-semana" onchange="renderObservacoes()"><option value="">Todas semanas</option><option value="16">Semana 16</option><option value="15">Semana 15</option><option value="14">Semana 14</option></select>
-    <select id="obs-tipo" onchange="renderObservacoes()"><option value="">Todos tipos</option><option>Geral da Semana</option><option>Cronograma</option><option>Financeiro</option><option>RDO</option><option>Documentação</option></select>
+    <select id="obs-tipo" onchange="renderObservacoes()"><option value="">Todos tipos</option><option>Geral da Semana</option><option>RDO</option><option>Documentação</option></select>
     <select id="obs-obra" onchange="renderObservacoes()"><option value="">Todas obras</option></select>
   </div>
   <div id="obs-lista"></div>
@@ -1125,7 +673,7 @@ textarea{resize:vertical;min-height:68px}
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-or" onclick="gerarRelatorio()">👁 Visualizar</button>
       <button class="btn btn-bl" onclick="exportarPPTX()">📊 PowerPoint</button>
-      <button class="btn" onclick="imprimirRelatorioSelecionado()">🖨 Imprimir / PDF</button>
+      <button class="btn" onclick="printRelatorio()">🖨 Imprimir / PDF</button>
     </div>
   </div>
   <div id="rel-preview"></div>
@@ -5166,13 +4714,15 @@ function parseSortValue(txt){
   const s=(txt||'').replace(/\s+/g,' ').trim();
   if(!s)return '';
   if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)){const [d,m,y]=s.split('/').map(Number);return new Date(Date.UTC(y,m-1,d)).getTime();}
-  const money=s.replace(/R\$\s?/g,'').replace(/\./g,'').replace(',', '.');
-  if(/^-?\d+(\.\d+)?M$/.test(s.replace(',', '.'))){return parseFloat(s.replace('R$','').replace(/\s/g,'').replace(',', '.').replace('M',''))*1e6;}
+  if(/^[A-Za-z]+\d+$/.test(s)){const m=s.match(/^([A-Za-z]+)(\d+)$/);return (m[1].toLowerCase()+'_'+m[2].padStart(12,'0'));}
+  if(/^[\d]+(?:\.[\d]+)+$/.test(s)){return s.split('.').map(part=>part.padStart(6,'0')).join('.');}
+  const money=s.replace(/R\$\s?/g,'').replace(/\./g,'').replace(',', '.').replace(/&nbsp;/g,'');
+  if(/^-?\d+(\.\d+)?M$/.test(s.replace(',', '.'))){return parseFloat(s.replace('R$','').replace(/\s|&nbsp;/g,'').replace(',', '.').replace('M',''))*1e6;}
   if(/^[-+]?\d+(,\d+)?%$/.test(s))return parseFloat(s.replace('%','').replace(',','.'));
   if(/^[-+]?\d+d/.test(s))return parseFloat(s);
   if(/^R\$/.test(s) && !isNaN(parseFloat(money)))return parseFloat(money);
   const n=s.replace(/[^\d,.-]/g,'').replace(',', '.');
-  if(n && !isNaN(parseFloat(n)))return parseFloat(n);
+  if(n && !isNaN(parseFloat(n)) && !/^[A-Za-z]/.test(s))return parseFloat(n);
   return s.toLowerCase();
 }
 const _domTableSort={};
@@ -5300,8 +4850,8 @@ function calcMedFarol(m){
   if(m.data_rec_prev){const prev=xl2iso(m.data_rec_prev);if(prev&&prev<hoje)return'r';}
   return'y';
 }
-function medPrev7(){const t=new Date();t.setDate(t.getDate()+7);const s=t.toISOString();return MEDICOES.filter(m=>!m.data_rec_real&&m.data_rec_prev&&xl2iso(m.data_rec_prev)<=s).reduce((a,m)=>a+m.valor,0);}
-function medPrev30(){const t=new Date();t.setDate(t.getDate()+30);const s=t.toISOString();return MEDICOES.filter(m=>!m.data_rec_real&&m.data_rec_prev&&xl2iso(m.data_rec_prev)<=s).reduce((a,m)=>a+m.valor,0);}
+function medPrev7(){const t=new Date();t.setDate(t.getDate()+7);const s=t.toISOString().slice(0,10);return MEDICOES.filter(m=>!m.data_rec_real&&m.data_rec_prev&&xl2iso(m.data_rec_prev)<=s).reduce((a,m)=>a+m.valor,0);}
+function medPrev30(){const t=new Date();t.setDate(t.getDate()+30);const s=t.toISOString().slice(0,10);return MEDICOES.filter(m=>!m.data_rec_real&&m.data_rec_prev&&xl2iso(m.data_rec_prev)<=s).reduce((a,m)=>a+m.valor,0);}
 
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
 const PAGE_TITLES={dashboard:'Dashboard Geral',projetos:'Base de Projetos',cronograma:'Cronograma & Prazos',rdo:'RDO — Relatório Diário de Obra',seguros:'Seguros & Garantias',arts:'ARTs & Documentos',medicoes:'Medições & Financeiro',satisfacao:'Pesquisa de Satisfação',observacoes:'Observações Livres',relatorios:'Gerar Relatório Executivo'};
@@ -5624,7 +5174,7 @@ function renderCronograma(){
 function renderSideComments(containerId,tipo){
   const el=document.getElementById(containerId);
   if(!el)return;
-  const obs=OBSERVACOES.filter(o=>o.tipo===tipo||o.tipo==='Geral da Semana').slice(0,10);
+  const obs=OBSERVACOES.filter(o=>o.tipo===tipo).slice(0,10);
   if(!obs.length){el.innerHTML='<div style="color:var(--tx3);font-size:12px;padding:12px 0">Nenhum comentário. Use ＋ para adicionar.</div>';return;}
   el.innerHTML=obs.map(o=>{
     const oi=OBSERVACOES.indexOf(o);
@@ -5633,7 +5183,7 @@ function renderSideComments(containerId,tipo){
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px">
         <div style="font-size:11px;font-weight:700;color:var(--or);flex:1;min-width:0">${o.obra||'Geral'}${o.titulo?' — <span style="color:var(--tx2);font-weight:400">'+o.titulo+'</span>':''}</div>
         <div style="display:flex;gap:2px;flex-shrink:0">
-          <button class="btn btn-xs" style="padding:1px 5px;font-size:10px" onclick="openObsModal(${oi})">✏</button>
+          <button class="btn btn-xs" style="padding:1px 5px;font-size:10px" onclick="openObsModal(${oi},'${tipo}')">✏</button>
           <button class="btn btn-xs btn-r" style="padding:1px 5px;font-size:10px" onclick="if(confirm('Excluir?')){excluirObs(${oi});renderSideComments('${containerId}','${tipo}')}">✕</button>
         </div>
       </div>
@@ -6072,7 +5622,7 @@ function openMedicaoModal(idx){
 function calcPrevRec(){
   const nf=document.getElementById('fm-data-nf').value;
   const prazo=parseInt(document.getElementById('fm-prazo').value)||30;
-  if(nf){const d=new Date(nf);d.setDate(d.getDate()+prazo);document.getElementById('fm-prev-rec').value=d.toISOString();}
+  if(nf){const d=new Date(nf);d.setDate(d.getDate()+prazo);document.getElementById('fm-prev-rec').value=d.toISOString().slice(0,10);}
 }
 function calcFarolMed(){
   const real=document.getElementById('fm-real-rec').value;
@@ -6334,7 +5884,7 @@ function renderSatisfacao(){
         <td style="white-space:nowrap">${new Date(p.data).toLocaleDateString('pt-BR')}</td>
         <td style="white-space:nowrap"><code style="font-size:10px">${p.id}</code></td>
         <td style="white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${p.cliente}">${p.cliente}</td>
-        <td style="text-align:center"><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:28px;line-height:1;font-style:normal">${f.e}</span><span class="badge ${f.cls}" style="font-size:10px;font-style:normal">${f.l}</span></div></td>
+        <td style="text-align:center"><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:36px;line-height:1;font-style:normal">${f.e}</span><span class="badge ${f.cls}" style="font-size:10px;font-style:normal">${f.l}</span></div></td>
         ${comentCells}
         <td class="nowrap"><button class="btn btn-xs" onclick="editSat(${pIdx})" title="Editar">✏</button> <button class="btn btn-xs btn-r" onclick="deleteSat(${pIdx})" title="Excluir">✕</button></td>
       </tr>`;
@@ -6386,36 +5936,65 @@ function deleteSat(idx){
 // ─── OBSERVAÇÕES ─────────────────────────────────────────────────────────────
 let obsNextId=8;
 let _editObsIdx=null;
-function openObsModal(idx){
+function openObsModal(idx, origem){
   _editObsIdx=idx;
+  const isLivre = origem === 'livre';
+  const isSide = (origem === 'Cronograma' || origem === 'Financeiro');
   document.getElementById('mo-obs-title').textContent=idx===null?'Novo Bloco':'Editar Bloco';
+  const tipoSelModal = document.getElementById('fo-tipo');
+  if(tipoSelModal){
+    Array.from(tipoSelModal.options).forEach(op=>{
+      const txt = op.textContent;
+      const sideType = (txt==='Cronograma'||txt==='Financeiro');
+      const hideForLivre = isLivre && sideType;
+      const hideForSide = isSide && txt !== origem;
+      op.disabled = hideForLivre || hideForSide;
+      op.hidden = hideForLivre || hideForSide;
+    });
+    if(isLivre && (tipoSelModal.value==='Cronograma'||tipoSelModal.value==='Financeiro')) tipoSelModal.value='Geral da Semana';
+    if(isSide) tipoSelModal.value = origem;
+  }
   const sel=document.getElementById('fo-obra');
   sel.innerHTML='<option value="">— Geral / Sem obra —</option>';
   PROJETOS.forEach(p=>{const o=document.createElement('option');o.value=p.obra;o.textContent=p.obra;sel.appendChild(o);});
   if(idx===null){
-    sel.value='';document.getElementById('fo-tipo').value='Geral da Semana';document.getElementById('fo-semana').value='16';
+    sel.value='';
+    document.getElementById('fo-tipo').value = isSide ? origem : 'Geral da Semana';
+    document.getElementById('fo-semana').value='16';
     document.getElementById('fo-cor').value='n';document.getElementById('fo-titulo').value='';document.getElementById('fo-texto').value='';
   } else {
     const o=OBSERVACOES[idx];
-    sel.value=o.obra||'';document.getElementById('fo-tipo').value=o.tipo;document.getElementById('fo-semana').value=o.semana;
+    sel.value=o.obra||'';
+    document.getElementById('fo-tipo').value = isSide ? origem : o.tipo;
+    document.getElementById('fo-semana').value=o.semana;
     document.getElementById('fo-cor').value=o.cor||'n';document.getElementById('fo-titulo').value=o.titulo||'';document.getElementById('fo-texto').value=o.texto;
   }
   openMo('mo-obs');
 }
 function addObsBlocoFor(tipo){
-  openObsModal(null);
+  // Cronograma e Financeiro são painéis independentes; o tipo fica travado no módulo de origem.
+  openObsModal(null, tipo);
   document.getElementById('fo-tipo').value=tipo;
 }
 function salvarObs(){
-  const novo={id:obsNextId++,obra:document.getElementById('fo-obra').value,tipo:document.getElementById('fo-tipo').value,
-    semana:parseInt(document.getElementById('fo-semana').value),cor:document.getElementById('fo-cor').value,
-    titulo:document.getElementById('fo-titulo').value,texto:document.getElementById('fo-texto').value};
-  if(_editObsIdx!==null)OBSERVACOES[_editObsIdx]=novo;else OBSERVACOES.push(novo);
-  closeMo('mo-obs');renderObservacoes();
-  dbAfterSaveObs(novo,obsIsNew);
-  // refresh side panels
+  const obsIsNew = (_editObsIdx===null || _editObsIdx===undefined);
+  const anterior = obsIsNew ? null : (OBSERVACOES[_editObsIdx] || {});
+  const novo={
+    id: obsIsNew ? (obsNextId++) : (anterior.id ?? obsNextId++),
+    id_seq: obsIsNew ? nextSeq('obs') : (anterior.id_seq || nextSeq('obs')),
+    obra:document.getElementById('fo-obra').value,
+    tipo:document.getElementById('fo-tipo').value,
+    semana:parseInt(document.getElementById('fo-semana').value)||getSemanaAtual(),
+    cor:document.getElementById('fo-cor').value,
+    titulo:document.getElementById('fo-titulo').value,
+    texto:document.getElementById('fo-texto').value
+  };
+  if(!obsIsNew) OBSERVACOES[_editObsIdx]=novo; else OBSERVACOES.push(novo);
+  closeMo('mo-obs');
+  renderObservacoes();
   renderSideComments('crono-comments','Cronograma');
   renderSideComments('med-comments','Financeiro');
+  dbAfterSaveObs(novo,obsIsNew);
 }
 function renderObservacoes(){
   const fs=document.getElementById('obs-semana').value;
@@ -6424,7 +6003,9 @@ function renderObservacoes(){
   // populate obra filter
   const selO=document.getElementById('obs-obra');
   if(selO.options.length<=1){PROJETOS.forEach(p=>{const o=document.createElement('option');o.value=p.obra;o.textContent=p.obra;selO.appendChild(o);});}
-  const data=OBSERVACOES.filter(o=>(!fs||String(o.semana)===fs)&&(!ft||o.tipo===ft)&&(!fo||o.obra===fo));
+  // Observações Livres é uma área independente: não exibe comentários lançados nos painéis laterais de Cronograma ou Medições.
+  const tiposLaterais = ['Cronograma','Financeiro'];
+  const data=OBSERVACOES.filter(o=>!tiposLaterais.includes(o.tipo)&&(!fs||String(o.semana)===fs)&&(!ft||o.tipo===ft)&&(!fo||o.obra===fo));
   document.getElementById('obs-lista').innerHTML=data.length?data.map(o=>{
     const colorClass='c-'+(o.cor||'n');
     const tagHtml=o.cor&&o.cor!=='n'?`<span class="obs-tag ${o.cor}">${o.cor==='g'?'🟢':o.cor==='y'?'🟡':'🔴'}</span>`:'';
@@ -6499,12 +6080,12 @@ function renderDashboard(){
   _charts.fin=new Chart(document.getElementById('ch-fin'),{type:'bar',
     data:{labels:['Carteira','Medido','Faturado','Recebido'],datasets:[{data:[tC/1e6,tM/1e6,tF/1e6,tR/1e6],backgroundColor:['#E87722aa','#28a745aa','#1a6fdbaa','#28c76faa'],borderColor:['#E87722','#28a745','#1a6fdb','#28c76f'],borderWidth:1}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>v.toFixed(1)+'M',color:tc},grid:{color:gc}},x:{ticks:{color:tc},grid:{display:false}}}}});
-  const avd=PROJETOS.filter(p=>p.status==='Ativo').map(p=>{const k=p.id+'|'+p.obra;const v=AVANCOS[k]||{};return {id:p.id,obra:p.obra,prev:Number(v.prev||0),real:Number(v.real||0)};});
-  const avH=Math.max(280,avd.length*50);
+  const avd=Object.entries(AVANCOS).filter(([k,v])=>v.prev!=null&&v.real!=null);
+  const avH=Math.max(360,avd.length*36);
   document.getElementById('ch-av-wrap').style.height=avH+'px';
   _charts.av=new Chart(document.getElementById('ch-av'),{type:'bar',
-    data:{labels:avd.map(v=>{const o=v.obra||'';return o.length>22?o.slice(0,20)+'…':o;}),
-      datasets:[{label:'Previsto %',data:avd.map(v=>v.prev),backgroundColor:'#1a6fdb55',borderColor:'#1a6fdb',borderWidth:1},{label:'Realizado %',data:avd.map(v=>v.real),backgroundColor:'#E87722aa',borderColor:'#E87722',borderWidth:1}]},
+    data:{labels:avd.map(([k])=>{const o=k.split('|')[1]||'';return o;}),
+      datasets:[{label:'Previsto %',data:avd.map(([k,v])=>v.prev),backgroundColor:'#1a6fdb55',borderColor:'#1a6fdb',borderWidth:1},{label:'Realizado %',data:avd.map(([k,v])=>v.real),backgroundColor:'#E87722aa',borderColor:'#E87722',borderWidth:1}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{color:lc,font:{size:11}}}},scales:{x:{max:100,ticks:{color:tc,callback:v=>v+'%'},grid:{color:gc}},y:{ticks:{color:tc,font:{size:11}},grid:{display:false}}}}});
   // Alertas
   const al=[];
@@ -6590,7 +6171,7 @@ function gerarRelatorio(){
   </div>`;
 
   if(document.getElementById('ri-rdo').checked){
-    html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+    html+=`<section class="rel-module" data-title="RDO"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">RDO</span>Status das Obras</div>
     <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a1a1a">
       ${['ID','Obra','Última Atualiz.','⬤','Enviado','⬤','Assinado','⬤','Responsável','Modelo','Status'].map(TH).join('')}
@@ -6611,7 +6192,7 @@ function gerarRelatorio(){
       const a=fd(r.atualizacao),e=fd(r.enviado),s=fdAssinado(r);
       return`<tr style="border-bottom:1px solid #222">${TD(r.id,'color:#d7d7d7;font-family:monospace;font-size:10px;font-weight:600')}${TD(r.obra,'font-weight:800;color:#ffffff') }<td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${a.txt}</td><td style="padding:6px 10px;text-align:center">${a.dot}</td><td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${e.txt}</td><td style="padding:6px 10px;text-align:center">${e.dot}</td><td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${s.txt}</td><td style="padding:6px 10px;text-align:center">${s.dot}</td>${TD(r.resp||'—','color:#e2e2e2')}${TD(r.modelo||'—','color:#e2e2e2')}<td style="padding:6px 10px;color:${c};font-weight:800">${st}</td></tr>`;
     }).join('')}
-    </tbody></table></div>`;
+    </tbody></table></div></section>`;
   }
 
   if(document.getElementById('ri-docs').checked){
@@ -6619,7 +6200,7 @@ function gerarRelatorio(){
     const artsEmit=DOCUMENTACAO.filter(d=>d.art_st==='Emitida').length;
     const ctosVenc=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0&&d.status==='Ativo').length;
     const ctosOk=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)>=0&&d.status==='Ativo').length;
-    html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+    html+=`<section class="rel-module" data-title="Documentação"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">DOCUMENTAÇÃO</span>Seguros, ARTs e Conformidade</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
       ${[['#4a9eff','Cadastrados',DOCUMENTACAO.length],['#ff6b6b','Pendências',docsPend],['#48c774','ARTs Emitidas',artsEmit],['#ff6b6b','Contratos Vencidos',ctosVenc]].map(([c,l,v])=>`<div style="background:#1a1a1a;border-radius:8px;padding:12px;border-top:3px solid ${c}"><div style="font-size:10px;color:#888;text-transform:uppercase">${l}</div><div style="font-size:22px;font-weight:700;color:${c};margin-top:4px">${v}</div></div>`).join('')}
@@ -6650,11 +6231,11 @@ function gerarRelatorio(){
           +'<td style="padding:4px 8px;color:'+dC+';font-weight:700">'+dT+'</td>'
           +'</tr>';
       }).join('');})()}
-    </tbody></table></div>`;
+    </tbody></table></div></section>`;
   }
   if(document.getElementById('ri-crono').checked){
     const noPrazo=PROJETOS.filter(p=>cronoFarol(p)==='g').length;
-    html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+    html+=`<section class="rel-module" data-title="Cronograma"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="display:grid;grid-template-columns:1fr 400px;gap:16px">
       <div>
         <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:8px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">CRONOGRAMA</span>Prazos, Tendências e Avanços
@@ -6674,19 +6255,19 @@ function gerarRelatorio(){
       </div>
       <div>
         <div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários</div>
-        ${OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16).map(o=>`
+        ${OBSERVACOES.filter(o=>o.tipo==='Cronograma'&&o.semana===16).map(o=>`
           <div style="border-left:3px solid #E87722;padding:8px 12px;margin-bottom:10px;background:#1a1a1a;border-radius:0 6px 6px 0">
             <div style="font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px">${o.obra?o.obra+' — ':''}${o.titulo||''}</div>
             <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap">${o.texto}</div>
           </div>`).join('')}
       </div>
-    </div></div>`;
+    </div></div></section>`;
   }
 
   if(document.getElementById('ri-med').checked){
     const c2=getMedCons();
     const tots=c2.reduce((s,m)=>({c:s.c+(m.contrato||0),m:s.m+m.med,f:s.f+m.fat,r:s.r+m.rec,nv:s.nv+m.nfv,ar:s.ar+m.ar}),{c:0,m:0,f:0,r:0,nv:0,ar:0});
-    html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+    html+=`<section class="rel-module" data-title="Medições"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="display:grid;grid-template-columns:1fr 340px;gap:16px">
       <div>
         <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:10px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">FINANCEIRO</span>Medições, Faturamentos e Recebimentos</div>
@@ -6704,33 +6285,33 @@ function gerarRelatorio(){
       </div>
       <div>
         <div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários</div>
-        ${OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16).map(o=>`
+        ${OBSERVACOES.filter(o=>o.tipo==='Financeiro'&&o.semana===16).map(o=>`
           <div style="border-left:3px solid #E87722;padding:8px 12px;margin-bottom:10px;background:#1a1a1a;border-radius:0 6px 6px 0">
             <div style="font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px">${o.obra?o.obra+' — ':''}${o.titulo||''}</div>
             <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap">${o.texto}</div>
           </div>`).join('')}
       </div>
-    </div></div>`;
+    </div></div></section>`;
   }
 
   if(document.getElementById('ri-sat').checked){
     const satToShow=PESQUISAS.filter(p=>p.incl_rel);
-    html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+    html+=`<section class="rel-module" data-title="Satisfação"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">SATISFAÇÃO</span>Avaliação de Satisfação</div>
     <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a1a1a">
       ${['Data','ID','Cliente','Geral','Comentário / Dimensões'].map(TH).join('')}
     </tr></thead><tbody>
     ${satToShow.map(p=>{const f=satFace(p.nivel);const c=p.nivel==='Satisfeito'?'#48c774':p.nivel==='Insatisfeito'?'#ff6b6b':'#ffc107';
       const comment=satComentarioHtml(p,true);
-      return`<tr style="border-bottom:1px solid #222">${TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#e0e0e0;font-weight:600')}${TD(p.id,'color:#c8c8c8;font-family:monospace;font-size:10px')}${TD(p.cliente,'font-weight:700;color:#f3f3f3')}<td style="padding:6px 10px;color:${c};font-weight:700">${f.e} ${f.l}</td><td style="padding:6px 10px;color:#d8d8d8;max-width:300px;font-size:11px">${comment}</td></tr>`;
+      return`<tr style="border-bottom:1px solid #222">${TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#e0e0e0;font-weight:600')}${TD(p.id,'color:#c8c8c8;font-family:monospace;font-size:10px')}${TD(p.cliente,'font-weight:700;color:#f3f3f3')}<td style="padding:6px 10px;color:${c};font-weight:700"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:26px;line-height:1">${f.e}</span><span>${f.l}</span></div></td><td style="padding:6px 10px;color:#d8d8d8;max-width:300px;font-size:11px">${comment}</td></tr>`;
     }).join('')}
-    </tbody></table></div>`;
+    </tbody></table></div></section>`;
   }
 
   if(document.getElementById('ri-obs').checked){
     const obs16=OBSERVACOES.filter(o=>o.semana===16);
     if(obs16.length){
-      html+=`<div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
+      html+=`<section class="rel-module" data-title="Comentários"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
       <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:14px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">COMENTÁRIOS</span>Observações e Destaques</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
         ${obs16.map(o=>{const corBd=o.cor==='g'?'#28c76f':o.cor==='y'?'#ffc107':o.cor==='r'?'#ea5455':'#444';
@@ -6738,320 +6319,56 @@ function gerarRelatorio(){
             <div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:6px">${o.obra?o.obra+' — ':''}${o.titulo||'Comentário Geral'}</div>
             <div style="font-size:11px;color:#b0b0b0;line-height:1.7;white-space:pre-wrap">${o.texto}</div>
           </div>`;}).join('')}
-      </div></div>`;
+      </div></div></section>`;
     }
   }
 
   html+=`<div style="background:#1a1a1a;padding:12px 28px;text-align:center;font-size:11px;color:#555;border-top:1px solid #333">SIOG — Grupo Lafaete · ${semana} · Emissão: ${now}</div></div>`;
-  document.getElementById('rel-preview').innerHTML=`<div class="card" style="padding:0;overflow:hidden">${html}</div>`;
+  document.getElementById('rel-preview').innerHTML=`<div class="toolbar" style="display:flex;justify-content:flex-end;gap:10px;margin:0 0 12px 0"><button class="btn btn-g" onclick="exportarPDF()">⬇ PDF</button><button class="btn btn-bl" onclick="exportarPPTX()">📊 PowerPoint</button><button class="btn" onclick="printRelatorio()">🖨 Imprimir visualização</button></div><div class="card" style="padding:0;overflow:hidden">${html}</div>`;
 }
 
+
 function exportarPDF(){
-  const el=document.getElementById('report-content');
-  if(!el){alert('Clique em "Visualizar" primeiro.');return;}
-  if(typeof html2canvas==='undefined'||typeof window.jspdf==='undefined'){window.print();return;}
-  const {jsPDF}=window.jspdf;
-  const A4_W=297, A4_H=210, MARGIN=8; // mm, landscape A4
-  const pxPerMm=3.7795;
-  const contentWidthPx=(A4_W-MARGIN*2)*pxPerMm;
-  html2canvas(el,{scale:2,backgroundColor:'#ffffff',useCORS:true,width:el.scrollWidth,windowWidth:el.scrollWidth}).then(canvas=>{
-    const pdf=new jsPDF('l','mm','a4');
-    const imgW=A4_W-MARGIN*2;
-    const imgH=canvas.height*imgW/canvas.width;
-    const pageContentH=A4_H-MARGIN*2;
-    const pagesNeeded=Math.ceil(imgH/pageContentH);
-    for(let pg=0;pg<pagesNeeded;pg++){
-      if(pg>0)pdf.addPage();
-      const srcY=pg*(canvas.height/pagesNeeded);
-      const srcH=canvas.height/pagesNeeded;
-      const c2=document.createElement('canvas');
-      c2.width=canvas.width;c2.height=Math.ceil(srcH);
-      c2.getContext('2d').drawImage(canvas,0,srcY,canvas.width,srcH,0,0,canvas.width,Math.ceil(srcH));
-      pdf.addImage(c2.toDataURL('image/jpeg',0.92),'JPEG',MARGIN,MARGIN,imgW,pageContentH);
-      // Page number
-      pdf.setFontSize(8);pdf.setTextColor(150);
-      pdf.text(`${pg+1} / ${pagesNeeded}`,A4_W-MARGIN,A4_H-3,'right');
-    }
-    const semana=(document.getElementById('rel-semana')?.value||'relatorio').replace(/\s+/g,'-');
-    pdf.save(`Relatorio-GrupoLafaete-${semana}.pdf`);
-  });
+  printRelatorio();
 }
 
 function exportarPPTX(){
+  // Regenera sempre para respeitar exatamente os quadrinhos marcados agora
+  gerarRelatorio();
+  const content=document.getElementById('report-content');
+  if(!content||!(content.innerHTML||'').trim()){alert('Não foi possível gerar o relatório.');return;}
   const semana=document.getElementById('rel-semana').value||'Semana 16';
   const corteStr=document.getElementById('rel-corte').value;
   const corteDate=corteStr?new Date(corteStr).toLocaleDateString('pt-BR'):'—';
   const emissor=document.getElementById('rel-emissor')?.value||'Diretoria de Projetos Especiais';
-  const now=new Date().toLocaleDateString('pt-BR');
-  const cons=getMedCons();
-  const tC=cons.reduce((s,m)=>s+(m.contrato||0),0);
-  const tR=cons.reduce((s,m)=>s+m.rec,0);
-  const tM=cons.reduce((s,m)=>s+m.med,0);
-  const tF=cons.reduce((s,m)=>s+m.fat,0);
-  const tNV=cons.reduce((s,m)=>s+m.nfv,0);
-  const tAR=cons.reduce((s,m)=>s+m.ar,0);
-  const incCrono=!!document.getElementById('ri-crono')?.checked;
-  const incRdo=!!document.getElementById('ri-rdo')?.checked;
-  const incDocs=!!document.getElementById('ri-docs')?.checked;
-  const incMed=!!document.getElementById('ri-med')?.checked;
-  const incSat=!!document.getElementById('ri-sat')?.checked;
-  const incObs=!!document.getElementById('ri-obs')?.checked;
-
-  // Light theme palette
-  const BG='#ffffff', BG2='#f5f5f5', BG3='#eeeeee';
-  const TX='#1a1a1a', TX2='#555555', TX3='#888888';
-  const OR='#E87722', G='#1a7a30', R='#c0392b', BL='#1558c0', Y='#a07800';
-  const HDR_BG='#1a1a1a', HDR_TX='#ffffff';
-
-  const S=(c,l,v,sub='')=>`<div style="background:#f8f8f8;border-radius:6px;padding:12px 14px;border-top:3px solid ${c};border:1px solid #e0e0e0">
-    <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px">${l}</div>
-    <div style="font-size:22px;font-weight:800;color:${c};margin:3px 0">${v}</div>
-    ${sub?`<div style="font-size:10px;color:#888">${sub}</div>`:''}
-  </div>`;
-
-  const TH=h=>`<th style="background:#f0f0f0;padding:6px 8px;text-align:left;border-bottom:2px solid #ddd;color:#555;font-size:9px;text-transform:uppercase;font-weight:700;white-space:nowrap">${h}</th>`;
-  const TD=(v,sx='')=>`<td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:10px;${sx}">${v}</td>`;
-  const SLIDE=(title,sub,body,extra='')=>`
-  <div class="slide">
-    <div class="s-hdr">
-      <div>
-        <div class="s-tag">${title}</div>
-        ${sub?`<div style="font-size:11px;color:#aaa;margin-top:2px">${sub}</div>`:''}
-      </div>
-      <div style="display:flex;align-items:center;gap:12px">
-        <img src="${LOGO_URI}" style="height:36px;object-fit:contain" alt="Grupo Lafaete">
-        <div style="text-align:right;font-size:10px;color:#aaa"><div style="color:${OR};font-weight:700">${semana}</div><div>Corte: ${corteDate}</div></div>
-      </div>
-    </div>
-    <div class="s-body">${body}</div>
-    ${extra}
-  </div>`;
-
-  const ativos=PROJETOS.filter(p=>p.status==='Ativo').length;
-  const atrasados=PROJETOS.filter(p=>p.alerta==='⚠ Atraso').length;
-  const noPrazo=PROJETOS.filter(p=>cronoFarol(p)==='g').length;
-
-  const medSlide=SLIDE('MEDIÇÕES & FINANCEIRO','Medições, Faturamentos e Recebimentos',`
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
-      ${S(BL,'Carteira Total',fmtR(tC))}
-      ${S(G,'Total Medido',fmtR(tM))}
-      ${S(OR,'Total Faturado',fmtR(tF))}
-      ${S(G,'Total Recebido',fmtR(tR))}
-      ${S(R,'NF Vencidas',fmtR(tNV))}
-      ${S(Y,'A Receber',fmtR(tAR))}
-      ${S(TX3,'Prev. 7 dias',fmtR(medPrev7()))}
-      ${S(TX3,'Prev. 30 dias',fmtR(medPrev30()))}
-    </div>
-    <table style="width:100%;border-collapse:collapse">
-      <thead><tr>${['ID','Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber'].map(TH).join('')}</tr></thead>
-      <tbody>
-      ${cons.map(m=>{const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—';
-        return`<tr><td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:10px;font-family:monospace;color:#888">${m.id}</td><td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${m.cliente}</td>
-        ${[m.contrato,m.med,m.fat].map(v=>TD(fmtR(v),'text-align:right')).join('')}
-        <td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:10px;text-align:right;color:${G};font-weight:600">${fmtR(m.rec)}</td>
-        ${TD(pct,'text-align:right')}
-        <td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:10px;text-align:right;color:${R}">${m.nfv>0?fmtR(m.nfv):'—'}</td>
-        <td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:10px;text-align:right">${m.ar>0?fmtR(m.ar):'—'}</td></tr>`;}).join('')}
-      <tr style="background:#f0f0f0;font-weight:700">
-        <td colspan="2" style="padding:6px 8px;font-size:10px">TOTAL GERAL</td>
-        ${[tC,tM,tF].map(v=>TD(fmtR(v),'text-align:right;font-weight:700')).join('')}
-        <td style="padding:6px 8px;text-align:right;color:${G};font-weight:700">${fmtR(tR)}</td>
-        ${TD(tC?(tR/tC*100).toFixed(0)+'%':'—','text-align:right;font-weight:700')}
-        <td style="padding:6px 8px;text-align:right;color:${R};font-weight:700">${fmtR(tNV)}</td>
-        <td style="padding:6px 8px;text-align:right;font-weight:700">${fmtR(tAR)}</td>
-      </tr>
-      </tbody>
-    </table>
-    ${OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16).length?`
-    <div style="margin-top:14px">
-      <div style="font-size:11px;font-weight:700;color:${OR};margin-bottom:8px">💬 Comentários</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      ${OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16).map(o=>`
-        <div style="border-left:3px solid ${OR};padding:8px 10px;background:#fafafa;border-radius:0 4px 4px 0">
-          <div style="font-size:10px;font-weight:700;color:${OR};margin-bottom:3px">${o.obra?o.obra+' — ':''}${o.titulo||''}</div>
-          <div style="font-size:10px;color:#555;line-height:1.6;white-space:pre-wrap">${o.texto}</div>
-        </div>`).join('')}
-      </div>
-    </div>`:''}
-  `);
-
-  const pptHtml=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-  <title>Relatório ${semana} — Grupo Lafaete</title>
-  <style>
-  *{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
-  body{background:#e8e8e8;padding:20px}
-  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:hidden;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column}
-  .s-hdr{background:#1a1a1a;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-  .s-tag{font-size:18px;font-weight:800;color:#E87722}
-  .s-body{padding:20px 32px;flex:1;overflow:hidden}
-  .krow{display:grid;gap:10px;margin-bottom:14px}
-  .krow-4{grid-template-columns:repeat(4,1fr)}
-  .krow-8{grid-template-columns:repeat(4,1fr)}
-  table{width:100%;border-collapse:collapse}
-  .obs-g{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .obs-c{border-left:3px solid #E87722;padding:10px 12px;background:#fafafa;border-radius:0 4px 4px 0}
-  .obs-ct{font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px}
-  .obs-cb{font-size:10px;color:#555;line-height:1.6;white-space:pre-wrap}
-  @media print{
-    @page{size:1280px 720px landscape;margin:0}
-    body{background:none;padding:0}
-    .slide{box-shadow:none;margin:0;page-break-after:always}
-  }
-  </style></head><body>
-
-  <!-- CAPA -->
-  <div class="slide">
-    <div style="background:#1a1a1a;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px">
-      <img src="${LOGO_URI}" style="height:80px;object-fit:contain;margin-bottom:36px" alt="Grupo Lafaete">
-      <div style="font-size:48px;font-weight:900;color:#E87722;text-align:center;line-height:1.1">Relatório Semanal</div>
-      <div style="font-size:24px;font-weight:600;color:#ffffff;margin:10px 0 4px">Gestão de Projetos Especiais</div>
-      <div style="font-size:16px;color:#E87722;font-weight:700;margin:16px 0 6px">${semana}</div>
-      <div style="font-size:14px;color:#888">Data de Corte: ${corteDate} &nbsp;·&nbsp; Emissão: ${now}</div>
-      <div style="font-size:13px;color:#666;margin-top:8px">${emissor}</div>
-      <div style="display:grid;grid-template-columns:repeat(4,160px);gap:12px;margin-top:36px">
-        ${[['#4a9eff','Projetos Ativos',ativos],['#ff6b6b','Atrasados',atrasados],['#E87722','Carteira',fmtR(tC)],['#48c774','Recebido',fmtR(tR)]].map(([col,lbl,val])=>`
-        <div style="background:rgba(255,255,255,.08);border-top:3px solid ${col};border-radius:6px;padding:14px;text-align:center">
-          <div style="font-size:9px;color:#888;text-transform:uppercase">${lbl}</div>
-          <div style="font-size:20px;font-weight:800;color:${col};margin-top:4px">${val}</div>
-        </div>`).join('')}
-      </div>
-    </div>
-  </div>
-
-  <!-- RDO -->
-  ${incRdo ? SLIDE('RDO — STATUS DAS OBRAS','Relatório Diário de Obra — '+semana,`
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-      ${S(BL,'Total em Campo',RDO.length)}${S(G,'✅ Atualizadas',RDO.filter(r=>getRdoStatus(r)==='Atualizado').length,'≤7 dias')}${S(R,'⚠ Pendentes',RDO.filter(r=>getRdoStatus(r)==='Pendente').length,'>7 dias')}${S(Y,'Não Iniciadas',RDO.filter(r=>getRdoStatus(r)==='Não Iniciado').length)}
-    </div>
-    <table><thead><tr>${['ID','Obra','Última Atualiz.','⬤','Enviado','⬤','Assinado','⬤','Responsável','Modelo','Status'].map(TH).join('')}</tr></thead>
-    <tbody>${RDO.map(r=>{const st=getRdoStatus(r);const cl=st==='Atualizado'?G:st==='Pendente'?R:Y;
-      const fd=v=>{if(!v||isNaN(v))return{t:v||'—',d:'🟡'};const dd=TODAY_XL-v;return{t:xl2str(v),d:dd<=7?'🟢':'🔴'};};
-      const a=fd(r.atualizacao),e=fd(r.enviado),s=fd(r.assinado);
-      return`<tr><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;font-family:monospace;color:#888">${r.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${r.obra}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${a.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${a.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${e.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${e.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${s.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${s.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${r.resp||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${r.modelo||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:${cl};font-weight:700">${st}</td></tr>`;}).join('')}
-    </tbody></table>
-  `) : ''}
-
-  <!-- CRONOGRAMA -->
-  ${incCrono ? SLIDE('CRONOGRAMA, PRAZOS E AVANÇOS','',`
-    <div style="display:grid;grid-template-columns:1fr 320px;gap:16px">
-      <div>
-        <div style="margin-bottom:8px;font-size:11px"><span style="color:${G};font-weight:600">🟢 ${noPrazo} No Prazo</span> &nbsp; <span style="color:${R};font-weight:600">🔴 ${ativos-noPrazo} Atrasadas</span></div>
-        <table><thead><tr>${['ID','Obra','Início','Pz.Contr.','Pz.Cliente','Tendência','⬤','%Prev','%Real','Ader.'].map(TH).join('')}</tr></thead>
-        <tbody>${PROJETOS.filter(p=>p.status==='Ativo').map(p=>{const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const cl=f==='g'?G:f==='y'?Y:R;
-          const parRows=(p.parciais||[]).map(par=>`<tr style="background:#fafafa"><td></td><td style="padding:3px 8px 3px 20px;font-size:9px;color:${OR}">↳ ${par.nome}</td><td style="padding:3px 8px;font-size:9px;color:#888">${xl2str(par.inicio)}</td><td style="padding:3px 8px;font-size:9px;color:${R}">${xl2str(par.prazo_cont)}</td><td style="padding:3px 8px;font-size:9px;color:${R}">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="padding:3px 8px;font-size:9px;color:${OR}">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`).join('');
-          return`<tr><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;font-family:monospace;color:#888">${p.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${p.obra}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;color:#888">${xl2str(p.inicio)}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;color:${R}">${xl2str(p.prazo_cont)}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;color:${R}">${xl2str(p.prazo_cli)}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;color:${cl};font-weight:700">${xl2str(p.tendencia)}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${f==='g'?'🟢':f==='y'?'🟡':'🔴'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;text-align:center">${av.prev!=null?av.prev.toFixed(1)+'%':'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;text-align:center;color:${cl}">${av.real!=null?av.real.toFixed(1)+'%':'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;text-align:center">${av.prev&&av.real?(av.real/av.prev*100).toFixed(0)+'%':'—'}</td></tr>${parRows}`;}).join('')}
-        </tbody></table>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:${OR};margin-bottom:8px">💬 Comentários</div>
-        ${OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16).map(o=>`
-          <div class="obs-c" style="margin-bottom:8px"><div class="obs-ct">${o.obra?o.obra+' — ':''}${o.titulo||''}</div><div class="obs-cb">${o.texto}</div></div>`).join('')||'<div style="color:#999;font-size:11px">Sem comentários.</div>'}
-      </div>
-    </div>
-  `) : ''}
-
-  <!-- MEDIÇÕES -->
-  ${incMed ? medSlide : ''}
-
-  <!-- DOCUMENTAÇÃO -->
-  ${(()=>{
-    function fStP(s){
-      if(!s||s==='-'||s==='N/A')return '<span style="color:#aaa;font-size:9px">N/A</span>';
-      if(s==='Pendente')return '<span style="color:#c0392b;font-weight:700;font-size:9px">Pend.</span>';
-      if(s==='Contratado'||s==='Emitida'||s==='Concluído'||s==='Assinado'||s==='Validado'||s==='Disponibilizado')
-        return '<span style="color:#1a7a30;font-size:9px">✓</span>';
-      return '<span style="color:#a07800;font-size:9px">'+s+'</span>';
-    }
-    const docsPend=DOCUMENTACAO.filter(d=>d.status==='Ativo'&&(d.art_st==='Pendente'||[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st].some(s=>s==='Pendente'))).length;
-    const artsEmit=DOCUMENTACAO.filter(d=>d.art_st==='Emitida').length;
-    const ctosVenc=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0&&d.status==='Ativo').length;
-    const ctosProx=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)>=0&&daysFromToday(d.vig_cto)<=30&&d.status==='Ativo').length;
-    const rows=DOCUMENTACAO.map(d=>{
-      const dias=d.vig_cto?daysFromToday(d.vig_cto):null;
-      const dC=dias===null?'#aaa':dias<0?'#c0392b':dias<=30?'#a07800':'#1a7a30';
-      const dT=dias===null?'—':dias<0?dias+'d':'+'+dias+'d';
-      const sg=[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st];
-      const sgPend=sg.some(s=>s==='Pendente'||s==='Vencido');
-      const sgContr=sg.some(s=>s==='Contratado');
-      const sgC=sgPend?'#c0392b':sgContr?'#1a7a30':'#aaa';
-      const sgT=sgPend?'Pend.':sgContr?'Contr.':'N/A';
-      return '<tr style="border-bottom:1px solid #eee">'
-        +'<td style="padding:3px 6px;font-size:9px;font-family:monospace;color:#aaa">'+d.id+'</td>'
-        +'<td style="padding:3px 6px;font-size:9px;font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis">'+d.obra+'</td>'
-        +'<td style="padding:3px 6px;font-size:9px;color:'+(d.status==='Ativo'?'#1558c0':'#888')+'">'+d.status+'</td>'
-        +'<td style="padding:3px 6px">'+fStP(d.art_st)+'</td>'
-        +'<td style="padding:3px 6px;color:'+sgC+';font-weight:600;font-size:9px">'+sgT+'</td>'
-        +'<td style="padding:3px 6px">'+fStP(d.crono_st)+'</td>'
-        +'<td style="padding:3px 6px">'+fStP(d.chi)+'</td>'
-        +'<td style="padding:3px 6px">'+fStP(d.che)+'</td>'
-        +'<td style="padding:3px 6px">'+fStP(d.te)+'</td>'
-        +'<td style="padding:3px 6px">'+fStP(d.atc)+'</td>'
-        +'<td style="padding:3px 6px;font-size:9px;color:'+dC+'">'+(d.vig_cto?new Date(d.vig_cto).toLocaleDateString('pt-BR'):'—')+'</td>'
-        +'<td style="padding:3px 6px;font-size:9px;font-weight:700;color:'+dC+'">'+dT+'</td>'
-        +'</tr>';
-    }).join('');
-    return incDocs ? SLIDE('DOCUMENTAÇÃO, SEGUROS & CONFORMIDADE','Situação Documental por Projeto',`
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-        ${[['#1558c0','Cadastrados',DOCUMENTACAO.length],['#c0392b','Pendências',docsPend],['#1a7a30','ARTs Emitidas',artsEmit],['#c0392b','Contratos Vencidos',ctosVenc]].map(([col,lbl,val])=>'<div style="background:#f8f8f8;border-radius:6px;padding:10px 12px;border-top:3px solid '+col+';border:1px solid #e0e0e0"><div style="font-size:9px;color:#888;text-transform:uppercase">'+lbl+'</div><div style="font-size:22px;font-weight:800;color:'+col+';margin-top:3px">'+val+'</div></div>').join('')}
-        <div style="background:#f8f8f8;border-radius:6px;padding:10px 12px;border-top:3px solid #a07800;border:1px solid #e0e0e0"><div style="font-size:9px;color:#888;text-transform:uppercase">Cto. Vencem ≤30d</div><div style="font-size:22px;font-weight:800;color:#a07800;margin-top:3px">${ctosProx}</div></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:16px;margin-bottom:10px;font-size:10px;color:#888">
-        <span style="display:flex;align-items:center;gap:4px"><span style="color:#c0392b;font-weight:700">Pend.</span> = Pendente</span>
-        <span style="display:flex;align-items:center;gap:4px"><span style="color:#1a7a30">✓</span> = OK/Concluído/Emitida</span>
-        <span style="display:flex;align-items:center;gap:4px"><span style="color:#aaa">N/A</span> = Não aplicável</span>
-        <span style="display:flex;align-items:center;gap:4px"><span style="color:#c0392b;font-weight:700">dias negativos</span> = Contrato vencido</span>
-      </div>
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="background:#f0f0f0">
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">ID</th>
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">Obra</th>
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">Status</th>
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">ART</th>
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">Seg/Gar</th>
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">Crono</th>
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">Chk.Int</th>
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">Chk.Ext</th>
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">Termo</th>
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">Atestado</th>
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">Vig.Cto.</th>
-            <th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">Dias</th>
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    `) : '';
-  })()}
-
-  <!-- SATISFAÇÃO -->
-  ${incSat ? SLIDE('SATISFAÇÃO DO CLIENTE','',`
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-      ${S(BL,'Total',PESQUISAS.length)}${S(G,'😊 Satisfeitos',PESQUISAS.filter(p=>p.nivel==='Satisfeito').length)}${S(Y,'😐 Parcialmente',PESQUISAS.filter(p=>p.nivel==='Parcialmente Satisfeito').length)}${S(R,'😞 Insatisfeitos',PESQUISAS.filter(p=>p.nivel==='Insatisfeito').length)}
-    </div>
-    <table><thead><tr>${['Data','ID','Cliente','Satisfação','Comentário'].map(TH).join('')}</tr></thead>
-    <tbody>${PESQUISAS.filter(p=>p.incl_rel).map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?G:p.nivel==='Insatisfeito'?R:Y;const com=satComentarioHtml(p,true);
-      return`<tr><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${new Date(p.data).toLocaleDateString('pt-BR')}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px;font-family:monospace;color:#888">${p.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${p.cliente}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;color:${cl};font-weight:700;font-size:12px">${f.e} ${f.l}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#555;max-width:400px;line-height:1.45">${com}</td></tr>`;}).join('')}
-    </tbody></table>
-  `) : ''}
-
-  <!-- COMENTÁRIOS -->
-  ${incObs ? SLIDE('COMENTÁRIOS & OBSERVAÇÕES',semana,`
-    <div class="obs-g">
-      ${OBSERVACOES.filter(o=>o.semana===16).map(o=>{const corBd=o.cor==='g'?'#1a7a30':o.cor==='y'?'#a07800':o.cor==='r'?'#c0392b':'#999';
-        return`<div class="obs-c" style="border-left-color:${corBd}"><div class="obs-ct" style="color:${corBd}">${o.obra?o.obra+' — ':''}${o.titulo||'Comentário Geral'}</div><div class="obs-cb">${o.texto}</div></div>`;}).join('')}
-    </div>
-  `) : ''}
-
-  </body></html>`;
-
+  const checkedMods=[...document.querySelectorAll('#page-relatorios input[id^=ri-][type=checkbox]:checked')].map(x=>x.id);
+  const sections=[...content.querySelectorAll('.rel-module')];
+  if(!sections.length){alert('Nenhum módulo selecionado para exportar.');return;}
+  if(sections.length < checkedMods.length){console.warn('A exportação encontrou menos módulos do que quadrinhos marcados.', {checkedMods, sections:sections.map(s=>s.dataset.title)});}
+  const slides=sections.map(sec=>`<div class="slide"><div class="s-hdr"><div><div class="s-tag">${sec.dataset.title||'Módulo'}</div><div class="s-sub">${semana}</div></div><div style="text-align:right;font-size:11px;color:#cfcfcf"><div style="color:#E87722;font-weight:800">${semana}</div><div>Corte: ${corteDate}</div><div>${emissor}</div></div></div><div class="s-body">${sec.innerHTML}</div></div>`).join('');
+  const pptHtml=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório ${semana} — Grupo Lafaete</title><style>*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}body{background:#e8e8e8;padding:20px}.slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);display:flex;flex-direction:column}.s-hdr{background:#1a1a1a;padding:18px 32px;display:flex;align-items:center;justify-content:space-between}.s-tag{font-size:20px;font-weight:800;color:#E87722}.s-sub{font-size:12px;color:#bdbdbd;margin-top:3px}.s-body{padding:20px 32px;flex:1;overflow:visible}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #eee;padding:5px 8px;vertical-align:top;font-size:10px;color:#111;line-height:1.35}th{background:#f0f0f0;color:#555;font-size:9px;text-transform:uppercase} .money{white-space:nowrap} @media print{@page{size:1280px 720px landscape;margin:0}body{background:none;padding:0}.slide{box-shadow:none;margin:0;page-break-after:always}}</style></head><body><div class="slide"><div style="background:#1a1a1a;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px"><img src="${LOGO_URI}" style="height:80px;object-fit:contain;margin-bottom:36px" alt="Grupo Lafaete"><div style="font-size:48px;font-weight:900;color:#E87722;text-align:center;line-height:1.1">Relatório Semanal</div><div style="font-size:24px;font-weight:600;color:#ffffff;margin:10px 0 4px">Gestão de Projetos Especiais</div><div style="font-size:18px;color:#E87722;font-weight:800;margin:16px 0 6px">${semana}</div><div style="font-size:14px;color:#d0d0d0">Data de Corte: ${corteDate} · Emissão: ${new Date().toLocaleDateString('pt-BR')}</div><div style="font-size:13px;color:#999;margin-top:8px">${emissor}</div></div></div>${slides}</body></html>`;
   const blob=new Blob([pptHtml],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;
-  a.download=`Relatorio-GrupoLafaete-${semana.replace(/\s+/g,'-')}.html`;
-  a.click();URL.revokeObjectURL(url);
-  alert('✅ Apresentação exportada! A capa completa foi mantida e os módulos seguem apenas o que estiver marcado. Abra o .html no Chrome e imprima em modo paisagem.');
+  const a=document.createElement('a');a.href=url; a.download=`Relatorio-GrupoLafaete-${semana.replace(/\s+/g,'-')}.html`; a.click(); URL.revokeObjectURL(url);
+  alert('✅ Apresentação exportada com os módulos selecionados.');
 }
 
+function printRelatorio(){
+  // Regenera sempre para respeitar exatamente os quadrinhos marcados agora
+  gerarRelatorio();
+  const content=document.getElementById('report-content');
+  if(!content||!(content.innerHTML||'').trim()){alert('Não foi possível gerar o relatório.');return;}
+  const semana=document.getElementById('rel-semana')?.value||'Relatório';
+  const corteStr=document.getElementById('rel-corte')?.value||'';
+  const corteDate=corteStr?new Date(corteStr).toLocaleDateString('pt-BR'):'—';
+  const emissor=document.getElementById('rel-emissor')?.value||'Diretoria de Projetos Especiais';
+  const checkedMods=[...document.querySelectorAll('#page-relatorios input[id^=ri-][type=checkbox]:checked')].map(x=>x.id);
+  const sections=[...content.querySelectorAll('.rel-module')];
+  if(sections.length < checkedMods.length){console.warn('A impressão encontrou menos módulos do que quadrinhos marcados.', {checkedMods, sections:sections.map(s=>s.dataset.title)});}
+  const slides=sections.map(sec=>`<section class="slide"><div class="s-hdr"><div><div class="s-tag">${sec.dataset.title||'Módulo'}</div><div class="s-sub">${semana}</div></div><div style="text-align:right;font-size:11px;color:#cfcfcf"><div style="color:#E87722;font-weight:800">${semana}</div><div>Corte: ${corteDate}</div><div>${emissor}</div></div></div><div class="s-body">${sec.innerHTML}</div></section>`).join('');
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${semana}</title><style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{margin:0;background:#fff}.slide{page-break-after:always;break-after:page;background:#fff;overflow:visible}.s-hdr{background:#1a1a1a;padding:12px 18px;display:flex;align-items:center;justify-content:space-between}.s-tag{font-size:16px;font-weight:800;color:#E87722}.s-sub{font-size:10px;color:#bdbdbd;margin-top:2px}.s-body{padding:14px 18px;overflow:visible}table{width:100%!important;border-collapse:collapse;table-layout:auto}thead{display:table-header-group}th,td{border-bottom:1px solid #ddd;padding:4px 6px;vertical-align:top;font-size:9px;color:#111;line-height:1.28;word-break:break-word}th{background:#f0f0f0!important;color:#555!important;font-size:8px;text-transform:uppercase}.money{white-space:nowrap}</style></head><body><section class="slide"><div style="background:#1a1a1a;min-height:180mm;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px"><img src="${LOGO_URI}" style="height:64px;object-fit:contain;margin-bottom:28px"><div style="font-size:38px;font-weight:900;color:#E87722;line-height:1.1;text-align:center">Relatório Semanal</div><div style="font-size:20px;font-weight:600;color:#fff;margin-top:8px">Gestão de Projetos Especiais</div><div style="font-size:16px;color:#E87722;font-weight:800;margin-top:14px">${semana}</div><div style="font-size:12px;color:#ddd;margin-top:8px">Data de Corte: ${corteDate} · Emissão: ${new Date().toLocaleDateString('pt-BR')}</div><div style="font-size:11px;color:#aaa;margin-top:8px">${emissor}</div></div></section>${slides}</body></html>`;
+  const w=window.open('','_blank'); w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),300);
+}
 // ─── INIT ────────────────────────────────────────────────────────────────────
 document.getElementById('hdr-title').textContent='Dashboard Geral';
 document.getElementById('sb-week').textContent='Semana '+getSemanaAtual()+' · '+new Date().toLocaleDateString('pt-BR');
@@ -7065,21 +6382,32 @@ document.getElementById('sb-week').textContent='Semana '+getSemanaAtual()+' · '
 // ═══════════════════════════════════════════════════════════
 
 const STORAGE_KEY = 'siog_lafaete_data_v6_original_com_dados';
+// Mantém compatibilidade com versões anteriores e com a versão corrigida.
+const STORAGE_KEYS_TO_TRY = [
+  'siog_lafaete_data_v6_original_com_dados',
+  'siog_lafaete_index_relatorio_dados_preservados_v10_20260423'
+];
+
+function buildStoragePayload() {
+  return {
+    ts: Date.now(),
+    PROJETOS,
+    RDO,
+    DOCUMENTACAO,
+    MEDICOES,
+    PESQUISAS,
+    OBSERVACOES,
+    AVANCOS,
+  };
+}
 
 function saveToStorage() {
   try {
-    const payload = {
-      ts: Date.now(),
-      PROJETOS,
-      RDO,
-      DOCUMENTACAO,
-      MEDICOES,
-      PESQUISAS,
-      OBSERVACOES,
-      AVANCOS,
-    };
+    const payload = buildStoragePayload();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    // Show subtle save indicator
+    // Também atualiza a chave v10 para evitar conflito caso o navegador já tenha usado a versão anterior.
+    try { localStorage.setItem('siog_lafaete_index_relatorio_dados_preservados_v10_20260423', JSON.stringify(payload)); } catch(_e) {}
+
     const ind = document.getElementById('save-indicator');
     if(ind) {
       ind.textContent = '✓ Salvo ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
@@ -7092,38 +6420,46 @@ function saveToStorage() {
   }
 }
 
+function isValidStorageData(data) {
+  if(!data || !Array.isArray(data.PROJETOS) || !data.PROJETOS.length) return false;
+  const MIN_PROJETOS = 31;
+  const MIN_RDO = 10;
+  const totalProjetos = data.PROJETOS.reduce((s,p)=>s+(Number(p?.valor)||0),0);
+  const totalMedicoes = Array.isArray(data.MEDICOES) ? data.MEDICOES.reduce((s,m)=>s+(Number(m?.valor_contrato)||0)+(Number(m?.valor)||0),0) : 0;
+  const ativosValidos = data.PROJETOS.filter(p=>String(p?.obra||p?.status||'').trim()).length;
+  const looksIncomplete = data.PROJETOS.length < MIN_PROJETOS || (Array.isArray(data.RDO) && data.RDO.length < MIN_RDO);
+  const looksZeroed = totalProjetos <= 0 || totalMedicoes <= 0 || ativosValidos < MIN_PROJETOS;
+  return !(looksIncomplete || looksZeroed);
+}
+
+function applyStorageData(data) {
+  if(data.PROJETOS   && data.PROJETOS.length)       PROJETOS      = data.PROJETOS;
+  if(data.RDO        && data.RDO.length)            RDO           = data.RDO;
+  if(data.DOCUMENTACAO && data.DOCUMENTACAO.length) DOCUMENTACAO  = data.DOCUMENTACAO;
+  if(data.MEDICOES   && data.MEDICOES.length)       MEDICOES      = data.MEDICOES;
+  if(data.PESQUISAS  && data.PESQUISAS.length)      PESQUISAS     = data.PESQUISAS;
+  if(data.OBSERVACOES && data.OBSERVACOES.length)   OBSERVACOES   = data.OBSERVACOES;
+  if(data.AVANCOS)                                  AVANCOS       = data.AVANCOS;
+}
+
 function loadFromStorage() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return false;
-    const data = JSON.parse(raw);
-    if(!data || !data.PROJETOS) return false;
-    // Version check: if stored data has fewer projects than seed data, ignore it
-    // This handles the case where old corrupted data is in localStorage
-    const MIN_PROJETOS = 31;
-    const MIN_RDO = 13;      // seed data has 15
-    const totalProjetos = Array.isArray(data.PROJETOS) ? data.PROJETOS.reduce((s,p)=>s+(Number(p?.valor)||0),0) : 0;
-    const totalMedicoes = Array.isArray(data.MEDICOES) ? data.MEDICOES.reduce((s,m)=>s+(Number(m?.valor)||0),0) : 0;
-    const ativosValidos = Array.isArray(data.PROJETOS) ? data.PROJETOS.filter(p=>String(p?.status||'').trim()).length : 0;
-    const looksIncomplete = data.PROJETOS.length < MIN_PROJETOS || (data.RDO && data.RDO.length < MIN_RDO);
-    const looksZeroed = totalProjetos <= 0 || totalMedicoes <= 0 || ativosValidos < MIN_PROJETOS;
-    if(looksIncomplete || looksZeroed) {
-      console.warn('localStorage inconsistente ou zerado, usando dados originais do arquivo');
-      localStorage.removeItem(STORAGE_KEY);
-      return false;
+    for(const key of STORAGE_KEYS_TO_TRY) {
+      const raw = localStorage.getItem(key);
+      if(!raw) continue;
+      const data = JSON.parse(raw);
+      if(!isValidStorageData(data)) {
+        console.warn('Dados locais inconsistentes ignorados na chave:', key);
+        continue;
+      }
+      applyStorageData(data);
+      // Migra o dado válido para a chave principal do primeiro arquivo.
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(buildStoragePayload()));
+      const saved = data.ts ? new Date(data.ts).toLocaleString('pt-BR') : 'sem data registrada';
+      console.log('✅ Dados restaurados do armazenamento local:', key, 'Último save:', saved);
+      return true;
     }
-    // Restore all data arrays
-    if(data.PROJETOS   && data.PROJETOS.length)    PROJETOS    = data.PROJETOS;
-    if(data.RDO        && data.RDO.length)         RDO         = data.RDO;
-    if(data.DOCUMENTACAO && data.DOCUMENTACAO.length) DOCUMENTACAO = data.DOCUMENTACAO;
-    if(data.MEDICOES   && data.MEDICOES.length)    MEDICOES    = data.MEDICOES;
-    if(data.PESQUISAS  && data.PESQUISAS.length)   PESQUISAS   = data.PESQUISAS;
-    if(data.OBSERVACOES && data.OBSERVACOES.length) OBSERVACOES = data.OBSERVACOES;
-    if(data.AVANCOS)                               AVANCOS     = data.AVANCOS;
-    const saved = new Date(data.ts).toLocaleString('pt-BR');
-    console.log('✅ Dados restaurados do armazenamento local. Último save:', saved);
-    // Admin class já foi aplicado na inicialização (_isAdmin default = true)
-    return true;
+    return false;
   } catch(e) {
     console.warn('Erro ao carregar dados locais:', e);
     return false;
@@ -7131,15 +6467,14 @@ function loadFromStorage() {
 }
 
 function clearStorage() {
-  if(!confirm('⚠️ Apagar TODOS os dados salvos e voltar para os dados originais da planilha?\n\nEsta ação não pode ser desfeita.')) return;
-  localStorage.removeItem(STORAGE_KEY);
+  if(!confirm('⚠️ Apagar TODOS os dados salvos e voltar para os dados originais do arquivo?\n\nEsta ação não pode ser desfeita.')) return;
+  STORAGE_KEYS_TO_TRY.forEach(k => localStorage.removeItem(k));
   location.reload();
 }
 
 function exportBackup() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if(!raw) { alert('Nenhum dado salvo ainda.'); return; }
-  const blob = new Blob([raw], {type:'application/json'});
+  const payload = buildStoragePayload();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -7158,8 +6493,8 @@ function importBackup() {
     reader.onload = ev => {
       try {
         const data = JSON.parse(ev.target.result);
-        if(!data.PROJETOS) { alert('Arquivo inválido.'); return; }
-        localStorage.setItem(STORAGE_KEY, ev.target.result);
+        if(!isValidStorageData(data)) { alert('Arquivo inválido ou incompleto.'); return; }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         alert('✅ Backup restaurado! A página será recarregada.');
         location.reload();
       } catch(e) { alert('Erro ao importar: ' + e.message); }
@@ -7744,42 +7079,28 @@ async function pushLocalDataToSupabase(){
   const ts=new Date().toISOString();
   function showMsg(m){const ind=document.getElementById('save-indicator');if(ind){ind.textContent=m;ind.style.opacity='1';ind.style.color='var(--bl2)';}}
   try{
-    const{data:rDb}=await _sb.from('rdo').select('id');
-    if(!rDb||rDb.length<RDO.length){
-      showMsg('⬆ Sincronizando dados...');
-      for(const r of RDO){
-        await _sb.from('rdo').upsert({id:r.id,obra:r.obra,atualizacao:String(r.atualizacao||''),enviado:String(r.enviado||''),assinado:String(r.assinado||''),resp:r.resp||'',modelo:r.modelo||'',histograma:r.histograma||'',obs:r.obs||'',updated_at:ts},{onConflict:'id,obra'}).catch(()=>{});
-      }
+    showMsg('⬆ Sincronizando dados do arquivo index...');
+    // Força os dados embarcados desta versão a prevalecerem no backup remoto.
+    // Antes, se a tabela remota tivesse a mesma quantidade de registros, alguns lançamentos antigos permaneciam.
+    for(const p of PROJETOS){
+      const row=Object.assign({},p,{parciais:JSON.stringify(p.parciais||[]),updated_at:ts});
+      await _sb.from('projetos').upsert(row,{onConflict:'id,obra'}).catch(()=>{});
     }
-    const{data:pDb}=await _sb.from('projetos').select('id');
-    if(!pDb||pDb.length<PROJETOS.length){
-      for(const p of PROJETOS){
-        const row=Object.assign({},p,{parciais:JSON.stringify(p.parciais||[]),updated_at:ts});
-        await _sb.from('projetos').upsert(row,{onConflict:'id'}).catch(()=>{});
-      }
+    for(const r of RDO){
+      await _sb.from('rdo').upsert({id:r.id,obra:r.obra,atualizacao:String(r.atualizacao||''),enviado:String(r.enviado||''),assinado:String(r.assinado||''),resp:r.resp||'',modelo:r.modelo||'',histograma:r.histograma||'',obs:r.obs||'',updated_at:ts},{onConflict:'id,obra'}).catch(()=>{});
     }
-    const{data:dDb}=await _sb.from('documentacao').select('id');
-    if(!dDb||dDb.length<DOCUMENTACAO.length){
-      for(const d of DOCUMENTACAO){
-        const row=Object.assign({},d,{art_tipos:JSON.stringify(d.art_tipos||[]),updated_at:ts});
-        await _sb.from('documentacao').upsert(row,{onConflict:'id,obra'}).catch(()=>{});
-      }
+    for(const d of DOCUMENTACAO){
+      const row=Object.assign({},d,{art_tipos:JSON.stringify(d.art_tipos||[]),updated_at:ts});
+      await _sb.from('documentacao').upsert(row,{onConflict:'id,obra'}).catch(()=>{});
     }
-    const{data:mDb}=await _sb.from('medicoes').select('id_seq');
-    if(!mDb||mDb.length<MEDICOES.length){
-      for(const m of MEDICOES){const{id_seq,...row}=Object.assign({},m,{updated_at:ts});await _sb.from('medicoes').insert(row).catch(()=>{});}
+    for(const [key,av] of Object.entries(AVANCOS||{})){
+      await _sb.from('avancos').upsert({projeto_key:key,prev:av.prev,real:av.real,semana:av.semana||'',obs:av.obs||'',updated_at:ts},{onConflict:'projeto_key'}).catch(()=>{});
     }
-    const{data:psDb}=await _sb.from('pesquisas').select('id_seq');
-    if(!psDb||psDb.length<PESQUISAS.length){
-      for(const p of PESQUISAS){const{id_seq,...row}=Object.assign({},p,{updated_at:ts});await _sb.from('pesquisas').insert(row).catch(()=>{});}
-    }
-    const{data:oDb}=await _sb.from('observacoes').select('id_seq');
-    if(!oDb||oDb.length<OBSERVACOES.length){
-      for(const o of OBSERVACOES){const{id_seq,...row}=Object.assign({},o,{updated_at:ts});await _sb.from('observacoes').insert(row).catch(()=>{});}
-    }
-    showMsg('✅ Sincronizado!');
+    // Medições, pesquisas e observações permanecem embarcadas no arquivo e são salvas localmente.
+    // Novos lançamentos feitos pelo usuário continuam sendo enviados pelas rotinas normais de edição.
+    showMsg('✅ Dados sincronizados com a base do arquivo index!');
     const ind=document.getElementById('save-indicator');
-    if(ind){clearTimeout(ind._t);ind._t=setTimeout(()=>{ind.style.opacity='0';},3000);}
+    if(ind){clearTimeout(ind._t);ind._t=setTimeout(()=>{ind.style.opacity='0';},3500);}
   }catch(e){console.warn('Push error:',e);}
 }
 function installAccessGuards(){
@@ -7831,157 +7152,6 @@ window.addEventListener('load', () => {
     try { initSupabase(); } catch(e) { console.warn('Supabase:', e); }
   }, 500);
 });
-
-
-// ===== Overrides: relatório/visualização/PDF espelhando o PowerPoint =====
-function __reportMeta(){
-  const semana=document.getElementById('rel-semana')?.value||'Semana 16';
-  const corteStr=document.getElementById('rel-corte')?.value||'';
-  const corteDate=corteStr?new Date(corteStr).toLocaleDateString('pt-BR'):'—';
-  const emissor=document.getElementById('rel-emissor')?.value||'Diretoria de Projetos Especiais';
-  const now=new Date().toLocaleDateString('pt-BR');
-  return {semana,corteDate,emissor,now};
-}
-function __reportFlags(){
-  return {
-    incCrono:!!document.getElementById('ri-crono')?.checked,
-    incRdo:!!document.getElementById('ri-rdo')?.checked,
-    incDocs:!!document.getElementById('ri-docs')?.checked,
-    incMed:!!document.getElementById('ri-med')?.checked,
-    incSat:!!document.getElementById('ri-sat')?.checked,
-    incObs:!!document.getElementById('ri-obs')?.checked,
-  };
-}
-function __commentColor(cor){return cor==='g'?'#1a7a30':cor==='y'?'#a07800':cor==='r'?'#c0392b':'#999';}
-function __commentCards(list){
-  return list.map(o=>`<div class="obs-c" style="border-left-color:${__commentColor(o.cor)}"><div class="obs-ct" style="color:${__commentColor(o.cor)}">${o.obra?o.obra+' — ':''}${o.titulo||'Comentário Geral'}</div><div class="obs-cb">${o.texto}</div></div>`).join('');
-}
-function __chunkComments(list,maxPerPage=4){
-  const chunks=[]; for(let i=0;i<list.length;i+=maxPerPage) chunks.push(list.slice(i,i+maxPerPage));
-  return chunks.length?chunks:[[]];
-}
-function __deckStyles(){ return `
-<style>
-  #rel-preview .deck-wrap{margin-top:16px}
-  .slide{width:1280px;min-height:720px;background:#ffffff;margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;display:flex;flex-direction:column;border-radius:8px}
-  .s-hdr{background:#1a1a1a;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-  .s-tag{font-size:18px;font-weight:800;color:#E87722}
-  .s-sub{font-size:11px;color:#aaa;margin-top:2px}
-  .s-body{padding:20px 32px;flex:1;overflow:visible;color:#1a1a1a}
-  .krow{display:grid;gap:10px;margin-bottom:14px}.krow-4{grid-template-columns:repeat(4,1fr)}
-  table{width:100%;border-collapse:collapse}.obs-g{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .obs-c{border-left:3px solid #E87722;padding:10px 12px;background:#fafafa;border-radius:0 4px 4px 0}
-  .obs-ct{font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px}.obs-cb{font-size:10px;color:#555;line-height:1.55;white-space:pre-wrap}.slide table td,.slide table th{font-family:Arial,sans-serif}.slide table td{font-size:10px;line-height:1.35}.slide table th{font-size:8px}
-  .split-2{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
-  .muted{color:#888}.mono{font-family:monospace}
-  .sat-big{font-size:24px;line-height:1}
-  .val-nowrap{white-space:nowrap;line-height:1.1}
-  @media print{
-    @page{size:A4 landscape;margin:8mm}
-    body{background:none!important}
-    #sb,#hdr,.filter-bar,.btn,.theme-btn,.mo,.comments-panel,.access-modal,.read-only-banner{display:none!important}
-    #main{margin-left:0!important} #content{padding:0!important}
-    #page-relatorios{display:block!important}
-    .card.mb16{display:none!important}
-    #rel-preview .deck-wrap{margin-top:0}
-    .slide{width:100%;min-height:auto;box-shadow:none;margin:0 0 12px 0;page-break-after:always;break-after:page;border-radius:0;overflow:visible!important}
-    .slide:last-child{page-break-after:auto;break-after:auto}
-  }
-</style>`; }
-function __TH(h){return `<th style="padding:4px 6px;text-align:left;font-size:8px;text-transform:uppercase;color:#555;font-weight:700">${h}</th>`;}
-function __TD(v,s=''){return `<td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;${s}">${v}</td>`;}
-function __S(c,l,v,sub=''){return `<div style="background:#f8f8f8;border-radius:6px;padding:12px 14px;border-top:3px solid ${c};border:1px solid #e0e0e0"><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px">${l}</div><div class="val-nowrap" style="font-size:18px;font-weight:800;color:${c};margin:3px 0">${v}</div>${sub?`<div style="font-size:10px;color:#888">${sub}</div>`:''}</div>`;}
-function __SLIDE(meta,title,sub,body){
-  return `<div class="slide"><div class="s-hdr"><div><div class="s-tag">${title}</div>${sub?`<div class="s-sub">${sub}</div>`:''}</div><div style="display:flex;align-items:center;gap:12px"><img src="${LOGO_URI}" style="height:36px;object-fit:contain" alt="Grupo Lafaete"><div style="text-align:right;font-size:10px;color:#aaa"><div style="color:#E87722;font-weight:700">${meta.semana}</div><div>Corte: ${meta.corteDate}</div><div>${meta.now}</div></div></div></div><div class="s-body">${body}</div></div>`;
-}
-function __buildDeckHTML(embedOnly=false){
-  const meta=__reportMeta();
-  const flags=__reportFlags();
-  const cons=getMedCons();
-  const tC=cons.reduce((s,m)=>s+(m.contrato||0),0);
-  const tR=cons.reduce((s,m)=>s+m.rec,0);
-  const tM=cons.reduce((s,m)=>s+m.med,0);
-  const tF=cons.reduce((s,m)=>s+m.fat,0);
-  const tNV=cons.reduce((s,m)=>s+m.nfv,0);
-  const tAR=cons.reduce((s,m)=>s+m.ar,0);
-  const ativos=PROJETOS.filter(p=>p.status==='Ativo').length;
-  const atrasados=PROJETOS.filter(p=>p.alerta==='⚠ Atraso').length;
-  const noPrazo=PROJETOS.filter(p=>cronoFarol(p)==='g').length;
-  let slides='';
-  slides += `<div class="slide"><div style="background:#1a1a1a;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px"><img src="${LOGO_URI}" style="height:80px;object-fit:contain;margin-bottom:36px" alt="Grupo Lafaete"><div style="font-size:48px;font-weight:900;color:#E87722;text-align:center;line-height:1.1">Relatório Semanal</div><div style="font-size:24px;font-weight:600;color:#ffffff;margin:10px 0 4px">Gestão de Projetos Especiais</div><div style="font-size:16px;color:#E87722;font-weight:700;margin:16px 0 6px">${meta.semana}</div><div style="font-size:14px;color:#888">Data de Corte: ${meta.corteDate} &nbsp;·&nbsp; Emissão: ${meta.now}</div><div style="font-size:13px;color:#666;margin-top:8px">${meta.emissor}</div><div style="display:grid;grid-template-columns:repeat(4,160px);gap:12px;margin-top:36px">${[['#4a9eff','Projetos Ativos',ativos],['#ff6b6b','Atrasados',atrasados],['#E87722','Carteira',fmtR(tC)],['#48c774','Recebido',fmtR(tR)]].map(([col,lbl,val])=>`<div style="background:rgba(255,255,255,.08);border-top:3px solid ${col};border-radius:6px;padding:14px;text-align:center"><div style="font-size:9px;color:#888;text-transform:uppercase">${lbl}</div><div class="val-nowrap" style="font-size:18px;font-weight:800;color:${col};margin-top:4px">${val}</div></div>`).join('')}</div></div></div>`;
-
-  if(flags.incRdo){
-    const rows=RDO.map(r=>{const st=getRdoStatus(r);const cl=st==='Atualizado'?'#1a7a30':st==='Pendente'?'#c0392b':'#a07800';
-      const fd=v=>{if(!v||isNaN(v))return{t:v||'—',d:'🟡'};const dd=TODAY_XL-v;return{t:xl2str(v),d:dd<=7?'🟢':'🔴'};};
-      const a=fd(r.atualizacao),e=fd(r.enviado),s=fd(r.assinado);
-      return `<tr><td class="mono muted" style="padding:4px 8px;border-bottom:1px solid #eee;font-size:9px">${r.id}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;font-weight:500">${r.obra}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${a.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${a.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${e.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${e.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${s.t}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:center">${s.d}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:#888">${r.resp||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px">${r.modelo||'—'}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;font-size:10px;color:${cl};font-weight:700">${st}</td></tr>`;}).join('');
-    slides += __SLIDE(meta,'RDO — STATUS DAS OBRAS','Relatório Diário de Obra',`<div class="krow krow-4">${__S('#4a9eff','Total em Campo',RDO.length)}${__S('#1a7a30','Atualizadas',RDO.filter(r=>getRdoStatus(r)==='Atualizado').length,'≤7 dias')}${__S('#c0392b','Pendentes',RDO.filter(r=>getRdoStatus(r)==='Pendente').length,'>7 dias')}${__S('#a07800','Não Iniciadas',RDO.filter(r=>getRdoStatus(r)==='Não Iniciado').length)}</div><table><thead><tr>${['ID','Obra','Última Atualiz.','⬤','Enviado','⬤','Assinado','⬤','Responsável','Modelo','Status'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table>`);
-  }
-
-  if(flags.incCrono){
-    const cronComments=OBSERVACOES.filter(o=>(o.tipo==='Cronograma'||o.tipo==='Geral da Semana')&&o.semana===16);
-    const commentChunks=__chunkComments(cronComments,4);
-    const tableHtml=`<table><thead><tr>${['ID','Obra / Entrega','Início','Prazo Contr.','Prazo Cliente','Tendência','⬤','% Prev.','% Real.','Ader.'].map(__TH).join('')}</tr></thead><tbody>${PROJETOS.filter(p=>p.status==='Ativo').map(p=>{const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const cl=f==='g'?'#1a7a30':f==='y'?'#a07800':'#c0392b';const base=`<tr><td class="mono muted">${p.id}</td><td style="font-weight:700">${p.obra}</td><td>${xl2str(p.inicio)}</td><td style="color:#c0392b">${xl2str(p.prazo_cont)}</td><td style="color:#c0392b">${xl2str(p.prazo_cli)}</td><td style="color:${cl};font-weight:700">${xl2str(p.tendencia)}</td><td style="text-align:center">${f==='g'?'🟢':f==='y'?'🟡':'🔴'}</td><td style="text-align:right">${fmtPct(av.prev||0)}</td><td style="text-align:right">${fmtPct(av.real||0)}</td><td style="text-align:right;color:${cl};font-weight:700">${((av.real||0)-(av.prev||0)).toFixed(1)} p.p.</td></tr>`;const pars=(p.parciais||[]).map(par=>`<tr style="background:#fafafa"><td></td><td style="padding-left:18px;color:#E87722">↳ ${par.nome}</td><td>${xl2str(par.inicio)}</td><td style="color:#c0392b">${xl2str(par.prazo_cont)}</td><td style="color:#c0392b">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="color:#E87722">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`).join('');return base+pars;}).join('')}</tbody></table>`;
-    slides += __SLIDE(meta,'CRONOGRAMA, PRAZOS E AVANÇOS','Tabela + comentários cronograma',`<div class="split-2"><div><div class="krow krow-4">${__S('#1a7a30','No Prazo',noPrazo)}${__S('#c0392b','Atrasadas',Math.max(ativos-noPrazo,0))}${__S('#4a9eff','Projetos Ativos',ativos)}${__S('#E87722','Carteira',fmtR(tC))}</div>${tableHtml}</div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div>${__commentCards(commentChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
-    for(let i=1;i<commentChunks.length;i++){
-      slides += __SLIDE(meta,'CRONOGRAMA — CONTINUAÇÃO','Comentários cronograma',`<div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Cronograma</div><div class="obs-g">${__commentCards(commentChunks[i])}</div></div>`);
-    }
-  }
-
-  if(flags.incDocs){
-    const rows=DOCUMENTACAO.filter(d=>d.status==='Ativo').map(d=>{function fSt(s){if(!s||s==='-'||s==='N/A')return'<span class="muted">N/A</span>';if(s==='Pendente')return'<span style="color:#c0392b;font-weight:700">Pend.</span>';if(s==='Contratado'||s==='Emitida'||s==='Concluído'||s==='Assinado')return'<span style="color:#1a7a30">✓</span>';return'<span style="color:#a07800">'+s+'</span>';} const dias=d.vig_cto?daysFromToday(d.vig_cto):null; const dC=dias===null?'#888':dias<0?'#c0392b':dias<=30?'#a07800':'#1a7a30'; const dT=dias===null?'—':dias+'d'; const sg=[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st]; const sC=sg.some(s=>s==='Pendente')?'#c0392b':sg.some(s=>s==='Contratado')?'#1a7a30':'#555'; const sT=sg.some(s=>s==='Pendente')?'Pend.':sg.some(s=>s==='Contratado')?'Contr.':'N/A'; return `<tr><td class="mono muted">${d.id}</td><td style="font-weight:700">${d.obra}</td><td>${fSt(d.art_st)}</td><td style="color:${sC}">${sT}</td><td>${fSt(d.crono_st)}</td><td>${fSt(d.chi)}</td><td>${fSt(d.che)}</td><td>${fSt(d.te)}</td><td>${fSt(d.atc)}</td><td style="color:${dC}">${d.vig_cto?new Date(d.vig_cto).toLocaleDateString('pt-BR'):'—'}</td><td style="color:${dC};font-weight:700">${dT}</td></tr>`;}).join('');
-    const docsPend=DOCUMENTACAO.filter(d=>d.status==='Ativo'&&(d.art_st==='Pendente'||[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st].some(s=>s==='Pendente'))).length;
-    const artsEmit=DOCUMENTACAO.filter(d=>d.art_st==='Emitida').length;
-    const ctosVenc=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0&&d.status==='Ativo').length;
-    slides += __SLIDE(meta,'DOCUMENTAÇÃO','Seguros, ARTs e Conformidade',`<div class="krow krow-4">${__S('#4a9eff','Cadastrados',DOCUMENTACAO.length)}${__S('#c0392b','Pendências',docsPend)}${__S('#1a7a30','ARTs Emitidas',artsEmit)}${__S('#c0392b','Contratos Vencidos',ctosVenc)}</div><table><thead><tr>${['ID','Obra','ART','Seg./Gar.','Crono.','Chk.Int','Chk.Ext','Termo','Atestado','Vig. Cto.','Dias'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table>`);
-  }
-
-  if(flags.incMed){
-    const medComments=OBSERVACOES.filter(o=>(o.tipo==='Financeiro'||o.tipo==='Geral da Semana')&&o.semana===16);
-    const medChunks=__chunkComments(medComments,4);
-    const rows=cons.map(m=>{const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—'; return `<tr>${__TD(m.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(m.cliente,'font-weight:700')}${__TD(fmtR(m.contrato),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.med),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.fat),'text-align:right;white-space:nowrap')}${__TD(fmtR(m.rec),'text-align:right;color:#1a7a30;font-weight:700;white-space:nowrap')}${__TD(pct,'text-align:right')}${__TD(m.nfv>0?fmtR(m.nfv):'—','text-align:right;color:#c0392b;white-space:nowrap')}${__TD(m.ar>0?fmtR(m.ar):'—','text-align:right;white-space:nowrap')}</tr>`;}).join('');
-    slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO','Medições, faturamentos e recebimentos',`<div class="split-2"><div><div class="krow krow-4">${__S('#1558c0','Carteira',fmtR(tC))}${__S('#1a7a30','Medido',fmtR(tM))}${__S('#E87722','Faturado',fmtR(tF))}${__S('#1a7a30','Recebido',fmtR(tR))}${__S('#c0392b','NF Vencidas',fmtR(tNV))}${__S('#a07800','A Receber',fmtR(tAR))}${__S('#888','Prev. 7 dias',fmtR(medPrev7()))}${__S('#888','Prev. 30 dias',fmtR(medPrev30()))}</div><table><thead><tr>${['ID','Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber'].map(__TH).join('')}</tr></thead><tbody>${rows}</tbody></table></div><div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div>${__commentCards(medChunks[0])||'<div class="muted">Sem comentários.</div>'}</div></div>`);
-    for(let i=1;i<medChunks.length;i++){
-      slides += __SLIDE(meta,'MEDIÇÕES & FINANCEIRO — CONTINUAÇÃO','Comentários financeiro',`<div><div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários Financeiro</div><div class="obs-g">${__commentCards(medChunks[i])}</div></div>`);
-    }
-  }
-
-  if(flags.incSat){
-    const satList=PESQUISAS.filter(p=>p.incl_rel);
-    const satChunks=__chunkComments(satList,6);
-    satChunks.forEach((chunk,idx)=>{
-      const rows=chunk.map(p=>{const f=satFace(p.nivel);const cl=p.nivel==='Satisfeito'?'#1a7a30':p.nivel==='Insatisfeito'?'#c0392b':'#a07800';const com=satComentarioHtml(p,true);return `<tr>${__TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#888')}${__TD(p.id,'font-family:monospace;font-size:9px;color:#777')}${__TD(p.cliente,'font-weight:700')}${__TD(`<div style="display:flex;align-items:center;gap:8px"><span class="sat-big">${f.e}</span><span style="font-size:12px;font-weight:800;color:${cl}">${f.l}</span></div>`)}${__TD(com,'color:#555;max-width:none;line-height:1.4;white-space:normal;word-break:break-word')}</tr>`;}).join('');
-      slides += __SLIDE(meta,idx===0?'SATISFAÇÃO DO CLIENTE':'SATISFAÇÃO DO CLIENTE — CONTINUAÇÃO',idx===0?'Avaliação de Satisfação':'Continuação dos registros',`<div class="krow krow-4">${__S('#1558c0','Total',PESQUISAS.length)}${__S('#1a7a30','😊 Satisfeitos',PESQUISAS.filter(p=>p.nivel==='Satisfeito').length)}${__S('#a07800','😐 Parcialmente',PESQUISAS.filter(p=>p.nivel==='Parcialmente Satisfeito').length)}${__S('#c0392b','😞 Insatisfeitos',PESQUISAS.filter(p=>p.nivel==='Insatisfeito').length)}</div><table><thead><tr>${['Data','ID','Cliente','Satisfação','Comentário'].map(__TH).join('')}</tr></thead><tbody>${rows||'<tr><td colspan="5" style="padding:16px;text-align:center;color:#777">Nenhuma avaliação marcada.</td></tr>'}</tbody></table>`);
-    });
-  }
-
-  if(flags.incObs){
-    const obs16=OBSERVACOES.filter(o=>o.semana===16);
-    slides += __SLIDE(meta,'COMENTÁRIOS & OBSERVAÇÕES',meta.semana,`${obs16.length?`<div class="obs-g">${__commentCards(obs16)}</div>`:'<div class="muted">Nenhuma observação cadastrada para a semana.</div>'}`);
-  }
-
-  const inner = `${__deckStyles()}<div class="deck-wrap">${slides}</div>`;
-  if(embedOnly) return inner;
-  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório ${meta.semana} — Grupo Lafaete</title>${__deckStyles()}</head><body><div class="deck-wrap">${slides}</div></body></html>`;
-}
-function gerarRelatorio(){
-  document.getElementById('rel-preview').innerHTML = __buildDeckHTML(true);
-}
-function imprimirRelatorioSelecionado(){
-  gerarRelatorio();
-  setTimeout(()=>window.print(),120);
-}
-function exportarPPTX(){
-  const meta=__reportMeta();
-  const pptHtml=__buildDeckHTML(false);
-  const blob=new Blob([pptHtml],{type:'text/html;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;
-  a.download=`Relatorio-GrupoLafaete-${meta.semana.replace(/\s+/g,'-')}.html`;
-  a.click(); URL.revokeObjectURL(url);
-  alert('✅ Apresentação exportada! A visualização e a impressão em PDF agora espelham a mesma estrutura do PowerPoint.');
-}
-
 </script>
 </body>
 </html>
