@@ -237,6 +237,7 @@ textarea{resize:vertical;min-height:68px}
 <!-- Correção v12: salvamento dos comentários de Cronograma/Financeiro e destaque apagado para pesquisas antigas -->
 <!-- Correção v13: Observações Livres separadas dos comentários de Cronograma e Medições -->
 <!-- Correção v14: Comentários de Cronograma, Financeiro e Observações Livres totalmente independentes, sem vínculo por obra -->
+<!-- Versão: exclusão independente de projetos por aba, mantendo demais dados preservados -->
 </head>
 <body>
 
@@ -479,6 +480,7 @@ textarea{resize:vertical;min-height:68px}
     <input type="text" class="si" placeholder="Buscar obra..." id="sc-q" list="dl-projetos" oninput="renderCronograma()">
     <select id="sc-farol" onchange="renderCronograma()"><option value="">Todos farois</option><option value="g">No prazo</option><option value="y">Atenção</option><option value="r">Atrasado</option></select>
     <button class="btn btn-or btn-sm" onclick="openCronoEdit(null)">+ Atualizar Avanços</button>
+    <button class="btn btn-r btn-sm" onclick="excluirProjetoDaAbaPrompt('cronograma')" title="Remove o projeto apenas da aba Cronograma">🗑 Excluir projeto desta aba</button>
   </div>
   <div class="split-layout">
     <div>
@@ -504,6 +506,7 @@ textarea{resize:vertical;min-height:68px}
     <input type="text" class="si" placeholder="Buscar obra..." id="sr-q" list="dl-projetos" oninput="renderRDO()">
     <select id="sr-status" onchange="renderRDO()"><option value="">Todos</option><option>Atualizado</option><option>Pendente</option><option>Não Iniciado</option></select>
     <button class="btn btn-or btn-sm" onclick="openRdoModal()">+ Atualizar RDO</button>
+    <button class="btn btn-r btn-sm" onclick="excluirProjetoDaAbaPrompt('rdo')" title="Remove o projeto apenas da aba RDO">🗑 Excluir projeto desta aba</button>
   </div>
   <div class="card card-table mb16"><div class="tw"><table>
     <thead><tr>
@@ -543,6 +546,7 @@ textarea{resize:vertical;min-height:68px}
     <input type="text" class="si" placeholder="Buscar obra..." id="sg-q" list="dl-projetos" oninput="renderGarantias()">
     <select id="sg-status" onchange="renderGarantias()"><option value="">Todos status</option><option>Ativo</option><option>Concluído</option></select>
     <button class="btn btn-or btn-sm" onclick="openDocEdit(null);switchMoDocTab('seguros',null)">+ Editar Seguros/Garantias</button>
+    <button class="btn btn-r btn-sm" onclick="excluirProjetoDaAbaPrompt('seguros')" title="Remove o projeto apenas da aba Seguros & Garantias">🗑 Excluir projeto desta aba</button>
   </div>
   <div class="card card-table"><div class="tw"><table>
     <thead><tr>
@@ -566,7 +570,8 @@ textarea{resize:vertical;min-height:68px}
     <input type="text" class="si" placeholder="Buscar obra..." id="sa-q" list="dl-projetos" oninput="renderArts()">
     <select id="sa-art" onchange="renderArts()"><option value="">Toda ART</option><option>Pendente</option><option>Emitida</option><option>N/A</option></select>
     <select id="sa-status" onchange="renderArts()"><option value="">Todos status</option><option>Ativo</option><option>Concluído</option></select>
-    <button class="btn btn-or btn-sm" onclick="openDocEdit(null);switchMoDocTab('arts',null)">+ Editar ARTs/Documentos</button>
+    <button class="btn btn-or btn-sm" onclick="openDocEdit(null);switchMoDocTab('arts')">+ Editar ARTs/Documentos</button>
+    <button class="btn btn-r btn-sm" onclick="excluirProjetoDaAbaPrompt('arts')" title="Remove o projeto apenas da aba ARTs & Documentos">🗑 Excluir projeto desta aba</button>
   </div>
   <div class="card card-table"><div class="tw"><table>
     <thead><tr>
@@ -585,6 +590,7 @@ textarea{resize:vertical;min-height:68px}
   <div class="filter-bar">
     <input type="text" class="si" placeholder="Buscar projeto/cliente..." id="sm-q" list="dl-projetos" oninput="renderMedicoes()">
     <button class="btn btn-or btn-sm" onclick="openMedicaoModal(null)">+ Lançar / Editar</button>
+    <button class="btn btn-r btn-sm" onclick="excluirProjetoDaAbaPrompt('medicoes')" title="Remove o projeto apenas da aba Medições">🗑 Excluir projeto desta aba</button>
   </div>
   <div class="split-layout">
     <div>
@@ -621,6 +627,7 @@ textarea{resize:vertical;min-height:68px}
     <select id="ss-proj" onchange="renderSatisfacao()"><option value="">Todos projetos</option></select>
     <select id="ss-nivel" onchange="renderSatisfacao()"><option value="">Todos níveis</option><option value="Satisfeito">😊 Satisfeito</option><option value="Parcialmente Satisfeito">😐 Parcialmente</option><option value="Insatisfeito">😞 Insatisfeito</option></select>
     <button class="btn btn-or btn-sm" onclick="openSatModal()">+ Nova Avaliação</button>
+    <button class="btn btn-r btn-sm" onclick="excluirProjetoDaAbaPrompt('satisfacao')" title="Remove o projeto apenas da aba Pesquisa de Satisfação">🗑 Excluir projeto desta aba</button>
   </div>
   <div class="card card-table">
     <div style="font-size:12px;color:var(--tx3);margin-bottom:12px">
@@ -644,6 +651,7 @@ textarea{resize:vertical;min-height:68px}
     <select id="obs-semana" onchange="renderObservacoes()"><option value="">Todas semanas</option><option value="16">Semana 16</option><option value="15">Semana 15</option><option value="14">Semana 14</option></select>
     <select id="obs-tipo" onchange="renderObservacoes()"><option value="">Todos tipos</option><option>Geral da Semana</option><option>RDO</option><option>Documentação</option></select>
     <select id="obs-obra" onchange="renderObservacoes()"><option value="">Todas obras</option></select>
+    <button class="btn btn-r btn-sm" onclick="excluirProjetoDaAbaPrompt('observacoes')" title="Remove o projeto apenas da aba Observações Livres">🗑 Excluir projeto desta aba</button>
   </div>
   <div id="obs-lista"></div>
 </div>
@@ -4856,6 +4864,11 @@ function medPrev30(){const t=new Date();t.setDate(t.getDate()+30);const s=t.toIS
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
 const PAGE_TITLES={dashboard:'Dashboard Geral',projetos:'Base de Projetos',cronograma:'Cronograma & Prazos',rdo:'RDO — Relatório Diário de Obra',seguros:'Seguros & Garantias',arts:'ARTs & Documentos',medicoes:'Medições & Financeiro',satisfacao:'Pesquisa de Satisfação',observacoes:'Observações Livres',relatorios:'Gerar Relatório Executivo'};
 const PAGE_RENDERS={projetos:renderProjetos,cronograma:renderCronograma,rdo:renderRDO,seguros:renderGarantias,arts:renderArts,medicoes:renderMedicoes,satisfacao:renderSatisfacao,observacoes:renderObservacoes,relatorios:initRelatorio};
+// Exclusões independentes por aba: permite ocultar/remover um projeto de uma página sem afetar as demais.
+let EXCLUIDOS_ABA = {cronograma:[]};
+function projetoKey(id, obra){return String(id||'')+'|'+String(obra||'');}
+function isProjetoExcluidoDaAba(tab, id, obra){return !!(EXCLUIDOS_ABA && Array.isArray(EXCLUIDOS_ABA[tab]) && EXCLUIDOS_ABA[tab].includes(projetoKey(id,obra)));}
+function marcarProjetoExcluidoDaAba(tab,id,obra){if(!EXCLUIDOS_ABA)EXCLUIDOS_ABA={};if(!Array.isArray(EXCLUIDOS_ABA[tab]))EXCLUIDOS_ABA[tab]=[];const k=projetoKey(id,obra);if(!EXCLUIDOS_ABA[tab].includes(k))EXCLUIDOS_ABA[tab].push(k);}
 function toggleSidebar(force){
   const sb=document.getElementById('sb');
   const willOpen=typeof force==='boolean'?force:!sb.classList.contains('open');
@@ -5064,6 +5077,89 @@ function excluirProjetoFromRDO(id, obra) {
   dbAfterDeleteProjeto(id, obra);
   alert('Projeto "' + obra + '" excluído de todas as bases com sucesso.');
 }
+
+function getProjetosDisponiveisDaAba(tab){
+  const map=new Map();
+  function add(id,obra){if(id&&obra)map.set(projetoKey(id,obra),{id:String(id),obra:String(obra)});}
+  if(tab==='cronograma'){
+    PROJETOS.forEach(p=>{if(!isProjetoExcluidoDaAba('cronograma',p.id,p.obra)) add(p.id,p.obra);});
+  }else if(tab==='rdo'){
+    RDO.forEach(r=>add(r.id,r.obra));
+  }else if(tab==='seguros'||tab==='arts'){
+    DOCUMENTACAO.forEach(d=>add(d.id,d.obra));
+  }else if(tab==='medicoes'){
+    MEDICOES.forEach(m=>add(m.id,m.cliente));
+  }else if(tab==='satisfacao'){
+    PESQUISAS.forEach(p=>add(p.id,p.cliente));
+  }else if(tab==='observacoes'){
+    OBSERVACOES.filter(o=>!['Cronograma','Financeiro'].includes(o.tipo)).forEach(o=>{
+      const pr=PROJETOS.find(p=>p.obra===o.obra);
+      add(pr?.id||o.id||'',o.obra);
+    });
+  }else if(tab==='projetos'){
+    PROJETOS.forEach(p=>add(p.id,p.obra));
+  }
+  return Array.from(map.values()).sort((a,b)=>a.obra.localeCompare(b.obra,'pt-BR'));
+}
+function nomeDaAbaExclusao(tab){return {cronograma:'Cronograma',rdo:'RDO',seguros:'Seguros & Garantias',arts:'ARTs & Documentos',medicoes:'Medições & Financeiro',satisfacao:'Pesquisa de Satisfação',observacoes:'Observações Livres',projetos:'Base de Projetos'}[tab]||tab;}
+function excluirProjetoDaAbaPrompt(tab){
+  if(typeof checkAdminOrBlock==='function' && !checkAdminOrBlock()) return;
+  const lista=getProjetosDisponiveisDaAba(tab);
+  if(!lista.length){alert('Não há projetos para excluir nesta aba.');return;}
+  const termo=prompt('Excluir projeto apenas da aba '+nomeDaAbaExclusao(tab)+'.\n\nDigite parte do ID ou nome da obra:');
+  if(termo===null) return;
+  const q=termo.trim().toLowerCase();
+  if(!q){alert('Informe um ID ou nome de obra.');return;}
+  const encontrados=lista.filter(p=>p.id.toLowerCase().includes(q)||p.obra.toLowerCase().includes(q));
+  if(encontrados.length===0){alert('Nenhum projeto encontrado nesta aba com esse texto.');return;}
+  if(encontrados.length>1){
+    alert('Encontrei mais de um projeto. Digite um trecho mais específico:\n\n'+encontrados.slice(0,12).map(p=>'• '+p.id+' — '+p.obra).join('\n'));
+    return;
+  }
+  excluirProjetoDaAba(tab,encontrados[0].id,encontrados[0].obra);
+}
+function excluirProjetoDaAba(tab,id,obra){
+  if(typeof checkAdminOrBlock==='function' && !checkAdminOrBlock()) return;
+  const aba=nomeDaAbaExclusao(tab);
+  if(!confirm('Excluir "'+obra+'" apenas da aba '+aba+'?\n\nAs demais abas serão preservadas e continuarão com os próprios dados/comentários desta obra.')) return;
+  const before={rdo:RDO.length,doc:DOCUMENTACAO.length,med:MEDICOES.length,pes:PESQUISAS.length,obs:OBSERVACOES.length};
+  if(tab==='cronograma'){
+    marcarProjetoExcluidoDaAba('cronograma',id,obra);
+    delete AVANCOS[projetoKey(id,obra)];
+    try{if(_sb)_sb.from('avancos').delete().eq('projeto_key',projetoKey(id,obra)).then(()=>{});}catch(e){}
+    renderCronograma();renderDashboard();
+  }else if(tab==='rdo'){
+    RDO=RDO.filter(r=>!(r.id===id && r.obra===obra));
+    try{if(_sb)_sb.from('rdo').delete().eq('id',id).eq('obra',obra).then(()=>{});}catch(e){}
+    renderRDO();updateBadges();
+  }else if(tab==='seguros'||tab==='arts'){
+    DOCUMENTACAO=DOCUMENTACAO.filter(d=>!(d.id===id && d.obra===obra));
+    try{if(_sb)_sb.from('documentacao').delete().eq('id',id).eq('obra',obra).then(()=>{});}catch(e){}
+    renderGarantias();renderArts();updateBadges();
+  }else if(tab==='medicoes'){
+    MEDICOES=MEDICOES.filter(m=>!(m.id===id && m.cliente===obra));
+    try{if(_sb)_sb.from('medicoes').delete().eq('id',id).eq('cliente',obra).then(()=>{});}catch(e){}
+    renderMedicoes();renderDashboard();
+  }else if(tab==='satisfacao'){
+    PESQUISAS=PESQUISAS.filter(p=>!(p.id===id && p.cliente===obra));
+    try{if(_sb)_sb.from('pesquisas').delete().eq('id',id).eq('cliente',obra).then(()=>{});}catch(e){}
+    renderSatisfacao();renderDashboard();
+  }else if(tab==='observacoes'){
+    OBSERVACOES=OBSERVACOES.filter(o=>!(o.obra===obra && !['Cronograma','Financeiro'].includes(o.tipo)));
+    // Mantém comentários laterais de Cronograma/Financeiro, pois são independentes.
+    renderObservacoes();
+  }else if(tab==='projetos'){
+    const idx=PROJETOS.findIndex(p=>p.id===id&&p.obra===obra);
+    if(idx>=0) excluirProjeto(idx);
+    return;
+  }
+  saveToStorage();
+  refreshResumoAutomatico();
+  populateAllSelects();
+  showSaveStatus('✓ Projeto excluído apenas da aba '+aba);
+  if(document.getElementById('page-relatorios')?.classList.contains('active')){try{gerarRelatorio();}catch(e){}}
+}
+
 function openRdoEditRow(id, obra) {
   // Pre-fill modal with existing RDO data
   const r = RDO.find(x => x.id === id && x.obra === obra);
@@ -5120,7 +5216,7 @@ function salvarCrono(){
 function renderCronograma(){
   const q=(document.getElementById('sc-q').value||'').toLowerCase();
   const ff=document.getElementById('sc-farol').value;
-  const ativos=PROJETOS.filter(p=>p.status==='Ativo');
+  const ativos=PROJETOS.filter(p=>p.status==='Ativo' && !isProjetoExcluidoDaAba('cronograma',p.id,p.obra));
   const noPrazo=ativos.filter(p=>cronoFarol(p)==='g').length;
   const atrasados=ativos.filter(p=>cronoFarol(p)==='r').length;
   document.getElementById('kpi-crono').innerHTML=`
@@ -5131,6 +5227,7 @@ function renderCronograma(){
   `;
   let rows='';
   PROJETOS.filter(p=>{
+    if(isProjetoExcluidoDaAba('cronograma',p.id,p.obra)) return false;
     const m=!q||p.obra.toLowerCase().includes(q)||p.id.toLowerCase().includes(q);
     const cf=cronoFarol(p);
     const fok=!ff||(ff==='g'&&cf==='g')||(ff==='y'&&cf==='y')||(ff==='r'&&cf==='r');
@@ -5152,7 +5249,7 @@ function renderCronograma(){
       <td style="text-align:center">${dotFarol(f,tip)}</td>
       <td>${pct(av.prev)}</td><td style="font-weight:600">${pct(av.real)}</td><td>${ader}</td>
       <td><button class="btn btn-xs btn-or" onclick="openCronoEdit(${PROJETOS.indexOf(p)})" title="Atualizar avanços">Atualizar</button>
-        <button class="btn btn-xs btn-r" onclick="excluirProjeto(${PROJETOS.indexOf(p)})" title="Excluir de todas as bases">🗑</button>
+        <button class="btn btn-xs btn-r" onclick="excluirProjetoDaAba('cronograma','${p.id}','${p.obra}')" title="Excluir apenas da aba Cronograma">🗑 Aba</button>
       </td>
     </tr>`;
     (p.parciais||[]).forEach(par=>{
@@ -5304,7 +5401,7 @@ function renderRDO(){
       <td class="nowrap">
         <button class="btn btn-xs btn-or" onclick="openRdoEditRow('${r.id}','${r.obra}')" title="Atualizar RDO">✏ Editar</button>
         <button class="btn btn-xs btn-r" onclick="excluirRDO('${r.id}','${r.obra}')" title="Excluir do RDO">🗑 RDO</button>
-        <button class="btn btn-xs" style="background:rgba(220,53,69,.15);border:1px solid var(--r2);color:var(--r2)" onclick="excluirProjetoFromRDO('${r.id}','${r.obra}')" title="Excluir Projeto de todas as bases">⛔ Projeto</button>
+        <button class="btn btn-xs" style="background:rgba(220,53,69,.15);border:1px solid var(--r2);color:var(--r2)" onclick="excluirProjetoDaAba('rdo','${r.id}','${r.obra}')" title="Excluir projeto apenas da aba RDO">🗑 Aba</button>
       </td>
       <td><code style="font-size:11px;color:var(--tx2)">${r.id}</code></td>
       <td><strong>${r.obra}</strong></td>
@@ -6234,18 +6331,19 @@ function gerarRelatorio(){
     </tbody></table></div></section>`;
   }
   if(document.getElementById('ri-crono').checked){
-    const noPrazo=PROJETOS.filter(p=>cronoFarol(p)==='g').length;
+    const projsCronoRel=PROJETOS.filter(p=>!isProjetoExcluidoDaAba('cronograma',p.id,p.obra));
+    const noPrazo=projsCronoRel.filter(p=>cronoFarol(p)==='g').length;
     html+=`<section class="rel-module" data-title="Cronograma"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="display:grid;grid-template-columns:1fr 400px;gap:16px">
       <div>
         <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:8px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">CRONOGRAMA</span>Prazos, Tendências e Avanços
           <span style="color:#48c774;font-size:12px;margin-left:8px">🟢 ${noPrazo} No Prazo</span>
-          <span style="color:#ff6b6b;font-size:12px;margin-left:8px">🔴 ${PROJETOS.filter(p=>p.status==='Ativo').length-noPrazo} Atrasadas</span>
+          <span style="color:#ff6b6b;font-size:12px;margin-left:8px">🔴 ${projsCronoRel.filter(p=>p.status==='Ativo').length-noPrazo} Atrasadas</span>
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a1a1a">
           ${['ID','Obra','Início','Prazo Contr.','Prazo Cli.','Tendência','⬤','% Prev.','% Real.','Ader.'].map(TH).join('')}
         </tr></thead><tbody>
-        ${PROJETOS.filter(p=>p.status==='Ativo'||p.status==='Encerrado').map(p=>{
+        ${projsCronoRel.filter(p=>p.status==='Ativo'||p.status==='Encerrado').map(p=>{
           const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const fc=f==='g'?'#48c774':f==='y'?'#ffc107':'#ff6b6b';
           const row=`<tr style="border-bottom:1px solid #222">${TD(p.id,'color:#c8c8c8;font-family:monospace;font-size:10px')}${TD(p.obra,'font-weight:700;color:#f3f3f3')}${TD(xl2str(p.inicio),'color:#e0e0e0;font-weight:600')}${TD(xl2str(p.prazo_cont),'color:#ff8b8b;font-weight:600')}${TD(xl2str(p.prazo_cli),'color:#ff8b8b;font-weight:600')}<td style="padding:6px 10px;color:${fc};font-weight:700">${xl2str(p.tendencia)}</td><td style="padding:6px 10px;text-align:center">${f==='g'?'🟢':f==='y'?'🟡':'🔴'}</td>${TD(av.prev!=null?av.prev.toFixed(1)+'%':'—','text-align:center')}${TD(av.real!=null?av.real.toFixed(1)+'%':'—',`text-align:center;color:${fc}`)}${TD(av.prev&&av.real?(av.real/av.prev*100).toFixed(0)+'%':'—','text-align:center')}</tr>`;
           const sub=(p.parciais||[]).map(par=>`<tr style="border-bottom:1px solid #222;background:rgba(232,119,34,.05)"><td></td><td style="padding:5px 10px 5px 20px;color:#ffd2b0;font-size:10px;font-weight:700">↳ ${par.nome}</td>${TD(xl2str(par.inicio),'color:#e0e0e0;font-weight:600')}${TD(xl2str(par.prazo_cont),'color:#ff8b8b;font-weight:600')}<td style="padding:5px 10px;color:#ff8b8b;font-weight:600">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="padding:5px 10px;color:#ffd2b0;font-weight:700">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`).join('');
@@ -6398,6 +6496,7 @@ function buildStoragePayload() {
     PESQUISAS,
     OBSERVACOES,
     AVANCOS,
+    EXCLUIDOS_ABA,
   };
 }
 
@@ -6440,6 +6539,7 @@ function applyStorageData(data) {
   if(data.PESQUISAS  && data.PESQUISAS.length)      PESQUISAS     = data.PESQUISAS;
   if(data.OBSERVACOES && data.OBSERVACOES.length)   OBSERVACOES   = data.OBSERVACOES;
   if(data.AVANCOS)                                  AVANCOS       = data.AVANCOS;
+  if(data.EXCLUIDOS_ABA)                            EXCLUIDOS_ABA = data.EXCLUIDOS_ABA;
 }
 
 function loadFromStorage() {
