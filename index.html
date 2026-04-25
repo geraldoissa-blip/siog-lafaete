@@ -246,6 +246,7 @@ textarea{resize:vertical;min-height:68px}
 <!-- Correção v16: quebra automática de texto longo nos comentários exportados para PowerPoint/PDF -->
 <!-- Correção v17: RDO persistente, backup embarcado, Pendência à Faturar e tabelas sem quebra no PowerPoint/PDF -->
 <!-- Correção v18: seleção de obras preservadas em comentários e edição em lote do RDO antes de salvar -->
+<!-- Correção v19: coluna Histograma incluída no relatório/exportação do RDO -->
 </head>
 <body>
 
@@ -7871,8 +7872,8 @@ function gerarRelatorio(){
   if(document.getElementById('ri-rdo').checked){
     html+=`<section class="rel-module" data-title="RDO"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">RDO</span>Status das Obras</div>
-    <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a1a1a">
-      ${['ID','Obra','Última Atualiz.','⬤','Enviado','⬤','Assinado','⬤','Responsável','Modelo','Status'].map(TH).join('')}
+    <table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed"><colgroup><col style="width:7%"><col style="width:19%"><col style="width:9%"><col style="width:3%"><col style="width:9%"><col style="width:3%"><col style="width:9%"><col style="width:3%"><col style="width:13%"><col style="width:9%"><col style="width:10%"><col style="width:6%"></colgroup><thead><tr style="background:#1a1a1a">
+      ${['ID','Obra','Última Atualiz.','⬤','Enviado','⬤','Assinado','⬤','Responsável','Modelo','Histograma','Status'].map(h=>TH(h,'white-space:normal;word-break:normal;overflow-wrap:normal')).join('')}
     </tr></thead><tbody>
     ${RDO.map(r=>{const st=getRdoStatus(r);const c=st==='Atualizado'?'#48c774':st==='Pendente'?'#ff6b6b':'#ffc107';
       // Same logic as RDO tab: green<=7d, red>7d, yellow=text/special; assinado=green if ==enviado
@@ -7888,7 +7889,7 @@ function gerarRelatorio(){
         return fd(r.assinado);
       };
       const a=fd(r.atualizacao),e=fd(r.enviado),s=fdAssinado(r);
-      return`<tr style="border-bottom:1px solid #222">${TD(r.id,'color:#d7d7d7;font-family:monospace;font-size:10px;font-weight:600')}${TD(r.obra,'font-weight:800;color:#ffffff') }<td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${a.txt}</td><td style="padding:6px 10px;text-align:center">${a.dot}</td><td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${e.txt}</td><td style="padding:6px 10px;text-align:center">${e.dot}</td><td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${s.txt}</td><td style="padding:6px 10px;text-align:center">${s.dot}</td>${TD(r.resp||'—','color:#e2e2e2')}${TD(r.modelo||'—','color:#e2e2e2')}<td style="padding:6px 10px;color:${c};font-weight:800">${st}</td></tr>`;
+      return`<tr style="border-bottom:1px solid #222">${TD(r.id,'color:#d7d7d7;font-family:monospace;font-size:10px;font-weight:600')}${TD(r.obra,'font-weight:800;color:#ffffff') }<td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${a.txt}</td><td style="padding:6px 10px;text-align:center">${a.dot}</td><td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${e.txt}</td><td style="padding:6px 10px;text-align:center">${e.dot}</td><td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${s.txt}</td><td style="padding:6px 10px;text-align:center">${s.dot}</td>${TD(r.resp||'—','color:#e2e2e2;overflow-wrap:anywhere;word-break:break-word')}${TD(r.modelo||'—','color:#e2e2e2;overflow-wrap:anywhere;word-break:break-word')}${TD(r.histograma||'—','color:#e2e2e2;overflow-wrap:anywhere;word-break:break-word;font-size:9px')}<td style="padding:6px 8px;color:${c};font-weight:800;white-space:nowrap">${st}</td></tr>`;
     }).join('')}
     </tbody></table></div></section>`;
   }
