@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SIOG — Grupo Lafaete</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
@@ -246,6 +247,8 @@ textarea{resize:vertical;min-height:68px}
 <!-- Correção v16: quebra automática de texto longo nos comentários exportados para PowerPoint/PDF -->
 <!-- Correção v17: RDO persistente, backup embarcado, Pendência à Faturar e tabelas sem quebra no PowerPoint/PDF -->
 <!-- Correção v18: seleção de obras preservadas em comentários e edição em lote do RDO antes de salvar -->
+<!-- Correção v19: coluna Histograma incluída no relatório do RDO -->
+<!-- Correção v20: autosave reforçado, exportação Excel e importação/exportação de backup preservadas -->
 <!-- Correção v19: coluna Histograma incluída no relatório/exportação do RDO -->
 </head>
 <body>
@@ -452,6 +455,8 @@ textarea{resize:vertical;min-height:68px}
   <div id="save-indicator" style="font-size:11px;color:var(--g2);opacity:0;transition:opacity 2s;white-space:nowrap"></div>
   <button class="btn btn-sm admin-only" onclick="openAccessModal()" title="Gerenciar acessos">🔐 Acessos</button>
   <button class="btn btn-sm" onclick="exportBackup()" title="Backup JSON">⬇ Backup</button>
+  <button class="btn btn-sm" onclick="exportExcel()" title="Exportar todas as bases para Excel">📊 Excel</button>
+  <button class="btn btn-sm" onclick="importExcel()" title="Importar Excel exportado pelo SIOG">⬆ Excel</button>
   <button class="btn btn-sm" onclick="importBackup()" title="Restaurar Backup">⬆ Restaurar</button>
   <button class="btn btn-sm" style="color:var(--r2)" onclick="clearStorage()" title="Resetar dados">🗑 Resetar</button>
   <button class="btn btn-sm" onclick="window.print()">🖨 Imprimir</button>
@@ -13563,24 +13568,259 @@ function exportBackup() {
 
 function importBackup() {
   const inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = '.json';
+  inp.type = 'file'; inp.accept = '.json,application/json';
   inp.onchange = e => {
     const file = e.target.files[0];
     if(!file) return;
     const reader = new FileReader();
-    reader.onload = ev => {
+    reader.onload = async ev => {
       try {
         const data = JSON.parse(ev.target.result);
         if(!isValidStorageData(data)) { alert('Arquivo inválido ou incompleto.'); return; }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        alert('✅ Backup restaurado! A página será recarregada.');
-        location.reload();
+        const payload = Object.assign({}, data, {ts: Date.now(), imported_from: file.name});
+        applyStorageData(payload);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(buildStoragePayload()));
+        try { localStorage.setItem('siog_lafaete_index_relatorio_dados_preservados_v10_20260423', JSON.stringify(buildStoragePayload())); } catch(_e) {}
+        saveToStorage();
+        if(_sb) await pushFullDataToSupabase();
+        try { renderProjetos(); } catch(_e) {}
+        try { renderRDO(); } catch(_e) {}
+        try { renderMedicoes(); } catch(_e) {}
+        try { renderSatisfacao(); } catch(_e) {}
+        try { renderObservacoes(); } catch(_e) {}
+        try { updateBadges(); } catch(_e) {}
+        try { populateAllSelects(); } catch(_e) {}
+        try { renderDashboard(); } catch(_e) {}
+        alert('✅ Backup restaurado com sucesso. Os dados importados foram aplicados nesta tela e salvos como a base mais recente.');
       } catch(e) { alert('Erro ao importar: ' + e.message); }
     };
     reader.readAsText(file);
   };
   inp.click();
 }
+
+function excelXmlEscape(v){ return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function excelDate(v){ if(v===null || v===undefined || v==='') return ''; if(typeof v==='number') return xl2str(v).replace('—',''); return String(v); }
+function excelMoney(v){ if(v===null || v===undefined || v==='') return ''; return Number(v)||0; }
+function excelSheetXml(name, headers, rows){
+  const safeName = excelXmlEscape(String(name).slice(0,31));
+  const headerXml = '<Row>'+headers.map(h=>'<Cell><Data ss:Type="String">'+excelXmlEscape(h)+'</Data></Cell>').join('')+'</Row>';
+  const bodyXml = rows.map(r => '<Row>'+headers.map(h => { const v = r[h]; const isNum = typeof v === 'number' && isFinite(v); return '<Cell><Data ss:Type="'+(isNum?'Number':'String')+'">'+excelXmlEscape(isNum ? String(v) : (v ?? ''))+'</Data></Cell>'; }).join('')+'</Row>').join('');
+  return '<Worksheet ss:Name="'+safeName+'"><Table>'+headerXml+bodyXml+'</Table></Worksheet>';
+}
+function excelJoinList(v){ return Array.isArray(v) ? v.join(' | ') : (v || ''); }
+function buildExcelSheetsData(){
+  const medCons = getMedCons().map(m => ({ ID:m.id, Cliente:m.cliente, Contrato:excelMoney(m.contrato), Medido:excelMoney(m.med), Faturado:excelMoney(m.fat), Recebido:excelMoney(m.rec), '% Recebido':m.contrato ? Number((m.rec/m.contrato*100).toFixed(2)) : '', 'NF Vencida':excelMoney(m.nfv), 'A Receber':excelMoney(m.ar), 'Pendência à Faturar':excelMoney(m.pf) }));
+  return {
+    'Base Projetos': PROJETOS.map(p=>({'ID':p.id,'Obra':p.obra,'Status':p.status,'Responsável':p.resp,'Início':excelDate(p.inicio),'Prazo Contratual':excelDate(p.prazo_cont),'Prazo Cliente':excelDate(p.prazo_cli),'Tendência':excelDate(p.tendencia),'Alerta':p.alerta,'Valor':excelMoney(p.valor),'Observações':p.obs})),
+    'RDO': RDO.map(r=>({'ID':r.id,'Obra':r.obra,'Atualização':excelDate(r.atualizacao),'Enviado':excelDate(r.enviado),'Assinado':excelDate(r.assinado),'Responsável':r.resp,'Modelo':r.modelo,'Histograma':r.histograma,'Observações':r.obs})),
+    'Documentação': DOCUMENTACAO.map(d=>({
+      'ID':d.id,'Obra':d.obra,'Status':d.status,'Vigência Contrato':excelDate(d.vig_cto),
+      'Seguro Riscos Engenharia':d.sre_st,'Vigência SRE':excelDate(d.sre_vig),'Seguro Resp. Civil':d.src_st,'Vigência SRC':excelDate(d.src_vig),
+      'Carta Fiança':d.cf_st,'Vigência CF':excelDate(d.cf_vig),'Garantia Aduaneira':d.ga_st,'Vigência GA':excelDate(d.ga_vig),
+      'Garantia Performance':d.gp_st,'Vigência GP':excelDate(d.gp_vig),'Geotécnico':d.geo_st,'Vigência GEO':excelDate(d.geo_vig),
+      'ART Status':d.art_st,'ART Tipos':excelJoinList(d.art_tipos),'ART Outros':d.art_outros,'Cronograma':d.crono_st,
+      'Habite-se Entrega':d.hbe,'Habite-se Cliente':d.hbc,'MTR':d.mtr,'Checklist Interno':d.chi,'Checklist Entrega':d.che,'Termo Entrega':d.te,'Aceite Técnico Cliente':d.atc
+    })),
+    'Dashboard Medições': medCons,
+    'Medições Base': MEDICOES.map(m=>({'Seq':m.id_seq,'ID':m.id,'Cliente':m.cliente,'Valor Contrato':excelMoney(m.valor_contrato),'Tipo':m.tipo,'Data Medição':excelDate(m.data_med),'Valor':excelMoney(m.valor),'Data NF':excelDate(m.data_nf),'Prazo Pgto':m.prazo_pgto,'Data Prevista':excelDate(m.data_rec_prev),'Data Real':excelDate(m.data_rec_real),'Dias Atraso':m.dias_atraso,'Farol':m.farol,'Observações':m.obs})),
+    'Satisfação': PESQUISAS.map(p=>({'Seq':p.id_seq,'ID':p.id,'Cliente':p.cliente,'Data':excelDate(p.data),'Nível':p.nivel,'Comentário Geral':p.comentario || p.geral,'Prazo':p.prazo,'Qualidade':p.qualidade,'Segurança':p.seguranca,'Equipe':p.equipe,'Comunicação':p.comunicacao,'Incluir Relatório':p.incl_rel===false?'Não':'Sim'})),
+    'Observações': OBSERVACOES.map(o=>({'Seq':o.id_seq,'ID':o.id || '','Obra':o.obra,'Tipo':o.tipo,'Semana':o.semana,'Cor':o.cor,'Título':o.titulo,'Texto':o.texto}))
+  };
+}
+function exportExcel(){
+  try{
+    const sheetsData = buildExcelSheetsData();
+    if(window.XLSX && XLSX.utils && XLSX.writeFile){
+      const wb = XLSX.utils.book_new();
+      Object.entries(sheetsData).forEach(([name, rows])=>{
+        const ws = XLSX.utils.json_to_sheet(rows, {cellDates:false});
+        const cols = Object.keys(rows[0] || {}).map(k => ({wch: Math.min(Math.max(String(k).length + 4, 12), 35)}));
+        ws['!cols'] = cols;
+        XLSX.utils.book_append_sheet(wb, ws, String(name).slice(0,31));
+      });
+      XLSX.writeFile(wb, 'siog-export-' + new Date().toISOString().slice(0,10) + '.xlsx');
+      showSaveStatus('✓ Excel exportado');
+      return;
+    }
+    const sheets = [];
+    Object.entries(sheetsData).forEach(([name, rows])=>{
+      const headers = Object.keys(rows[0] || {});
+      sheets.push(excelSheetXml(name, headers, rows));
+    });
+    const xml = '<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'+sheets.join('')+'</Workbook>';
+    const blob = new Blob([xml], {type:'application/vnd.ms-excel;charset=utf-8'});
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href = url; a.download = 'siog-export-' + new Date().toISOString().slice(0,10) + '.xls'; a.click(); URL.revokeObjectURL(url); showSaveStatus('✓ Excel exportado');
+  } catch(e){ console.error(e); alert('Não foi possível exportar para Excel: '+e.message); }
+}
+function _normHeader(h){return String(h||'').trim();}
+function _cell(v){return v===undefined||v===null?'':v;}
+function _txt(v){return String(_cell(v)).trim();}
+function _num(v){
+  if(v===undefined||v===null||v==='') return null;
+  if(typeof v==='number' && isFinite(v)) return v;
+  let s=String(v).trim(); if(!s) return null;
+  s=s.replace(/R\$|%|\s/g,'');
+  if(s.includes(',') && s.includes('.')) s=s.replace(/\./g,'').replace(',','.');
+  else if(s.includes(',')) s=s.replace(',','.');
+  const n=Number(s); return isFinite(n)?n:null;
+}
+function _dateToExcelSerial(d){return Math.round((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())/86400000)+25569);}
+function _dateVal(v){
+  if(v===undefined||v===null||v==='') return null;
+  if(typeof v==='number' && isFinite(v)) return v;
+  if(v instanceof Date && !isNaN(v)) return _dateToExcelSerial(v);
+  const s=String(v).trim(); if(!s) return null;
+  const upper=s.toUpperCase();
+  if(['PENDENTE','NÃO INICIADA','NAO INICIADA','N/A','-'].includes(upper)) return s;
+  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(m){ let y=Number(m[3]); if(y<100) y+=2000; return _dateToExcelSerial(new Date(y, Number(m[2])-1, Number(m[1]))); }
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return _dateToExcelSerial(new Date(Number(m[1]), Number(m[2])-1, Number(m[3])));
+  const n=_num(s); return n!==null?n:s;
+}
+function _boolRel(v){const s=_txt(v).toLowerCase(); return !(s==='não'||s==='nao'||s==='false'||s==='0');}
+function _splitList(v){return _txt(v).split(/\s*[|;]\s*/).filter(Boolean);}
+function _rowVal(row, names){for(const n of names){ if(Object.prototype.hasOwnProperty.call(row,n)) return row[n]; } return '';}
+function _findProjetoBase(id, obra){return PROJETOS.find(p=>(_txt(id)&&String(p.id)===_txt(id)) || (_txt(obra)&&String(p.obra).toUpperCase()===_txt(obra).toUpperCase()));}
+function parseWorkbookXml(text){
+  const doc = new DOMParser().parseFromString(text, 'text/xml');
+  if(doc.getElementsByTagName('parsererror').length) throw new Error('Arquivo Excel/XML inválido.');
+  const sheets = {};
+  const wsNodes = Array.from(doc.getElementsByTagNameNS('*','Worksheet')).length ? Array.from(doc.getElementsByTagNameNS('*','Worksheet')) : Array.from(doc.getElementsByTagName('Worksheet'));
+  wsNodes.forEach(ws=>{
+    const name = ws.getAttribute('ss:Name') || ws.getAttribute('Name') || ws.getAttributeNS('urn:schemas-microsoft-com:office:spreadsheet','Name') || 'Planilha';
+    const rowNodes = Array.from(ws.getElementsByTagNameNS('*','Row')).length ? Array.from(ws.getElementsByTagNameNS('*','Row')) : Array.from(ws.getElementsByTagName('Row'));
+    const rows = rowNodes.map(row=>{
+      const cells = Array.from(row.getElementsByTagNameNS('*','Cell')).length ? Array.from(row.getElementsByTagNameNS('*','Cell')) : Array.from(row.getElementsByTagName('Cell'));
+      return cells.map(c=>{
+        const d = (Array.from(c.getElementsByTagNameNS('*','Data'))[0] || c.getElementsByTagName('Data')[0]);
+        return d ? d.textContent : '';
+      });
+    }).filter(r=>r.some(c=>String(c||'').trim()!==''));
+    if(!rows.length) { sheets[name]=[]; return; }
+    const headers = rows[0].map(_normHeader);
+    sheets[name] = rows.slice(1).map(r=>{const o={}; headers.forEach((h,i)=>o[h]=r[i]??''); return o;});
+  });
+  return sheets;
+}
+function workbookToSheets(wb){
+  const out={};
+  wb.SheetNames.forEach(name=>{ out[name] = XLSX.utils.sheet_to_json(wb.Sheets[name], {defval:'', raw:false}); });
+  return out;
+}
+function getSheet(sheets, aliases){
+  const keys=Object.keys(sheets);
+  for(const a of aliases){ const k=keys.find(x=>x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')===a.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')); if(k) return sheets[k]; }
+  return null;
+}
+function applyExcelSheets(sheets){
+  let changed=[];
+  const sp = getSheet(sheets, ['Base Projetos','Projetos']);
+  if(sp && sp.length){
+    PROJETOS = sp.map(row=>{
+      const id=_txt(_rowVal(row,['ID','Id'])); const obra=_txt(_rowVal(row,['Obra','Cliente'])); const old=_findProjetoBase(id,obra) || {};
+      return Object.assign({}, old, {id, obra, status:_txt(_rowVal(row,['Status'])) || old.status || 'Ativo', resp:_txt(_rowVal(row,['Responsável','Responsavel'])) || old.resp || '', inicio:_dateVal(_rowVal(row,['Início','Inicio'])), prazo_cont:_dateVal(_rowVal(row,['Prazo Contratual'])), prazo_cli:_dateVal(_rowVal(row,['Prazo Cliente'])), tendencia:_dateVal(_rowVal(row,['Tendência','Tendencia'])), alerta:_txt(_rowVal(row,['Alerta'])) || old.alerta || '', valor:_num(_rowVal(row,['Valor'])) ?? old.valor ?? null, obs:_txt(_rowVal(row,['Observações','Observacoes'])) || '', parciais: old.parciais || [], ativo_rdo: old.ativo_rdo !== undefined ? old.ativo_rdo : true});
+    }).filter(p=>p.id||p.obra);
+    changed.push('Base Projetos');
+  }
+  const sr = getSheet(sheets, ['RDO']);
+  if(sr && sr.length){
+    RDO = sr.map(row=>({id:_txt(_rowVal(row,['ID','Id'])), obra:_txt(_rowVal(row,['Obra','Cliente'])), atualizacao:_dateVal(_rowVal(row,['Atualização','Atualizacao'])), enviado:_dateVal(_rowVal(row,['Enviado'])), assinado:_dateVal(_rowVal(row,['Assinado'])), resp:_txt(_rowVal(row,['Responsável','Responsavel'])), modelo:_txt(_rowVal(row,['Modelo'])), histograma:_txt(_rowVal(row,['Histograma'])), obs:_txt(_rowVal(row,['Observações','Observacoes']))})).filter(r=>r.id||r.obra);
+    changed.push('RDO');
+  }
+  const sd = getSheet(sheets, ['Documentação','Documentacao']);
+  if(sd && sd.length){
+    DOCUMENTACAO = sd.map(row=>({
+      id:_txt(_rowVal(row,['ID','Id'])), obra:_txt(_rowVal(row,['Obra','Cliente'])), status:_txt(_rowVal(row,['Status'])), vig_cto:_dateVal(_rowVal(row,['Vigência Contrato','Vigencia Contrato']))||'',
+      sre_st:_txt(_rowVal(row,['Seguro Riscos Engenharia'])), sre_vig:_dateVal(_rowVal(row,['Vigência SRE','Vigencia SRE']))||'', src_st:_txt(_rowVal(row,['Seguro Resp. Civil'])), src_vig:_dateVal(_rowVal(row,['Vigência SRC','Vigencia SRC']))||'',
+      cf_st:_txt(_rowVal(row,['Carta Fiança','Carta Fianca'])), cf_vig:_dateVal(_rowVal(row,['Vigência CF','Vigencia CF']))||'', ga_st:_txt(_rowVal(row,['Garantia Aduaneira'])), ga_vig:_dateVal(_rowVal(row,['Vigência GA','Vigencia GA']))||'',
+      gp_st:_txt(_rowVal(row,['Garantia Performance'])), gp_vig:_dateVal(_rowVal(row,['Vigência GP','Vigencia GP']))||'', geo_st:_txt(_rowVal(row,['Geotécnico','Geotecnico'])), geo_vig:_dateVal(_rowVal(row,['Vigência GEO','Vigencia GEO']))||'',
+      art_st:_txt(_rowVal(row,['ART Status'])), art_tipos:_splitList(_rowVal(row,['ART Tipos'])), art_outros:_txt(_rowVal(row,['ART Outros'])), crono_st:_txt(_rowVal(row,['Cronograma'])),
+      hbe:_txt(_rowVal(row,['Habite-se Entrega'])), hbc:_txt(_rowVal(row,['Habite-se Cliente'])), mtr:_txt(_rowVal(row,['MTR'])), chi:_txt(_rowVal(row,['Checklist Interno'])), che:_txt(_rowVal(row,['Checklist Entrega'])), te:_txt(_rowVal(row,['Termo Entrega'])), atc:_txt(_rowVal(row,['Aceite Técnico Cliente','Aceite Tecnico Cliente']))
+    })).filter(d=>d.id||d.obra);
+    changed.push('Documentação');
+  }
+  const sm = getSheet(sheets, ['Medições Base','Medicoes Base','Base Medições','Base Medicoes']);
+  if(sm && sm.length){
+    MEDICOES = sm.map((row,i)=>({id_seq:_txt(_rowVal(row,['Seq','ID Seq','id_seq'])) || nextSeq('med'), id:_txt(_rowVal(row,['ID','Id'])), cliente:_txt(_rowVal(row,['Cliente','Obra'])), valor_contrato:_num(_rowVal(row,['Valor Contrato'])) || 0, tipo:_txt(_rowVal(row,['Tipo'])) || 'Medição', data_med:_dateVal(_rowVal(row,['Data Medição','Data Medicao'])), valor:_num(_rowVal(row,['Valor'])) || 0, data_nf:_dateVal(_rowVal(row,['Data NF'])), prazo_pgto:_num(_rowVal(row,['Prazo Pgto','Prazo Pagamento'])) || 30, data_rec_prev:_dateVal(_rowVal(row,['Data Prevista'])), data_rec_real:_dateVal(_rowVal(row,['Data Real'])), dias_atraso:_num(_rowVal(row,['Dias Atraso'])) || 0, farol:_num(_rowVal(row,['Farol'])) || 1, obs:_txt(_rowVal(row,['Observações','Observacoes']))})).filter(m=>m.id||m.cliente);
+    changed.push('Medições Base');
+  }
+  const ss = getSheet(sheets, ['Satisfação','Satisfacao','Pesquisa']);
+  if(ss && ss.length){
+    PESQUISAS = ss.map(row=>({id_seq:_txt(_rowVal(row,['Seq','ID Seq','id_seq'])) || nextSeq('sat'), id:_txt(_rowVal(row,['ID','Id'])), cliente:_txt(_rowVal(row,['Cliente','Obra'])), data:_dateVal(_rowVal(row,['Data'])), nivel:_num(_rowVal(row,['Nível','Nivel'])) || 3, comentario:_txt(_rowVal(row,['Comentário Geral','Comentario Geral'])), prazo:_txt(_rowVal(row,['Prazo'])), qualidade:_txt(_rowVal(row,['Qualidade'])), seguranca:_txt(_rowVal(row,['Segurança','Seguranca'])), equipe:_txt(_rowVal(row,['Equipe'])), comunicacao:_txt(_rowVal(row,['Comunicação','Comunicacao'])), incl_rel:_boolRel(_rowVal(row,['Incluir Relatório','Incluir Relatorio']))})).filter(p=>p.id||p.cliente||p.comentario);
+    changed.push('Satisfação');
+  }
+  const so = getSheet(sheets, ['Observações','Observacoes']);
+  if(so && so.length){
+    OBSERVACOES = so.map(row=>({id_seq:_txt(_rowVal(row,['Seq','ID Seq','id_seq'])) || nextSeq('obs'), id:_txt(_rowVal(row,['ID','Id'])), obra:_txt(_rowVal(row,['Obra','Cliente'])), tipo:_txt(_rowVal(row,['Tipo'])) || 'Geral', semana:_num(_rowVal(row,['Semana'])) || 16, cor:_txt(_rowVal(row,['Cor'])) || 'n', titulo:_txt(_rowVal(row,['Título','Titulo'])), texto:_txt(_rowVal(row,['Texto','Observação','Observacao']))})).filter(o=>o.obra||o.titulo||o.texto);
+    changed.push('Observações');
+  }
+  if(!changed.length) throw new Error('Nenhuma aba reconhecida foi encontrada. Use o Excel exportado pelo próprio SIOG.');
+  return changed;
+}
+async function afterExcelImport(fileName, changed){
+  const payload = Object.assign(buildStoragePayload(), {ts: Date.now(), imported_excel_from:fileName, imported_excel_sheets:changed});
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  try { localStorage.setItem('siog_lafaete_index_relatorio_dados_preservados_v10_20260423', JSON.stringify(payload)); } catch(_e) {}
+  saveToStorage();
+  if(_sb) await pushFullDataToSupabase();
+  ['renderProjetos','renderRDO','renderDocumentacao','renderMedicoes','renderSatisfacao','renderObservacoes','updateBadges','populateAllSelects','renderDashboard'].forEach(fn=>{try{ if(typeof window[fn]==='function') window[fn](); }catch(_e){}});
+  alert('✅ Excel importado com sucesso. Abas atualizadas: '+changed.join(', ')+'.\n\nOs dados foram salvos no navegador e enviados ao Supabase quando disponível.');
+}
+function importExcel(){
+  const msg = 'Importar Excel para atualizar a base do SIOG?\n\nUse preferencialmente o arquivo exportado pelo botão 📊 Excel deste sistema.\nAs abas presentes no Excel serão substituídas/atualizadas no sistema. Abas ausentes serão preservadas.\n\nAntes de importar, recomenda-se gerar um Backup JSON.';
+  if(!confirm(msg)) return;
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='.xlsx,.xls,.xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel';
+  inp.onchange=e=>{
+    const file=e.target.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=async ev=>{
+      try{
+        let sheets;
+        const name=(file.name||'').toLowerCase();
+        const buf=ev.target.result;
+        if(window.XLSX && (name.endsWith('.xlsx') || name.endsWith('.xlsm') || name.endsWith('.xls'))){
+          try{ sheets = workbookToSheets(XLSX.read(buf, {type:'array', cellDates:false})); }
+          catch(xlsxErr){
+            const text = new TextDecoder('utf-8').decode(new Uint8Array(buf));
+            sheets = parseWorkbookXml(text);
+          }
+        } else {
+          const text = typeof buf === 'string' ? buf : new TextDecoder('utf-8').decode(new Uint8Array(buf));
+          sheets = parseWorkbookXml(text);
+        }
+        const changed = applyExcelSheets(sheets);
+        await afterExcelImport(file.name, changed);
+      }catch(err){ console.error(err); alert('Erro ao importar Excel: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  inp.click();
+}
+function installAutoSaveRobusto(){
+  if(window.__siogAutoSaveRobusto) return; window.__siogAutoSaveRobusto = true;
+  const doSave = () => { try { saveToStorage(); } catch(e){} };
+  window.addEventListener('beforeunload', doSave);
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') doSave(); });
+  setInterval(doSave, 30000);
+}
+async function pushFullDataToSupabase(){
+  if(!_sb) return false; const ts = new Date().toISOString();
+  try{
+    for(const p of PROJETOS){ await _sb.from('projetos').upsert(Object.assign({},p,{parciais:JSON.stringify(p.parciais||[]),updated_at:ts}),{onConflict:'id,obra'}).catch(()=>{}); }
+    for(const r of RDO){ await _sb.from('rdo').upsert({id:r.id,obra:r.obra,atualizacao:String(r.atualizacao||''),enviado:String(r.enviado||''),assinado:String(r.assinado||''),resp:r.resp||'',modelo:r.modelo||'',histograma:r.histograma||'',obs:r.obs||'',updated_at:ts},{onConflict:'id,obra'}).catch(()=>{}); }
+    for(const d of DOCUMENTACAO){ await _sb.from('documentacao').upsert(Object.assign({},d,{art_tipos:JSON.stringify(d.art_tipos||[]),updated_at:ts}),{onConflict:'id,obra'}).catch(()=>{}); }
+    for(const m of MEDICOES){ await _sb.from('medicoes').upsert(Object.assign({},m,{updated_at:ts}),{onConflict:'id_seq'}).catch(()=>{}); }
+    for(const p of PESQUISAS){ await _sb.from('pesquisas').upsert(Object.assign({},p,{updated_at:ts}),{onConflict:'id_seq'}).catch(()=>{}); }
+    for(const o of OBSERVACOES){ await _sb.from('observacoes').upsert(Object.assign({},o,{updated_at:ts}),{onConflict:'id_seq'}).catch(()=>{}); }
+    for(const [key,av] of Object.entries(AVANCOS||{})){ await _sb.from('avancos').upsert({projeto_key:key,prev:av.prev,real:av.real,semana:av.semana||'',obs:av.obs||'',updated_at:ts},{onConflict:'projeto_key'}).catch(()=>{}); }
+    showSaveStatus('✓ Backup sincronizado com Supabase'); return true;
+  }catch(e){ console.warn('Sincronização completa:', e); return false; }
+}
+
 
 
 window.addEventListener('resize',()=>{
@@ -14227,6 +14467,7 @@ window.addEventListener('load', () => {
   }
 
   installAccessGuards();
+  installAutoSaveRobusto();
   ['re-atualiz','re-enviado','re-assinado'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.__rdoInputFix){el.addEventListener('input',()=>clearSpecialField(id));el.__rdoInputFix=true;}});
   renderAccessLists();
   applyAccessState();
