@@ -249,6 +249,7 @@ textarea{resize:vertical;min-height:68px}
 <!-- Correção v18: seleção de obras preservadas em comentários e edição em lote do RDO antes de salvar -->
 <!-- Correção v19: coluna Histograma incluída no relatório do RDO -->
 <!-- Correção v20: autosave reforçado, exportação Excel e importação/exportação de backup preservadas -->
+<!-- Correção v21: importação Excel com datas preservadas por serial bruto para evitar divergência em RDO -->
 <!-- Correção v19: coluna Histograma incluída no relatório/exportação do RDO -->
 </head>
 <body>
@@ -13707,7 +13708,12 @@ function parseWorkbookXml(text){
 }
 function workbookToSheets(wb){
   const out={};
-  wb.SheetNames.forEach(name=>{ out[name] = XLSX.utils.sheet_to_json(wb.Sheets[name], {defval:'', raw:false}); });
+  wb.SheetNames.forEach(name=>{
+    // IMPORTANTE: usar raw:true preserva os seriais reais do Excel nas células de data.
+    // Com raw:false, o SheetJS devolve a data já formatada pelo Excel/locale e pode converter
+    // datas para textos ambíguos, causando divergência na importação do RDO.
+    out[name] = XLSX.utils.sheet_to_json(wb.Sheets[name], {defval:'', raw:true});
+  });
   return out;
 }
 function getSheet(sheets, aliases){
