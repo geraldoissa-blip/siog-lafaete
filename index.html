@@ -109,6 +109,22 @@ td.nowrap{white-space:nowrap!important;overflow:visible!important;max-width:none
 input,select,textarea{width:100%;background:var(--bg3);border:1px solid var(--bd2);border-radius:var(--rad);color:var(--tx);font-family:inherit;font-size:13px;padding:8px 12px;transition:border .15s}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--or)}
 select option{background:var(--bg3);color:var(--tx)}
+/* v13 — Campo de pesquisa nas listas de obras/projetos, sem alterar dados */
+.obra-select-search{
+  width:100%;
+  margin-bottom:6px;
+  background:var(--bg3);
+  border:1px solid var(--bd2);
+  border-radius:var(--rad);
+  color:var(--tx);
+  font-family:inherit;
+  font-size:12px;
+  padding:7px 10px;
+  box-sizing:border-box;
+}
+.obra-select-search:focus{outline:none;border-color:var(--or)}
+.obra-select-search::placeholder{color:var(--tx3)}
+
 textarea{resize:vertical;min-height:68px}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .fr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
@@ -6655,6 +6671,13 @@ const PAGE_RENDERS={projetos:renderProjetos,cronograma:renderCronograma,rdo:rend
 // Exclusões independentes por aba: permite ocultar/remover um projeto de uma página sem afetar as demais.
 let EXCLUIDOS_ABA = {cronograma:[]};
 function projetoKey(id, obra){return String(id||'')+'|'+String(obra||'');}
+// Oculta apenas nas listas de seleção as opções importadas com ID curto numérico (ex.: "2 — Obra", "23 — Obra").
+// Mantém os dados nas bases, relatórios e tabelas; apenas evita duplicidade/confusão nos selects.
+function isOpcaoObraIdCurtoNumerico(id, obra){
+  const cod=String(id||'').trim();
+  const nome=String(obra||'').trim();
+  return !!nome && /^\d{1,2}$/.test(cod);
+}
 function isProjetoExcluidoDaAba(tab, id, obra){return !!(EXCLUIDOS_ABA && Array.isArray(EXCLUIDOS_ABA[tab]) && EXCLUIDOS_ABA[tab].includes(projetoKey(id,obra)));}
 function marcarProjetoExcluidoDaAba(tab,id,obra){if(!EXCLUIDOS_ABA)EXCLUIDOS_ABA={};if(!Array.isArray(EXCLUIDOS_ABA[tab]))EXCLUIDOS_ABA[tab]=[];const k=projetoKey(id,obra);if(!EXCLUIDOS_ABA[tab].includes(k))EXCLUIDOS_ABA[tab].push(k);}
 function toggleSidebar(force){
@@ -6895,7 +6918,9 @@ function getProjetosDisponiveisDaAba(tab){
   }else if(tab==='projetos'){
     PROJETOS.forEach(p=>add(p.id,p.obra));
   }
-  return Array.from(map.values()).sort((a,b)=>a.obra.localeCompare(b.obra,'pt-BR'));
+  return Array.from(map.values())
+    .filter(p=>!isOpcaoObraIdCurtoNumerico(p.id,p.obra))
+    .sort((a,b)=>a.obra.localeCompare(b.obra,'pt-BR'));
 }
 function nomeDaAbaExclusao(tab){return {cronograma:'Cronograma',rdo:'RDO',seguros:'Seguros & Garantias',arts:'ARTs & Documentos',medicoes:'Medições & Financeiro',satisfacao:'Pesquisa de Satisfação',observacoes:'Observações Livres',projetos:'Base de Projetos'}[tab]||tab;}
 function excluirProjetoDaAbaPrompt(tab){
@@ -7893,7 +7918,9 @@ function getProjetosReferenciados(includeBase=true){
   MEDICOES.forEach(m=>add(m.id,m.cliente));
   PESQUISAS.forEach(p=>add(p.id,p.cliente));
   OBSERVACOES.forEach(o=>add(o.id||'',o.obra));
-  return Array.from(map.values()).sort((a,b)=>a.obra.localeCompare(b.obra,'pt-BR'));
+  return Array.from(map.values())
+    .filter(p=>!isOpcaoObraIdCurtoNumerico(p.id,p.obra))
+    .sort((a,b)=>a.obra.localeCompare(b.obra,'pt-BR'));
 }
 function fillObraSelectFromReferencias(sel, opts={}){
   if(!sel) return;
@@ -7905,6 +7932,8 @@ function fillObraSelectFromReferencias(sel, opts={}){
     const label=p.id?`${p.id} — ${p.obra}`:p.obra;
     return `<option value="${value.replace(/"/g,'&quot;')}">${label}</option>`;
   }).join('');
+  // v14: após repopular selects, reaplica a busca/ordenação de forma assíncrona e segura.
+  if(typeof scheduleEnhanceObraSelects === 'function') scheduleEnhanceObraSelects();
 }
 // ─── OBSERVAÇÕES ─────────────────────────────────────────────────────────────
 let obsNextId=8;
@@ -8085,10 +8114,10 @@ function populateAllSelects(){
       el.value = prevVal || '';
     } else if (id === 'ce-proj') {
       // Avanços do cronograma continuam usando a Base de Projetos, pois dependem das datas/parciais do projeto.
-      const ativos=PROJETOS.filter(p => p.status === 'Ativo' || p.status === 'Encerrado');
+      const ativos=PROJETOS.filter(p => (p.status === 'Ativo' || p.status === 'Encerrado') && !isOpcaoObraIdCurtoNumerico(p.id,p.obra));
       el.innerHTML = ativos.map((p,i) => `<option value="${PROJETOS.indexOf(p)}">${p.id} — ${p.obra}</option>`).join('');
     } else if (id === 'dd-proj' || id === 'dd-proj-arts') {
-      el.innerHTML = PROJETOS.map((p,i) => `<option value="${i}">${p.id} — ${p.obra}</option>`).join('');
+      el.innerHTML = PROJETOS.map((p,i) => ({p,i})).filter(x=>!isOpcaoObraIdCurtoNumerico(x.p.id,x.p.obra)).map(({p,i}) => `<option value="${i}">${p.id} — ${p.obra}</option>`).join('');
     } else {
       fillObraSelectFromReferencias(el,{firstHtml:'<option value="">— Selecione —</option>',mode:'idobra'});
     }
@@ -14765,6 +14794,9 @@ function installAccessGuards(){
     window[name] = wrapped;
   });
   document.addEventListener('click', function(e){
+    // v14: não interferir em inputs/selects/listas suspensas nativas.
+    // Isso evita travar cliques em campos de busca e caixas de seleção.
+    if(e.target.closest('input,select,textarea,.obra-select-search')) return;
     if(hasEditAccess()) return;
     const btn = e.target.closest('button');
     if(!btn) return;
@@ -14776,6 +14808,124 @@ function installAccessGuards(){
       guardEdit('alteração');
     }
   }, true);
+}
+
+
+// ── v14: pesquisa e ordenação segura nas caixas de seleção de obras/projetos ──
+// Mantém a alteração anterior, mas elimina travamentos causados por MutationObserver
+// reordenando o próprio select em loop. Não altera dados, relatórios ou layout.
+const OBRA_SELECT_IDS_PESQUISA = ['ce-proj','re-proj','dd-proj','dd-proj-arts','fm-proj','fs-proj','fo-obra','ss-proj','obs-obra'];
+let _obraSelectEnhanceTimer = null;
+function obraSelectSortKey(txt){
+  return String(txt||'')
+    .replace(/^\s*(?:P\d+|\d+(?:\.\d+)*|\d{1,2})\s*[—-]\s*/i,'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toUpperCase().trim();
+}
+function sortObraSelectOptions(sel){
+  if(!sel || !OBRA_SELECT_IDS_PESQUISA.includes(sel.id)) return;
+  const current=sel.value;
+  const opts=Array.from(sel.options);
+  const fixed=[];
+  const sortable=[];
+  opts.forEach(op=>{
+    const isFixed = op.value==='' || /^\s*[—-]/.test(op.textContent||'') || /todos projetos|todas obras|selecione|geral/i.test(op.textContent||'');
+    (isFixed ? fixed : sortable).push(op);
+  });
+  sortable.sort((a,b)=>obraSelectSortKey(a.textContent).localeCompare(obraSelectSortKey(b.textContent),'pt-BR'));
+  const ordered=[...fixed,...sortable];
+  const same=ordered.length===opts.length && ordered.every((op,i)=>op===opts[i]);
+  if(same){
+    if(Array.from(sel.options).some(op=>op.value===current)) sel.value=current;
+    return;
+  }
+  const frag=document.createDocumentFragment();
+  ordered.forEach(op=>frag.appendChild(op));
+  sel.appendChild(frag);
+  if(Array.from(sel.options).some(op=>op.value===current)) sel.value=current;
+}
+function filtrarObraSelect(sel, termo){
+  if(!sel) return;
+  const q=String(termo||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  Array.from(sel.options).forEach(op=>{
+    if(op.value==='' || /^\s*[—-]/.test(op.textContent||'')){op.hidden=false; op.disabled=false; return;}
+    const txt=(op.textContent||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    const hide=!!q && !txt.includes(q);
+    op.hidden = hide;
+    // Alguns navegadores não respeitam apenas hidden dentro de <select>.
+    // Desabilitar junto evita seleção acidental sem impedir abrir a lista.
+    op.disabled = hide;
+  });
+}
+function enhanceObraSelect(sel){
+  if(!sel || !OBRA_SELECT_IDS_PESQUISA.includes(sel.id)) return;
+
+  // Se o campo de busca já existir, apenas reaplica ordenação/filtro sem criar duplicidade.
+  let inp = null;
+  if(sel.previousElementSibling && sel.previousElementSibling.classList && sel.previousElementSibling.classList.contains('obra-select-search')){
+    inp = sel.previousElementSibling;
+  }
+  if(!inp){
+    inp=document.createElement('input');
+    inp.type='search';
+    inp.className='obra-select-search';
+    inp.placeholder='Digite para buscar a obra...';
+    inp.setAttribute('autocomplete','off');
+    if(sel.parentNode) sel.parentNode.insertBefore(inp,sel);
+  }
+
+  if(!sel.__obraSearchInputBound){
+    inp.addEventListener('input',()=>filtrarObraSelect(sel,inp.value));
+    inp.addEventListener('keydown',(ev)=>{
+      if(ev.key==='Enter'){
+        ev.preventDefault();
+        const first=Array.from(sel.options).find(op=>!op.hidden && !op.disabled && op.value!=='');
+        if(first){ sel.value=first.value; sel.dispatchEvent(new Event('change',{bubbles:true})); }
+      }
+    });
+    sel.__obraSearchInputBound=true;
+  }
+
+  if(!sel.__obraSearchRefreshing){
+    sel.__obraSearchRefreshing=true;
+    sortObraSelectOptions(sel);
+    filtrarObraSelect(sel,inp.value);
+    sel.__obraSearchRefreshing=false;
+  }
+
+  // Observador seguro: desconecta/reagenda antes de reordenar, evitando loop que travava cliques.
+  if(!sel.__obraSearchObserver){
+    let pending=false;
+    const obs=new MutationObserver(()=>{
+      if(sel.__obraSearchRefreshing || pending) return;
+      pending=true;
+      setTimeout(()=>{
+        pending=false;
+        if(sel.__obraSearchRefreshing) return;
+        const val=sel.value;
+        sel.__obraSearchRefreshing=true;
+        try{
+          sortObraSelectOptions(sel);
+          if(Array.from(sel.options).some(op=>op.value===val)) sel.value=val;
+          filtrarObraSelect(sel,inp.value);
+        }finally{
+          sel.__obraSearchRefreshing=false;
+        }
+      },0);
+    });
+    obs.observe(sel,{childList:true});
+    sel.__obraSearchObserver=obs;
+  }
+}
+function enhanceObraSelects(){
+  OBRA_SELECT_IDS_PESQUISA.forEach(id=>enhanceObraSelect(document.getElementById(id)));
+}
+function scheduleEnhanceObraSelects(){
+  if(_obraSelectEnhanceTimer) return;
+  _obraSelectEnhanceTimer=setTimeout(()=>{
+    _obraSelectEnhanceTimer=null;
+    try{ enhanceObraSelects(); }catch(e){ console.warn('Busca nas listas de obras:', e); }
+  },0);
 }
 
 // ── INIT ─────────────────────────────────────────────────
@@ -14802,7 +14952,7 @@ window.addEventListener('load', () => {
   // Step 2: Render data from current in-memory arrays
   try { renderProjetos(); } catch(e) { console.warn('Render projetos:', e); }
   try { updateBadges(); } catch(e) { console.warn('Badges:', e); }
-  try { populateAllSelects(); } catch(e) { console.warn('Selects:', e); }
+  try { populateAllSelects(); enhanceObraSelects(); } catch(e) { console.warn('Selects:', e); }
   setTimeout(() => {
     try { renderDashboard(); } catch(e) { console.warn('Dashboard:', e); }
   }, 300);
