@@ -136,7 +136,7 @@ textarea{resize:vertical;min-height:68px}
 /* LAYOUT */
 .page{display:none}.page.active{display:block}
 .mb16{margin-bottom:16px}.mt16{margin-top:16px}
-.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}.filter-bar .btn{order:-1}.filter-bar input,.filter-bar select{order:0}
 .si{flex:1!important;min-width:180px;max-width:280px}
 .alert{display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border-radius:var(--rad);margin-bottom:8px;font-size:13px}
 .al-r{background:rgba(220,53,69,.07);border:1px solid rgba(220,53,69,.2);color:var(--r2)}
@@ -252,6 +252,19 @@ textarea{resize:vertical;min-height:68px}
 .report-page table th,.report-page table td,#report-content table th,#report-content table td{word-break:normal!important;overflow-wrap:normal!important;hyphens:none!important;}
 .report-page .nowrap,#report-content .nowrap,.export-nowrap{white-space:nowrap!important;word-break:keep-all!important;overflow-wrap:normal!important;}
 @media print{#report-content table th,#report-content table td{white-space:nowrap!important;font-size:8.5px!important;padding:3px 4px!important;}#report-content table td.wrap{white-space:normal!important;}}
+
+/* v39: botões à esquerda, salvar+ e arraste de comentários */
+.action-left{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-right:8px}.drag-handle{cursor:grab;color:var(--tx3);user-select:none;padding:0 4px}.dragging{opacity:.55;outline:1px dashed var(--or)}
+
+/* Correção v40: ações sempre à esquerda e títulos de observações alinhados à esquerda */
+.acoes-left{position:sticky!important;left:0!important;z-index:4!important;background:var(--bg2)!important;box-shadow:1px 0 0 var(--bd);white-space:nowrap!important;min-width:92px;}
+th.acoes-left{background:var(--bg3)!important;z-index:5!important;}
+tr:hover td.acoes-left{background:var(--bg3)!important;}
+.obs-blk .obs-title{justify-content:flex-start!important;text-align:left!important;width:100%!important;}
+.obs-blk .obs-title,.obs-blk .obs-obra,.obs-blk .obs-sep{align-self:flex-start!important;}
+.obs-blk > div:first-child{justify-content:flex-start!important;text-align:left!important;}
+.obs-blk > div:first-child > div{flex:1!important;text-align:left!important;min-width:0!important;}
+
 </style>
 <!-- Correção: dados do primeiro arquivo + exportação por módulos selecionados v8 -->
 <!-- Versão v12: inclui opção de tonalidade clara/escura para PDF/PowerPoint, mantendo configurações anteriores -->
@@ -275,6 +288,8 @@ textarea{resize:vertical;min-height:68px}
 <!-- Correção v26: aumenta novamente a fonte do Cronograma no PDF/PPT e aproxima o farol da coluna Tendência -->
 <!-- Correção v25: relatório de Documentação conta Pendências somente pelos campos visíveis com texto Pend. -->
 <!-- Correção v28: valores em cinza mais forte no quadro de Medições do relatório PPT/PDF -->
+<!-- Correção v40: ações à esquerda nas abas restantes e Observações Livres alinhadas à esquerda -->
+<!-- Correção v39: edição de obras excluídas/inativas nas abas, Salvar+, botões à esquerda e arraste de comentários -->
 </head>
 <body>
 
@@ -507,7 +522,7 @@ textarea{resize:vertical;min-height:68px}
     <button class="btn btn-or btn-sm" onclick="openProjModal(null)">＋ Novo Projeto</button>
   </div>
   <div class="card card-table"><div class="tw"><table>
-    <thead><tr><th>ID</th><th>Obra / Cliente</th><th>Status</th><th>Resp.</th><th>Início</th><th>Prazo Contr.</th><th>Prazo Cliente</th><th>Tendência</th><th>Farol</th><th>Contrato</th><th>Obs</th><th>Ações</th></tr></thead>
+    <thead><tr><th class="acoes-left">Ações</th><th>ID</th><th>Obra / Cliente</th><th>Status</th><th>Resp.</th><th>Início</th><th>Prazo Contr.</th><th>Prazo Cliente</th><th>Tendência</th><th>Farol</th><th>Contrato</th><th>Obs</th></tr></thead>
     <tbody id="tbody-proj"></tbody>
   </table></div></div>
 </div>
@@ -524,7 +539,7 @@ textarea{resize:vertical;min-height:68px}
   <div class="split-layout">
     <div>
       <div class="card card-table"><div class="tw"><table>
-        <thead><tr><th>ID</th><th>Obra / Entrega</th><th>Início</th><th>Prazo Contr.</th><th>Prazo Cliente</th><th>Tendência</th><th title="Farol automático: Tendência vs Prazo Cliente">⬤</th><th>% Prev.</th><th>% Real.</th><th>Ader.</th><th>Ações</th></tr></thead>
+        <thead><tr><th class="acoes-left">Ações</th><th>ID</th><th>Obra / Entrega</th><th>Início</th><th>Prazo Contr.</th><th>Prazo Cliente</th><th>Tendência</th><th title="Farol automático: Tendência vs Prazo Cliente">⬤</th><th>% Prev.</th><th>% Real.</th><th>Ader.</th></tr></thead>
         <tbody id="tbody-crono"></tbody>
       </table></div></div>
     </div>
@@ -589,14 +604,14 @@ textarea{resize:vertical;min-height:68px}
   </div>
   <div class="card card-table"><div class="tw"><table>
     <thead><tr>
-      <th>ID</th><th>Obra</th><th>Status</th><th>Vigência Cto.</th><th>Dias p/ Vencer</th>
+      <th class="acoes-left">Ações</th><th>ID</th><th>Obra</th><th>Status</th><th>Vigência Cto.</th><th>Dias p/ Vencer</th>
       <th>Seg. Risco Eng.</th><th>Vigência</th>
       <th>Seg. Resp. Civil</th><th>Vigência</th>
       <th>Carta Fiança</th><th>Vigência</th>
       <th>Gar. Adiantamento</th><th>Vigência</th>
       <th>Gar. Performance</th><th>Vigência</th>
       <th>Gar. Exec. Obra</th><th>Vigência</th>
-      <th>Status Geral Seg/Gar</th><th>Observação Automática</th><th>Ações</th>
+      <th>Status Geral Seg/Gar</th><th>Observação Automática</th>
     </tr></thead>
     <tbody id="tbody-docs-gar"></tbody>
   </table></div></div>
@@ -614,10 +629,10 @@ textarea{resize:vertical;min-height:68px}
   </div>
   <div class="card card-table"><div class="tw"><table>
     <thead><tr>
-      <th>ID</th><th>Obra</th><th>Status</th><th>ART Status</th><th>Tipos de ART</th>
+      <th class="acoes-left">Ações</th><th>ID</th><th>Obra</th><th>Status</th><th>ART Status</th><th>Tipos de ART</th>
       <th>Crono. Status</th><th>Handbook Escopo</th><th>Handbook Contrato</th>
       <th>Matriz Resp.</th><th>Chk. Interno</th><th>Chk. Externo</th>
-      <th>Termo Entrega</th><th>Atestado Capac.</th><th>Ações</th>
+      <th>Termo Entrega</th><th>Atestado Capac.</th>
     </tr></thead>
     <tbody id="tbody-docs-art"></tbody>
   </table></div></div>
@@ -644,7 +659,7 @@ textarea{resize:vertical;min-height:68px}
       <div class="card card-table">
         <div class="card-title">Histórico de Lançamentos</div>
         <div class="tw"><table>
-          <thead><tr><th>ID</th><th>Cliente</th><th>Tipo</th><th>Data Med.</th><th>Valor</th><th>Data NF</th><th>Prazo (d)</th><th>Prev. Rec.</th><th>Real. Rec.</th><th>Dias Atraso</th><th>⬤</th><th>Ações</th></tr></thead>
+          <thead><tr><th class="acoes-left">Ações</th><th>ID</th><th>Cliente</th><th>Tipo</th><th>Data Med.</th><th>Valor</th><th>Data NF</th><th>Prazo (d)</th><th>Prev. Rec.</th><th>Real. Rec.</th><th>Dias Atraso</th><th>⬤</th></tr></thead>
           <tbody id="tbody-med-hist"></tbody>
         </table></div>
       </div>
@@ -680,7 +695,7 @@ textarea{resize:vertical;min-height:68px}
       Registros da semana atual em destaque · Histórico em cinza · Clique no ⬤ da linha para incluir/excluir do relatório
     </div>
     <div class="tw"><table>
-      <thead><tr><th>Rel.</th><th>Data</th><th>ID</th><th>Cliente</th><th>Geral</th><th>Comentário / Prazo / Qualidade / Seg. / Equipe / Comunicação</th><th>Ações</th></tr></thead>
+      <thead><tr><th class="acoes-left">Ações</th><th>Rel.</th><th>Data</th><th>ID</th><th>Cliente</th><th>Geral</th><th>Comentário / Prazo / Qualidade / Seg. / Equipe / Comunicação</th></tr></thead>
       <tbody id="tbody-sat"></tbody>
     </table></div>
   </div>
@@ -761,7 +776,7 @@ textarea{resize:vertical;min-height:68px}
       <button type="button" class="btn btn-sm" onclick="addParcialRow()" style="margin-top:6px">+ Adicionar</button>
     </div>
     <div class="fg"><label>Observações Gerais</label><textarea id="pp-obs" rows="2"></textarea></div>
-    <div class="mo-ft"><button class="btn" onclick="closeMo('mo-proj')">Cancelar</button><button class="btn btn-or" onclick="salvarProjeto()">Salvar Projeto</button></div>
+    <div class="mo-ft"><button class="btn" onclick="closeMo('mo-proj')">Cancelar</button><button class="btn btn-bl" onclick="salvarProjeto(true)">Salvar +</button><button class="btn btn-or" onclick="salvarProjeto()">Salvar Projeto</button></div>
   </div>
 </div>
 
@@ -775,7 +790,7 @@ textarea{resize:vertical;min-height:68px}
       Os campos de Início, Prazo Contratual, Prazo Cliente e Tendência vêm da Base de Projetos. Edite apenas os avanços.
     </div>
     <div class="fr"><div class="fg"><label>% Avanço Previsto (0–100)</label><input type="number" id="ce-prev" min="0" max="100" step="0.1"/></div><div class="fg"><label>% Avanço Realizado (0–100)</label><input type="number" id="ce-real" min="0" max="100" step="0.1"/></div></div>
-    <div class="mo-ft"><button class="btn" onclick="closeMo('mo-crono')">Cancelar</button><button class="btn btn-or" onclick="salvarCrono()">Salvar</button></div>
+    <div class="mo-ft"><button class="btn" onclick="closeMo('mo-crono')">Cancelar</button><button class="btn btn-bl" onclick="salvarCrono(true)">Salvar +</button><button class="btn btn-or" onclick="salvarCrono()">Salvar</button></div>
   </div>
 </div>
 
@@ -819,7 +834,7 @@ textarea{resize:vertical;min-height:68px}
     </div>
     <div class="fr"><div class="fg"><label>Modelo</label><select id="re-modelo"><option>RDOWEB</option><option>MODELO CLIENTE</option><option>Próprio</option></select></div><div class="fg"><label>Histograma Até</label><input type="text" id="re-hist" placeholder="ATÉ 08/04/2026 ou N/A"/></div></div>
     <div class="fg"><label>Observação / Alerta</label><textarea id="re-obs" rows="2"></textarea></div>
-    <div class="mo-ft"><button class="btn" onclick="requestCloseRdoModal()">Fechar</button><button class="btn btn-or" onclick="salvarRDO()">Salvar tudo</button></div>
+    <div class="mo-ft"><button class="btn" onclick="requestCloseRdoModal()">Fechar</button><button class="btn btn-bl" onclick="salvarRDO(true)">Salvar +</button><button class="btn btn-or" onclick="salvarRDO()">Salvar tudo</button></div>
   </div>
 </div>
 
@@ -876,7 +891,7 @@ textarea{resize:vertical;min-height:68px}
       </div>
       <div class="fg"><label>Atestado de Capacidade Técnica</label><select id="dd-atc"><option>-</option><option>Pendente</option><option>Concluído</option><option>N/A</option></select></div>
     </div>
-    <div class="mo-ft"><button class="btn" onclick="closeMo('mo-doc')">Cancelar</button><button class="btn btn-or" onclick="salvarDoc()">Salvar</button></div>
+    <div class="mo-ft"><button class="btn" onclick="closeMo('mo-doc')">Cancelar</button><button class="btn btn-bl" onclick="salvarDoc(true)">Salvar +</button><button class="btn btn-or" onclick="salvarDoc()">Salvar</button></div>
   </div>
 </div>
 
@@ -915,7 +930,7 @@ textarea{resize:vertical;min-height:68px}
     <div style="font-size:11px;font-weight:700;color:var(--tx3);text-transform:uppercase;margin:8px 0 6px">OU por dimensão</div>
     <div class="fr3"><div class="fg"><label>Prazo</label><textarea id="fs-prazo" rows="2" placeholder="Comentário..."></textarea></div><div class="fg"><label>Qualidade</label><textarea id="fs-qual" rows="2" placeholder="Comentário..."></textarea></div><div class="fg"><label>Segurança</label><textarea id="fs-seg" rows="2" placeholder="Comentário..."></textarea></div></div>
     <div class="fr"><div class="fg"><label>Equipe</label><textarea id="fs-equipe" rows="2" placeholder="Comentário..."></textarea></div><div class="fg"><label>Comunicação</label><textarea id="fs-com" rows="2" placeholder="Comentário..."></textarea></div></div>
-    <div class="mo-ft"><button class="btn" onclick="closeMo('mo-sat')">Cancelar</button><button class="btn btn-or" onclick="salvarSat()">Salvar Avaliação</button></div>
+    <div class="mo-ft"><button class="btn" onclick="closeMo('mo-sat')">Cancelar</button><button class="btn btn-bl" onclick="salvarSat(true)">Salvar +</button><button class="btn btn-or" onclick="salvarSat()">Salvar Avaliação</button></div>
   </div>
 </div>
 
@@ -927,7 +942,7 @@ textarea{resize:vertical;min-height:68px}
     <div class="fr"><div class="fg"><label>Semana</label><select id="fo-semana"><option value="16">Semana 16</option><option value="15">Semana 15</option><option value="14">Semana 14</option></select></div><div class="fg"><label>Cor / Destaque</label><select id="fo-cor"><option value="n">Sem cor</option><option value="g">🟢 Verde</option><option value="y">🟡 Amarelo</option><option value="r">🔴 Vermelho</option></select></div></div>
     <div class="fg"><label>Título chamativo (após o nome da obra)</label><input type="text" id="fo-titulo" placeholder="Ex: Em andamento · Obra paralisada · Risco de atraso"/></div>
     <div class="fg"><label>Texto do bloco (use • para itens)</label><textarea id="fo-texto" rows="8" placeholder="• Ponto 1&#10;• Ponto 2&#10;• Ponto 3"></textarea></div>
-    <div class="mo-ft"><button class="btn" onclick="closeMo('mo-obs')">Cancelar</button><button class="btn btn-or" onclick="salvarObs()">Salvar</button></div>
+    <div class="mo-ft"><button class="btn" onclick="closeMo('mo-obs')">Cancelar</button><button class="btn btn-bl" onclick="salvarObs(true)">Salvar +</button><button class="btn btn-or" onclick="salvarObs()">Salvar</button></div>
   </div>
 </div>
 
@@ -6852,7 +6867,7 @@ function addParcialRow(){
     <button onclick="this.closest('div[style]').remove()" class="btn btn-sm btn-r" style="margin-top:18px">✕</button>`;
   document.getElementById('pp-parciais').appendChild(d);
 }
-function salvarProjeto(){
+function salvarProjeto(keepOpen=false){
   const id=document.getElementById('pp-id').value.trim();
   const obra=document.getElementById('pp-obra').value.trim();
   if(!id||!obra){alert('ID e Obra são obrigatórios.');return;}
@@ -6885,8 +6900,10 @@ function salvarProjeto(){
     RDO.push({id,obra,atualizacao:'NÃO INICIADA',enviado:'NÃO INICIADA',assinado:'NÃO INICIADA',resp:'',modelo:'',histograma:'',obs:'Novo projeto'});
     DOCUMENTACAO.push({id,obra,status:np.status,vig_cto:'',sre_st:'N/A',sre_vig:'',src_st:'N/A',src_vig:'',cf_st:'N/A',cf_vig:'',ga_st:'N/A',ga_vig:'',gp_st:'N/A',gp_vig:'',geo_st:'N/A',geo_vig:'',art_st:'Pendente',art_tipos:[],art_outros:'',crono_st:'-',hbe:'-',hbc:'-',mtr:'-',chi:'-',che:'-',te:'-',atc:'-'});
   }
-  closeMo('mo-proj');renderProjetos();renderDashboard();updateBadges();populateAllSelects();
+  renderProjetos();renderDashboard();updateBadges();populateAllSelects();
   dbAfterSaveProjeto(np, _editProjIdx===null);
+  if(keepOpen){_editProjIdx=PROJETOS.findIndex(x=>x.id===np.id&&x.obra===np.obra);showSaveStatus('✓ Projeto salvo');return;}
+  closeMo('mo-proj');
 }
 function renderProjetos(){
   const q=(document.getElementById('sp-q').value||'').toLowerCase();
@@ -6897,6 +6914,11 @@ function renderProjetos(){
     const f=cronoFarol(p);
     const tip=f==='g'?'No prazo':f==='y'?'Atenção — próximo':' Atrasado';
     return`<tr>
+      <td class="acoes-left">
+        <button class="btn btn-xs" onclick="openProjModal(${idx})">Editar</button>
+        <button class="btn btn-xs" style="background:rgba(40,167,69,.1);border-color:var(--g);color:var(--g2)" onclick="concluirProjeto(${idx})" title="Concluído">✓</button>
+        <button class="btn btn-xs btn-r" onclick="excluirProjeto(${idx})" title="Excluir apenas da Base de Projetos">🗑</button>
+      </td>
       <td><code style="font-size:11px;color:var(--tx2)">${p.id}</code></td>
       <td><strong>${p.obra}</strong>${p.obs?`<div style="font-size:11px;color:var(--tx3)">${p.obs.slice(0,60)}${p.obs.length>60?'…':''}</div>`:''}</td>
       <td>${bS(p.status)}</td><td>${p.resp||'—'}</td>
@@ -6906,12 +6928,7 @@ function renderProjetos(){
       <td style="color:var(--or);font-weight:600">${xl2str(p.tendencia)}</td>
       <td style="text-align:center">${dotFarol(f,tip)}</td>
       <td style="text-align:right">${p.valor?fmtR(p.valor):'—'}</td>
-      <td style="font-size:11px;color:var(--tx3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.obs||''}">${p.obs||'—'}</td>
-      <td style="white-space:nowrap">
-        <button class="btn btn-xs" onclick="openProjModal(${idx})">Editar</button>
-        <button class="btn btn-xs" style="background:rgba(40,167,69,.1);border-color:var(--g);color:var(--g2)" onclick="concluirProjeto(${idx})" title="Concluído">✓</button>
-        <button class="btn btn-xs btn-r" onclick="excluirProjeto(${idx})" title="Excluir apenas da Base de Projetos">🗑</button>
-      </td></tr>`;
+      <td style="font-size:11px;color:var(--tx3);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.obs||''}">${p.obs||'—'}</td></tr>`;
   }).join('')||'<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--tx3)">Nenhum projeto encontrado.</td></tr>';
 }
 function concluirProjeto(idx){
@@ -7083,17 +7100,20 @@ function populateCronoEdit(){
   document.getElementById('ce-prev').value=av.prev??'';
   document.getElementById('ce-real').value=av.real??'';
 }
-function salvarCrono(){
+function salvarCrono(keepOpen=false){
   const idx=parseInt(document.getElementById('ce-proj').value);
-  const p=PROJETOS[idx];const k=p.id+'|'+p.obra;
+  const p=PROJETOS[idx]; if(!p)return;
+  const k=p.id+'|'+p.obra;
   const prev=parseFloat(document.getElementById('ce-prev').value);
   const real=parseFloat(document.getElementById('ce-real').value);
   if(!AVANCOS[k])AVANCOS[k]={};
   if(!isNaN(prev))AVANCOS[k].prev=prev;
   if(!isNaN(real))AVANCOS[k].real=real;
   AVANCOS[k].semana='Semana atual';
-  closeMo('mo-crono');renderCronograma();renderDashboard();
-  dbAfterSaveCrono(p.id+'|'+p.obra,AVANCOS[p.id+'|'+p.obra]);
+  renderCronograma();renderDashboard();
+  dbAfterSaveCrono(k,AVANCOS[k]);
+  if(keepOpen){showSaveStatus('✓ Avanço salvo');return;}
+  closeMo('mo-crono');
 }
 function renderCronograma(){
   const q=(document.getElementById('sc-q').value||'').toLowerCase();
@@ -7122,6 +7142,9 @@ function renderCronograma(){
     const tip=f==='g'?`No prazo — Tend.:${xl2str(p.tendencia)} ≤ Cli.:${xl2str(p.prazo_cli)}`:f==='y'?`Atenção — Tend.:${xl2str(p.tendencia)}`:` Atrasado — Tend.:${xl2str(p.tendencia)} > Cli.:${xl2str(p.prazo_cli)}`;
     const grp=`${p.id}|${p.obra}`;
     rows+=`<tr data-group="${grp}" data-group-parent="1">
+      <td class="acoes-left"><button class="btn btn-xs btn-or" onclick="openCronoEdit(${PROJETOS.indexOf(p)})" title="Atualizar avanços">Atualizar</button>
+        <button class="btn btn-xs btn-r" onclick="excluirProjetoDaAba('cronograma','${p.id}','${p.obra}')" title="Excluir apenas da aba Cronograma">🗑 Aba</button>
+      </td>
       <td><code style="font-size:11px;color:var(--tx2)">${p.id}</code></td>
       <td><strong>${p.obra}</strong></td>
       <td>${xl2str(p.inicio)}</td>
@@ -7130,19 +7153,16 @@ function renderCronograma(){
       <td style="color:var(--or);font-weight:700">${xl2str(p.tendencia)}</td>
       <td style="text-align:center">${dotFarol(f,tip)}</td>
       <td>${pct(av.prev)}</td><td style="font-weight:600">${pct(av.real)}</td><td>${ader}</td>
-      <td><button class="btn btn-xs btn-or" onclick="openCronoEdit(${PROJETOS.indexOf(p)})" title="Atualizar avanços">Atualizar</button>
-        <button class="btn btn-xs btn-r" onclick="excluirProjetoDaAba('cronograma','${p.id}','${p.obra}')" title="Excluir apenas da aba Cronograma">🗑 Aba</button>
-      </td>
     </tr>`;
     (p.parciais||[]).forEach(par=>{
       const pf=par.tendencia&&par.prazo_cli?(par.tendencia<=par.prazo_cli?'g':'r'):'y';
       rows+=`<tr data-group="${grp}" style="background:rgba(232,119,34,.04)">
-        <td></td><td style="padding-left:24px;color:var(--or);font-size:12px">↳ ${par.nome}</td>
+        <td class="acoes-left"></td><td></td><td style="padding-left:24px;color:var(--or);font-size:12px">↳ ${par.nome}</td>
         <td>${xl2str(par.inicio)}</td><td style="color:var(--tx2)">${xl2str(par.prazo_cont)}</td>
         <td style="color:var(--r2)">${par.prazo_cli?xl2str(par.prazo_cli):'<span style="color:var(--tx3)">À definir</span>'}</td>
         <td style="color:var(--or)">${xl2str(par.tendencia)}</td>
         <td style="text-align:center">${dotFarol(pf)}</td>
-        <td>—</td><td>—</td><td>—</td><td></td>
+        <td>—</td><td>—</td><td>—</td>
       </tr>`;
     });
   });
@@ -7150,6 +7170,11 @@ function renderCronograma(){
   // Side comments
   renderSideComments('crono-comments','Cronograma');
 }
+let _obsDragIdx=null;
+function obsDragStart(ev,idx){_obsDragIdx=idx;ev.dataTransfer.effectAllowed='move';ev.currentTarget.classList.add('dragging');}
+function obsDragOver(ev){ev.preventDefault();ev.dataTransfer.dropEffect='move';}
+function obsDragEnd(ev){ev.currentTarget.classList.remove('dragging');_obsDragIdx=null;}
+function obsDrop(ev,targetIdx){ev.preventDefault();if(_obsDragIdx===null||_obsDragIdx===targetIdx)return;const item=OBSERVACOES.splice(_obsDragIdx,1)[0];const ni=_obsDragIdx<targetIdx?targetIdx-1:targetIdx;OBSERVACOES.splice(Math.max(0,ni),0,item);saveToStorage();renderObservacoes();renderSideComments('crono-comments','Cronograma');renderSideComments('med-comments','Financeiro');showSaveStatus('✓ Ordem dos comentários atualizada');}
 function renderSideComments(containerId,tipo){
   const el=document.getElementById(containerId);
   if(!el)return;
@@ -7158,9 +7183,9 @@ function renderSideComments(containerId,tipo){
   el.innerHTML=obs.map(o=>{
     const oi=OBSERVACOES.indexOf(o);
     const corBd=o.cor==='g'?'#28c76f':o.cor==='y'?'#ffc107':o.cor==='r'?'#ea5455':'var(--bd)';
-    return`<div style="border-left:3px solid ${corBd};padding:8px 10px;margin-bottom:8px;background:var(--bg3);border-radius:0 var(--rad) var(--rad) 0">
+    return`<div draggable="true" ondragstart="obsDragStart(event,${oi})" ondragover="obsDragOver(event)" ondrop="obsDrop(event,${oi})" ondragend="obsDragEnd(event)" style="border-left:3px solid ${corBd};padding:8px 10px;margin-bottom:8px;background:var(--bg3);border-radius:0 var(--rad) var(--rad) 0">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px">
-        <div style="font-size:11px;font-weight:700;color:var(--or);flex:1;min-width:0">${o.obra||'Geral'}${o.titulo?' — <span style="color:var(--tx2);font-weight:400">'+o.titulo+'</span>':''}</div>
+        <span class="drag-handle" title="Arraste para reordenar">↕</span><div style="font-size:11px;font-weight:700;color:var(--or);flex:1;min-width:0;text-align:left">${o.obra||'Geral'}${o.titulo?' — <span style="color:var(--tx2);font-weight:400">'+o.titulo+'</span>':''}</div>
         <div style="display:flex;gap:2px;flex-shrink:0">
           <button class="btn btn-xs" style="padding:1px 5px;font-size:10px" onclick="openObsModal(${oi},'${tipo}')">✏</button>
           <button class="btn btn-xs btn-r" style="padding:1px 5px;font-size:10px" onclick="if(confirm('Excluir?')){excluirObs(${oi});renderSideComments('${containerId}','${tipo}')}">✕</button>
@@ -7284,7 +7309,7 @@ function getRdoFieldValue(fieldId){
   if(el.dataset.special)return el.dataset.special;
   return el.value;
 }
-function salvarRDO(){
+function salvarRDO(keepOpen=false){
   rdoStoreCurrent(false);
   const itens=Object.values(_rdoBatch);
   if(!itens.length){alert('Nenhuma alteração de RDO para salvar.');return;}
@@ -7293,7 +7318,7 @@ function salvarRDO(){
     if(ei>=0)RDO[ei]=novo;else RDO.push(novo);
   });
   _rdoDirty=false;
-  document.getElementById('mo-rdo').classList.remove('open');
+  if(!keepOpen) document.getElementById('mo-rdo').classList.remove('open');
   renderRDO();updateBadges();saveToStorage();
   itens.forEach(novo=>{
     const rdoToSave = {id:novo.id, obra:novo.obra, atualizacao:String(novo.atualizacao||''),
@@ -7443,25 +7468,14 @@ function ensureDocForProject(projIdx){
 }
 function openDocEdit(idx){
   _editDocIdx=idx;
-  const sel=document.getElementById('dd-proj');
-  const artSel=document.getElementById('dd-proj-arts');
-  const opts=PROJETOS.map((p,i)=>`<option value="${i}">${p.id} — ${p.obra}</option>`).join('');
-  if(sel) sel.innerHTML=opts;
-  if(artSel) artSel.innerHTML=opts;
-  if(idx!==null){
-    const d=DOCUMENTACAO[idx];
-    const projIdx=Math.max(0,PROJETOS.findIndex(p=>p.id===d?.id&&p.obra===d?.obra));
-    if(sel) sel.value=String(projIdx);
-    if(artSel) artSel.value=String(projIdx);
-  }else{
-    if(sel) sel.value='0';
-    if(artSel) artSel.value='0';
-  }
+  const selected=(idx!==null&&DOCUMENTACAO[idx])?((DOCUMENTACAO[idx].id||'')+'|'+(DOCUMENTACAO[idx].obra||'')):'';
+  fillDocSelectsV39(selected);
   loadDocData();
   document.getElementById('mo-doc-seguros').style.display='block';
   document.getElementById('mo-doc-arts').style.display='none';
   document.querySelectorAll('#mo-doc .tab').forEach((b,i)=>{b.classList.toggle('active',i===0);});
-  document.getElementById('mo-doc-title').textContent='Editar Documentação — '+(PROJETOS[parseInt(sel.value,10)]?.obra||'');
+  const ref=parseIdObraValue(document.getElementById('dd-proj')?.value||selected);
+  document.getElementById('mo-doc-title').textContent='Editar Documentação — '+(ref.obra||'');
   openMo('mo-doc');
 }
 function docChecklistManualFlag(d,campo){
@@ -7476,12 +7490,12 @@ function docEffectiveChecklistValue(d,campo){
 function loadDocData(){
   const segSel=document.getElementById('dd-proj');
   const artSel=document.getElementById('dd-proj-arts');
-  const projIdx=parseInt((segSel&&segSel.value!==''?segSel.value:(artSel?artSel.value:'0')),10);
-  if(segSel) segSel.value=String(projIdx);
-  if(artSel) artSel.value=String(projIdx);
-  const d=ensureDocForProject(projIdx);
+  const val=(segSel&&segSel.value!==''?segSel.value:(artSel?artSel.value:''));
+  if(segSel) segSel.value=String(val);
+  if(artSel) artSel.value=String(val);
+  const d=ensureDocForProjectV39(parseIdObraValue(val));
   if(!d)return;
-  document.getElementById('mo-doc-title').textContent='Editar Documentação — '+(PROJETOS[projIdx]?.obra||d.obra||'');
+  document.getElementById('mo-doc-title').textContent='Editar Documentação — '+(d.obra||'');
   document.getElementById('dd-vig-cto').value=dateToISOInput(d.vig_cto);
   // seguros
   const fields=[['sre','sre'],['src','src'],['cf','cf'],['ga','ga'],['gp','gp'],['geo','geo']];
@@ -7508,9 +7522,8 @@ function loadDocData(){
     const el=document.getElementById('dd-'+fid);if(el)el.value=docEffectiveChecklistValue(d,key);
   });
 }
-function salvarDoc(){
-  const projIdx=parseInt(document.getElementById('dd-proj').value,10);
-  const d=ensureDocForProject(projIdx);
+function salvarDoc(keepOpen=false){
+  const d=ensureDocForProjectV39(parseIdObraValue(document.getElementById('dd-proj').value));
   if(!d)return;
   d.vig_cto=document.getElementById('dd-vig-cto').value || ''; // ISO local, sem conversão por timezone
   const fields=[['sre','sre'],['src','src'],['cf','cf'],['ga','ga'],['gp','gp'],['geo','geo']];
@@ -7544,8 +7557,10 @@ function salvarDoc(){
       d[key+'_manual']=false;
     }
   });
-  closeMo('mo-doc');renderDocs();updateBadges();refreshResumoAutomatico();
+  renderDocs();updateBadges();refreshResumoAutomatico();
   dbAfterSaveDoc(d);
+  if(keepOpen){showSaveStatus('✓ Documentação salva');return;}
+  closeMo('mo-doc');
 }
 function buildSegGarStatus(d){
   return bSegGar({sre:d.sre_st,src:d.src_st,cf:d.cf_st,ga:d.ga_st,gp:d.gp_st,geo:d.geo_st});
@@ -7593,6 +7608,10 @@ function renderGarantias(){
   tbody.innerHTML=data.map(d=>{
     const ri=DOCUMENTACAO.indexOf(d);
     return`<tr>
+      <td class="acoes-left">
+        <button class="btn btn-xs btn-or" onclick="openDocEdit(${ri});switchMoDocTab('seguros',null)">✏</button>
+        <button class="btn btn-xs btn-r" onclick="excluirProjetoDaAba('seguros','${d.id}','${d.obra}')" title="Excluir apenas da aba Seguros & Garantias">🗑</button>
+      </td>
       <td style="font-size:10px;font-family:monospace;color:var(--tx2)">${d.id}</td>
       <td style="font-weight:600;max-width:160px">${d.obra}</td>
       <td>${bS(d.status)}</td>
@@ -7606,10 +7625,6 @@ function renderGarantias(){
       <td>${sgSt(d.geo_st)}</td><td>${vigC(d.geo_vig)}</td>
       <td>${buildSegGarStatus(d)}</td>
       <td style="font-size:10px;color:var(--tx3);max-width:200px;white-space:normal;word-break:break-word">${buildSegGarObs(d)||'—'}</td>
-      <td class="nowrap">
-        <button class="btn btn-xs btn-or" onclick="openDocEdit(${ri});switchMoDocTab('seguros',null)">✏</button>
-        <button class="btn btn-xs btn-r" onclick="excluirProjeto(PROJETOS.findIndex(p=>p.id===DOCUMENTACAO[${ri}].id&&p.obra===DOCUMENTACAO[${ri}].obra))" title="Excluir de todas as bases">🗑</button>
-      </td>
     </tr>`;
   }).join('')||'<tr><td colspan="20" style="text-align:center;padding:24px;color:var(--tx3)">Nenhum registro.</td></tr>';
 }
@@ -7634,6 +7649,10 @@ function renderArts(){
     const tipos=buildArtTiposDisplay(d);
     const tiposStr=tipos.length?tipos.join(' · '):'—';
     return`<tr>
+      <td class="acoes-left">
+        <button class="btn btn-xs btn-or" onclick="openDocEdit(${ri});switchMoDocTab('arts',null)">✏</button>
+        <button class="btn btn-xs btn-r" onclick="excluirProjetoDaAba('arts','${d.id}','${d.obra}')" title="Excluir apenas da aba ARTs & Documentos">🗑</button>
+      </td>
       <td style="font-size:10px;font-family:monospace;color:var(--tx2)">${d.id}</td>
       <td style="font-weight:600;max-width:150px">${d.obra}</td>
       <td>${bS(d.status)}</td>
@@ -7645,10 +7664,6 @@ function renderArts(){
       <td>${checklistAlert(d,'che')}</td>
       <td>${checklistAlert(d,'te')}</td>
       <td>${checklistAlert(d,'atc')}</td>
-      <td class="nowrap">
-        <button class="btn btn-xs btn-or" onclick="openDocEdit(${ri});switchMoDocTab('arts',null)">✏</button>
-        <button class="btn btn-xs btn-r" onclick="excluirProjeto(PROJETOS.findIndex(p=>p.id===DOCUMENTACAO[${ri}].id&&p.obra===DOCUMENTACAO[${ri}].obra))" title="Excluir de todas as bases">🗑</button>
-      </td>
     </tr>`;
   }).join('')||'<tr><td colspan="14" style="text-align:center;padding:24px;color:var(--tx3)">Nenhum registro.</td></tr>';
 }
@@ -7843,6 +7858,7 @@ function renderMedicoes(){
     else if(!real&&prev&&prev<hoje){const d=daysBetween(prev,hoje);dias='+'+d+'d (atraso)';diasStyle='color:var(--r2);font-weight:600';}
     const f=calcMedFarol(m);
     return`<tr>
+      <td class="acoes-left"><button class="btn btn-xs" onclick="openMedicaoModal(${MEDICOES.indexOf(m)})">Editar</button> <button class="btn btn-xs btn-r" onclick="excluirMedicao(${MEDICOES.indexOf(m)})">Excluir</button></td>
       <td><code style="font-size:11px;white-space:nowrap">${m.id}</code></td>
       <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${m.cliente}">${m.cliente}</td>
       <td style="white-space:nowrap"><span class="badge ${m.tipo==='Adiantamento'?'bo':'bbl'}">${m.tipo}</span></td>
@@ -7854,7 +7870,6 @@ function renderMedicoes(){
       <td style="color:var(--g2)">${xl2str(m.data_rec_real)}</td>
       <td style="text-align:center;${diasStyle}">${dias}</td>
       <td style="text-align:center">${dotFarol(f)}</td>
-      <td class="nowrap"><button class="btn btn-xs" onclick="openMedicaoModal(${MEDICOES.indexOf(m)})">Editar</button> <button class="btn btn-xs btn-r" onclick="excluirMedicao(${MEDICOES.indexOf(m)})">Excluir</button></td>
     </tr>`;
   }).join('');
   // side comments
@@ -7877,7 +7892,7 @@ function highlightSat(){
   else if(v==='Parcialmente Satisfeito')document.getElementById('fs-lbl-p').style.borderColor='var(--y2)';
   else if(v==='Insatisfeito')document.getElementById('fs-lbl-i').style.borderColor='var(--r2)';
 }
-function salvarSat(){
+function salvarSat(keepOpen=false){
   const pv=document.getElementById('fs-proj').value;if(!pv){alert('Selecione o projeto.');return;}
   const nivel=document.querySelector('input[name="fs-nivel"]:checked')?.value;
   if(!nivel){alert('Selecione o nível de satisfação.');return;}
@@ -7892,8 +7907,10 @@ function salvarSat(){
   novo.id_seq=satIsNew?nextSeq('sat'):(PESQUISAS[parseInt(editIdx)]?.id_seq||nextSeq('sat'));
   if(!satIsNew){PESQUISAS[parseInt(editIdx)]=novo;delete document.getElementById('mo-sat').dataset.editIdx;}
   else PESQUISAS.push(novo);
-  closeMo('mo-sat');renderSatisfacao();refreshResumoAutomatico();
+  renderSatisfacao();refreshResumoAutomatico();
   dbAfterSaveSat(novo,satIsNew);
+  if(keepOpen){document.getElementById('mo-sat').dataset.editIdx=PESQUISAS.findIndex(x=>x.id_seq===novo.id_seq);showSaveStatus('✓ Avaliação salva');return;}
+  closeMo('mo-sat');
 }
 function getSemanaAtual(){
   const d=new Date();
@@ -7984,13 +8001,13 @@ function renderSatisfacao(){
       const pIdx=PESQUISAS.indexOf(p);
       const inclBtn=`<button class="dot ${p.incl_rel?'dg':'dgr'}" title="${p.incl_rel?'Incluir no relatório':'Excluir do relatório'}" onclick="toggleSatRel(${pIdx})"></button>`;
       rows+=`<tr class="${rowCls}" style="font-style:normal">
+        <td class="acoes-left"><button class="btn btn-xs" onclick="editSat(${pIdx})" title="Editar">✏</button> <button class="btn btn-xs btn-r" onclick="deleteSat(${pIdx})" title="Excluir">✕</button></td>
         <td style="text-align:center">${inclBtn}</td>
         <td style="white-space:nowrap">${new Date(p.data).toLocaleDateString('pt-BR')}</td>
         <td style="white-space:nowrap"><code style="font-size:10px">${p.id}</code></td>
         <td style="white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${p.cliente}">${p.cliente}</td>
         <td style="text-align:center"><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:36px;line-height:1;font-style:normal">${f.e}</span><span class="badge ${f.cls}" style="font-size:10px;font-style:normal">${f.l}</span></div></td>
         ${comentCells}
-        <td class="nowrap"><button class="btn btn-xs" onclick="editSat(${pIdx})" title="Editar">✏</button> <button class="btn btn-xs btn-r" onclick="deleteSat(${pIdx})" title="Excluir">✕</button></td>
       </tr>`;
     });
   });
@@ -8071,6 +8088,12 @@ function fillObraSelectFromReferencias(sel, opts={}){
   // v14: após repopular selects, reaplica a busca/ordenação de forma assíncrona e segura.
   if(typeof scheduleEnhanceObraSelects === 'function') scheduleEnhanceObraSelects();
 }
+
+// v39 — seleção de documentação também inclui obras removidas da Base de Projetos
+function parseIdObraValue(v){const raw=String(v||'');const si=raw.indexOf('|');if(si>=0)return{id:raw.slice(0,si),obra:raw.slice(si+1)};const p=PROJETOS[parseInt(raw,10)];return p?{id:p.id,obra:p.obra}:{id:'',obra:''};}
+function ensureDocForProjectV39(ref){const r=(typeof ref==='object'&&ref)?ref:parseIdObraValue(ref);const id=(r.id||'').trim(),obra=(r.obra||'').trim();if(!obra)return null;const p=PROJETOS.find(x=>x.id===id&&x.obra===obra)||PROJETOS.find(x=>x.id===id)||null;let d=DOCUMENTACAO.find(x=>x.id===id&&x.obra===obra);if(!d){d={id:id||p?.id||'',obra:obra||p?.obra||'',status:p?.status||'Concluído',vig_cto:'',sre_st:'N/A',sre_vig:'',src_st:'N/A',src_vig:'',cf_st:'N/A',cf_vig:'',ga_st:'N/A',ga_vig:'',gp_st:'N/A',gp_vig:'',geo_st:'N/A',geo_vig:'',art_st:'Pendente',art_tipos:[],art_outros:'',crono_st:'-',hbe:'-',hbc:'-',mtr:'-',chi:'-',che:'-',te:'-',atc:'-'};DOCUMENTACAO.push(d);}else if(p){d.status=p.status;}return d;}
+function fillDocSelectsV39(selected){const opts=getProjetosReferenciados(true).map(p=>`<option value="${(p.id+'|'+p.obra).replace(/"/g,'&quot;')}">${p.id? p.id+' — ':''}${p.obra}${PROJETOS.some(x=>x.id===p.id&&x.obra===p.obra)?'':' (fora da Base)'}</option>`).join('');['dd-proj','dd-proj-arts'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.innerHTML=opts;if(selected&&[...el.options].some(o=>o.value===selected))el.value=selected;});if(typeof scheduleEnhanceObraSelects==='function')scheduleEnhanceObraSelects();}
+
 // ─── OBSERVAÇÕES ─────────────────────────────────────────────────────────────
 let obsNextId=8;
 let _editObsIdx=null;
@@ -8113,7 +8136,7 @@ function addObsBlocoFor(tipo){
   openObsModal(null, tipo);
   document.getElementById('fo-tipo').value=tipo;
 }
-function salvarObs(){
+function salvarObs(keepOpen=false){
   const obsIsNew = (_editObsIdx===null || _editObsIdx===undefined);
   const anterior = obsIsNew ? null : (OBSERVACOES[_editObsIdx] || {});
   const novo={
@@ -8127,11 +8150,12 @@ function salvarObs(){
     texto:document.getElementById('fo-texto').value
   };
   if(!obsIsNew) OBSERVACOES[_editObsIdx]=novo; else OBSERVACOES.push(novo);
-  closeMo('mo-obs');
   renderObservacoes();
   renderSideComments('crono-comments','Cronograma');
   renderSideComments('med-comments','Financeiro');
   dbAfterSaveObs(novo,obsIsNew);
+  if(keepOpen){_editObsIdx=OBSERVACOES.findIndex(x=>x.id_seq===novo.id_seq);showSaveStatus('✓ Bloco salvo');return;}
+  closeMo('mo-obs');
 }
 function renderObservacoes(){
   const fs=document.getElementById('obs-semana').value;
@@ -8146,9 +8170,10 @@ function renderObservacoes(){
   document.getElementById('obs-lista').innerHTML=data.length?data.map(o=>{
     const colorClass='c-'+(o.cor||'n');
     const tagHtml=o.cor&&o.cor!=='n'?`<span class="obs-tag ${o.cor}">${o.cor==='g'?'🟢':o.cor==='y'?'🟡':'🔴'}</span>`:'';
-    return`<div class="obs-blk ${colorClass}">
+    return`<div class="obs-blk ${colorClass}" draggable="true" ondragstart="obsDragStart(event,${OBSERVACOES.indexOf(o)})" ondragover="obsDragOver(event)" ondrop="obsDrop(event,${OBSERVACOES.indexOf(o)})" ondragend="obsDragEnd(event)">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
-        <div>
+        <span class="drag-handle" title="Arraste para reordenar">↕</span>
+        <div style="flex:1;min-width:0;text-align:left">
           ${o.obra?`<div class="obs-title">${tagHtml}<span class="obs-obra">${o.obra}</span>${o.titulo?`<span class="obs-sep">—</span><span style="color:var(--tx2);font-weight:400">${o.titulo}</span>`:''}</div>`:''}
           <div style="display:flex;gap:6px;margin-bottom:8px">
             <span class="badge bgr" style="font-size:10px">${o.tipo}</span>
@@ -8253,7 +8278,7 @@ function populateAllSelects(){
       const ativos=PROJETOS.filter(p => (p.status === 'Ativo' || p.status === 'Encerrado') && !isOpcaoObraIdCurtoNumerico(p.id,p.obra));
       el.innerHTML = ativos.map((p,i) => `<option value="${PROJETOS.indexOf(p)}">${p.id} — ${p.obra}</option>`).join('');
     } else if (id === 'dd-proj' || id === 'dd-proj-arts') {
-      el.innerHTML = PROJETOS.map((p,i) => ({p,i})).filter(x=>!isOpcaoObraIdCurtoNumerico(x.p.id,x.p.obra)).map(({p,i}) => `<option value="${i}">${p.id} — ${p.obra}</option>`).join('');
+      fillDocSelectsV39(el.value);
     } else {
       fillObraSelectFromReferencias(el,{firstHtml:'<option value="">— Selecione —</option>',mode:'idobra'});
     }
