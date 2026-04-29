@@ -269,6 +269,12 @@ textarea{resize:vertical;min-height:68px}
 <!-- Correção v21: importação Excel com datas preservadas por serial bruto para evitar divergência em RDO -->
 <!-- Correção v22: datas da Base Documentação corrigidas por nome da obra, edição sem perda de 1 dia e PDF em paisagem real -->
 <!-- Correção v19: coluna Histograma incluída no relatório/exportação do RDO -->
+<!-- Correção v23: exportações PPT/PDF com faróis próximos às datas, pendências documentais por tendência, fontes padronizadas e medições sem página em branco -->
+<!-- Correção v24: permite editar nome de cliente/obra em Medições mesmo quando a obra não existe mais na Base de Projetos; preserva valor de contrato de lançamentos inativos -->
+<!-- Correção v25: aumenta fonte do Cronograma nas exportações PPT/PDF e ajusta datas de início para cor escura/legível -->
+<!-- Correção v26: aumenta novamente a fonte do Cronograma no PDF/PPT e aproxima o farol da coluna Tendência -->
+<!-- Correção v25: relatório de Documentação conta Pendências somente pelos campos visíveis com texto Pend. -->
+<!-- Correção v28: valores em cinza mais forte no quadro de Medições do relatório PPT/PDF -->
 </head>
 <body>
 
@@ -546,9 +552,9 @@ textarea{resize:vertical;min-height:68px}
       <th>Ações</th>
       <th onclick="sortRDO('id')" style="cursor:pointer;user-select:none" id="rdo-th-id">ID <span id="rdo-sort-id"></span></th>
       <th onclick="sortRDO('obra')" style="cursor:pointer;user-select:none" id="rdo-th-obra">Obra <span id="rdo-sort-obra"></span></th>
-      <th onclick="sortRDO('atualizacao')" style="cursor:pointer;user-select:none">Última Atualiz. Campo <span id="rdo-sort-atualizacao"></span></th><th title="Verde≤7d / Vermelho>7d / Amarelo=N.I.">⬤</th>
-      <th onclick="sortRDO('enviado')" style="cursor:pointer;user-select:none">RDO Enviado ao Cliente <span id="rdo-sort-enviado"></span></th><th>⬤</th>
-      <th onclick="sortRDO('assinado')" style="cursor:pointer;user-select:none">RDO Assinado Cliente <span id="rdo-sort-assinado"></span></th><th>⬤</th>
+      <th title="Verde≤7d / Vermelho>7d / Amarelo=N.I."></th><th onclick="sortRDO('atualizacao')" style="cursor:pointer;user-select:none">Última Atualiz. Campo <span id="rdo-sort-atualizacao"></span></th>
+      <th></th><th onclick="sortRDO('enviado')" style="cursor:pointer;user-select:none">RDO Enviado ao Cliente <span id="rdo-sort-enviado"></span></th>
+      <th></th><th onclick="sortRDO('assinado')" style="cursor:pointer;user-select:none">RDO Assinado Cliente <span id="rdo-sort-assinado"></span></th>
       <th onclick="sortRDO('resp')" style="cursor:pointer;user-select:none">Responsável <span id="rdo-sort-resp"></span></th>
       <th onclick="sortRDO('modelo')" style="cursor:pointer;user-select:none">Modelo <span id="rdo-sort-modelo"></span></th>
       <th>Histograma Até</th>
@@ -661,6 +667,13 @@ textarea{resize:vertical;min-height:68px}
     <select id="ss-nivel" onchange="renderSatisfacao()"><option value="">Todos níveis</option><option value="Satisfeito">😊 Satisfeito</option><option value="Parcialmente Satisfeito">😐 Parcialmente</option><option value="Insatisfeito">😞 Insatisfeito</option></select>
     <button class="btn btn-or btn-sm" onclick="openSatModal()">+ Nova Avaliação</button>
     <button class="btn btn-r btn-sm" onclick="excluirProjetoDaAbaPrompt('satisfacao')" title="Remove o projeto apenas da aba Pesquisa de Satisfação">🗑 Excluir projeto desta aba</button>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="ph"><span>Observação para o relatório</span></div>
+    <div class="pc">
+      <textarea id="sat-rel-obs" rows="3" style="width:100%;min-height:78px;resize:vertical" placeholder="Ex.: Nesta semana não houve atualização da pesquisa de satisfação." oninput="saveSatRelObs(this.value)"></textarea>
+      <div style="font-size:12px;color:var(--tx3);margin-top:8px">Esta observação será exibida logo após o cabeçalho da seção de Satisfação no relatório quando não houver pesquisa incluída.</div>
+    </div>
   </div>
   <div class="card card-table">
     <div style="font-size:12px;color:var(--tx3);margin-bottom:12px">
@@ -871,7 +884,8 @@ textarea{resize:vertical;min-height:68px}
 <div class="mo" id="mo-med">
   <div class="mo-box">
     <div class="mo-hdr"><div class="mo-title" id="mo-med-title">Lançar / Editar Medição</div><button class="mo-x" onclick="closeMo('mo-med')">×</button></div>
-    <div class="fr"><div class="fg"><label>Projeto *</label><select id="fm-proj"></select></div><div class="fg"><label>Tipo *</label><select id="fm-tipo"><option>Medição</option><option>Adiantamento</option><option>Recebimento</option></select></div></div>
+    <div class="fr"><div class="fg"><label>Projeto *</label><select id="fm-proj" onchange="medProjSelectChanged()"></select></div><div class="fg"><label>Tipo *</label><select id="fm-tipo"><option>Medição</option><option>Adiantamento</option><option>Recebimento</option></select></div></div>
+    <div class="fg"><label>Nome da obra / cliente <small style="color:var(--tx3)">(permite corrigir obra excluída/inativa)</small></label><input type="text" id="fm-cliente-manual" placeholder="Ex.: ANGLO AMERICAN COZINHA"/></div>
     <div class="fr"><div class="fg"><label>Data da Medição</label><input type="date" id="fm-data-med"/></div><div class="fg"><label>Valor (R$) *</label><input type="number" id="fm-valor" step="0.01" min="0"/></div></div>
     <div class="fr"><div class="fg"><label>Data Emissão NF</label><input type="date" id="fm-data-nf"/></div><div class="fg"><label>Prazo Contratual de Pgto (dias)</label><input type="number" id="fm-prazo" value="30" oninput="calcPrevRec()"/></div></div>
     <div class="fr"><div class="fg"><label>Data Prevista Recebimento <small style="color:var(--tx3)">(auto)</small></label><input type="date" id="fm-prev-rec"/></div><div class="fg"><label>Data Real Recebimento</label><input type="date" id="fm-real-rec" oninput="calcFarolMed()"/></div></div>
@@ -1400,87 +1414,87 @@ let RDO = [
     "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
   },
   {
-    "id": "1.24.01395",
+    "id": "P010",
     "obra": "1000 CASAS - ELDORADO DO SUL",
-    "atualizacao": "NÃO INICIADA",
-    "enviado": "NÃO INICIADA",
-    "assinado": "NÃO INICIADA",
+    "atualizacao": 46130,
+    "enviado": 46130,
+    "assinado": 46121,
     "resp": "JOYCE ALVES",
     "modelo": "RDOWEB",
     "histograma": "TERCEIRIZADO - EMPREITADA",
     "obs": ""
   },
   {
-    "id": "1.24.01395",
+    "id": "P003",
     "obra": "1000 CASAS - FAXINAL DO SOTURNO",
-    "atualizacao": 46107,
-    "enviado": 46107,
-    "assinado": 46098,
+    "atualizacao": 46127,
+    "enviado": 46127,
+    "assinado": 46125,
     "resp": "JOYCE ALVES",
     "modelo": "RDOWEB",
     "histograma": "TERCEIRIZADO - EMPREITADA",
     "obs": ""
   },
   {
-    "id": "1.24.01395",
+    "id": "P007",
     "obra": "1000 CASAS - MUÇUM",
-    "atualizacao": 46105,
-    "enviado": 46105,
+    "atualizacao": 46126,
+    "enviado": 46126,
     "assinado": 46098,
     "resp": "ÁGDA FURTADO",
     "modelo": "RDOWEB",
     "histograma": "TERCEIRIZADO - EMPREITADA",
-    "obs": ""
+    "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
   },
   {
-    "id": "1.24.01395",
+    "id": "P004",
     "obra": "1000 CASAS - VERA CRUZ",
-    "atualizacao": 46108,
-    "enviado": 46108,
-    "assinado": "PENDENTE",
+    "atualizacao": 46126,
+    "enviado": 46126,
+    "assinado": 46121,
     "resp": "LUCAS MACHADO",
     "modelo": "RDOWEB",
     "histograma": "TERCEIRIZADO - EMPREITADA",
     "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
   },
   {
-    "id": "1.24.01395",
+    "id": "P006",
     "obra": "1000 CASAS - PINHAL",
-    "atualizacao": 46113,
-    "enviado": 46113,
-    "assinado": 46101,
+    "atualizacao": 46128,
+    "enviado": 46128,
+    "assinado": 46121,
     "resp": "CAIQUE SANTOS",
     "modelo": "RDOWEB",
     "histograma": "TERCEIRIZADO - EMPREITADA",
     "obs": ""
   },
   {
-    "id": "1.24.01395",
+    "id": "P008",
     "obra": "1000 CASAS - TRIUNFO",
-    "atualizacao": 46113,
-    "enviado": 46113,
-    "assinado": 46098,
+    "atualizacao": 46121,
+    "enviado": 46121,
+    "assinado": 46121,
     "resp": "JOYCE ALVES",
     "modelo": "RDOWEB",
     "histograma": "TERCEIRIZADO - EMPREITADA",
     "obs": ""
   },
   {
-    "id": "1.24.01395",
+    "id": "P005",
     "obra": "1000 CASAS - MARQUES DE SOUZA",
-    "atualizacao": 46113,
-    "enviado": 46113,
+    "atualizacao": 46125,
+    "enviado": 46125,
     "assinado": 46087,
     "resp": "ÁGDA FURTADO",
     "modelo": "RDOWEB",
     "histograma": "TERCEIRIZADO - EMPREITADA",
-    "obs": ""
+    "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
   },
   {
     "id": "1.24.01395",
     "obra": "1000 CASAS - RESTINGA SECA",
-    "atualizacao": 46113,
-    "enviado": 46113,
+    "atualizacao": 46129,
+    "enviado": 46129,
     "assinado": 46110,
     "resp": "LUCAS MACHADO",
     "modelo": "RDOWEB",
@@ -1490,24 +1504,24 @@ let RDO = [
   {
     "id": "1.25.01509",
     "obra": "ÁGUAS DO RIO",
-    "atualizacao": "NÃO INICIADA",
-    "enviado": "NÃO INICIADA",
-    "assinado": "NÃO INICIADA",
+    "atualizacao": 46128,
+    "enviado": 46128,
+    "assinado": "PENDENTE",
     "resp": "PENDENTE",
     "modelo": "RDOWEB",
     "histograma": "N/A",
-    "obs": "NÃO INICIADO"
+    "obs": ""
   },
   {
     "id": "1.26.01589",
     "obra": "GNR LARA VILA VELHA",
-    "atualizacao": 46110,
-    "enviado": 46110,
-    "assinado": "PENDENTE",
-    "resp": "JOÃO VITOR / BRUNA",
+    "atualizacao": 46129,
+    "enviado": 46129,
+    "assinado": 46117,
+    "resp": "BRUNA",
     "modelo": "MODELO CLIENTE",
-    "histograma": "ATÉ 29/03/2026",
-    "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
+    "histograma": "ATÉ 08/04/2026",
+    "obs": ""
   },
   {
     "id": "1.26.01590",
@@ -1523,46 +1537,35 @@ let RDO = [
   {
     "id": "1.25.01564",
     "obra": "USIMINAS",
-    "atualizacao": "NÃO INICIADA",
-    "enviado": "NÃO INICIADA",
-    "assinado": "NÃO INICIADA",
-    "resp": "PENDENTE",
+    "atualizacao": "PENDENTE",
+    "enviado": "PENDENTE",
+    "assinado": "PENDENTE",
+    "resp": "MIGUEL",
     "modelo": "MODELO CLIENTE",
-    "histograma": "N/A",
-    "obs": "NÃO INICIADO"
+    "histograma": "PENDENTE",
+    "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
   },
   {
     "id": "1.24.01332",
     "obra": "BN ENGENHARIA",
-    "atualizacao": "NÃO INICIADA",
-    "enviado": "NÃO INICIADA",
-    "assinado": "NÃO INICIADA",
-    "resp": "",
-    "modelo": "MODELO CLIENTE",
-    "histograma": "",
+    "atualizacao": 46129,
+    "enviado": 46129,
+    "assinado": 46011,
+    "resp": "MURILO",
+    "modelo": "RDOWEB",
+    "histograma": "ATÉ 17/04/2026",
     "obs": ""
   },
   {
     "id": "1.25.01530",
     "obra": "CSN",
-    "atualizacao": 46109,
-    "enviado": 46109,
-    "assinado": 46109,
-    "resp": "CLAUDINEI / JOÃO VITOR",
-    "modelo": "RDOWEB",
-    "histograma": "ATÉ 28/03/2026",
-    "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
-  },
-  {
-    "id": "P010",
-    "obra": "1000 CASAS - ELDORADO DO SUL",
-    "atualizacao": 46130,
-    "enviado": 46130,
+    "atualizacao": 46121,
+    "enviado": 46121,
     "assinado": 46121,
-    "resp": "JOYCE ALVES",
+    "resp": "JOÃO VITOR",
     "modelo": "RDOWEB",
-    "histograma": "TERCEIRIZADO - EMPREITADA",
-    "obs": ""
+    "histograma": "ATÉ 09/04/2026",
+    "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
   }
 ];
 
@@ -1571,7 +1574,7 @@ let DOCUMENTACAO = [
     "id": "1.24.01332",
     "obra": "BN ENGENHARIA",
     "status": "Ativo",
-    "vig_cto": "2025-12-31",
+    "vig_cto": 46022,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "N/A",
@@ -1604,7 +1607,7 @@ let DOCUMENTACAO = [
   },
   {
     "id": "1.25.1492",
-    "obra": "ANGO AMERICAN COZINHA",
+    "obra": "ANGLO AMERICAN COZINHA",
     "status": "Concluído",
     "vig_cto": "",
     "sre_st": "N/A",
@@ -1676,7 +1679,7 @@ let DOCUMENTACAO = [
     "id": "1.25.01509",
     "obra": "ÁGUAS DO RIO",
     "status": "Ativo",
-    "vig_cto": "2026-05-31",
+    "vig_cto": 46173,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "N/A",
@@ -1684,11 +1687,11 @@ let DOCUMENTACAO = [
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "Contratado",
-    "ga_vig": "2025-12-12",
+    "ga_vig": 46003,
     "gp_st": "N/A",
     "gp_vig": "",
     "geo_st": "Contratado",
-    "geo_vig": "2026-05-31",
+    "geo_vig": 46173,
     "art_st": "Pendente",
     "art_tipos": [
       "ART Execução/Montagem"
@@ -1707,15 +1710,15 @@ let DOCUMENTACAO = [
     "id": "1.25.01526",
     "obra": "GRÃOS DO PIAUÍ - 55 MÓDULOS E ESTR. METÁLICA",
     "status": "Ativo",
-    "vig_cto": "2026-04-29",
+    "vig_cto": 46141,
     "sre_st": "Pendente",
-    "sre_vig": "2026-04-29",
+    "sre_vig": 46141,
     "src_st": "Pendente",
-    "src_vig": "2026-04-29",
+    "src_vig": 46141,
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "Contratado",
-    "ga_vig": "2026-04-29",
+    "ga_vig": 46141,
     "gp_st": "N/A",
     "gp_vig": "",
     "geo_st": "N/A",
@@ -1739,11 +1742,11 @@ let DOCUMENTACAO = [
     "id": "1.25.01530",
     "obra": "CSN",
     "status": "Ativo",
-    "vig_cto": "2026-04-30",
+    "vig_cto": 46142,
     "sre_st": "Contratado",
-    "sre_vig": "2026-04-07",
+    "sre_vig": 46119,
     "src_st": "Contratado",
-    "src_vig": "2026-04-07",
+    "src_vig": 46119,
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "N/A",
@@ -1771,7 +1774,7 @@ let DOCUMENTACAO = [
     "id": "1.25.01540",
     "obra": "SERRA VERDE",
     "status": "Ativo",
-    "vig_cto": "2026-02-13",
+    "vig_cto": 46066,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "N/A",
@@ -1779,7 +1782,7 @@ let DOCUMENTACAO = [
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "Contratado",
-    "ga_vig": "2026-06-30",
+    "ga_vig": 46203,
     "gp_st": "N/A",
     "gp_vig": "",
     "geo_st": "N/A",
@@ -1800,7 +1803,7 @@ let DOCUMENTACAO = [
     "id": "1.25.01564",
     "obra": "USIMINAS",
     "status": "Ativo",
-    "vig_cto": "2026-12-18",
+    "vig_cto": 46374,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "N/A",
@@ -1832,15 +1835,15 @@ let DOCUMENTACAO = [
     "id": "1.25.01578",
     "obra": "GRÃOS DO PIAUÍ - OBRAS CIVIS",
     "status": "Ativo",
-    "vig_cto": "2026-07-26",
+    "vig_cto": 46229,
     "sre_st": "Contratado",
-    "sre_vig": "2026-07-26",
+    "sre_vig": 46229,
     "src_st": "Contratado",
-    "src_vig": "2026-07-26",
+    "src_vig": 46229,
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "Contratado",
-    "ga_vig": "2026-07-26",
+    "ga_vig": 46229,
     "gp_st": "N/A",
     "gp_vig": "",
     "geo_st": "N/A",
@@ -1863,15 +1866,15 @@ let DOCUMENTACAO = [
     "id": "1.26.01580",
     "obra": "GRÃOS DO PIAUÍ - PERFURAÇÃO POÇOS",
     "status": "Ativo",
-    "vig_cto": "2026-06-04",
+    "vig_cto": 46177,
     "sre_st": "Pendente",
-    "sre_vig": "2026-05-02",
+    "sre_vig": 46144,
     "src_st": "Pendente",
-    "src_vig": "2026-05-02",
+    "src_vig": 46144,
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "Contratado",
-    "ga_vig": "2026-06-04",
+    "ga_vig": 46177,
     "gp_st": "N/A",
     "gp_vig": "",
     "geo_st": "N/A",
@@ -1952,11 +1955,11 @@ let DOCUMENTACAO = [
     "id": "P003",
     "obra": "1000 CASAS - FAXINAL DO SOTURNO",
     "status": "Ativo",
-    "vig_cto": "2026-01-27",
+    "vig_cto": 46049,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "Contratado",
-    "src_vig": "2026-11-10",
+    "src_vig": 46336,
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "N/A",
@@ -1984,11 +1987,11 @@ let DOCUMENTACAO = [
     "id": "P007",
     "obra": "1000 CASAS - MUÇUM",
     "status": "Ativo",
-    "vig_cto": "2026-04-28",
+    "vig_cto": 46140,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "Contratado",
-    "src_vig": "2026-08-10",
+    "src_vig": 46244,
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "N/A",
@@ -2016,11 +2019,11 @@ let DOCUMENTACAO = [
     "id": "P004",
     "obra": "1000 CASAS - VERA CRUZ",
     "status": "Ativo",
-    "vig_cto": "2026-04-10",
+    "vig_cto": 46122,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "Contratado",
-    "src_vig": "2026-12-31",
+    "src_vig": 46387,
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "N/A",
@@ -2048,11 +2051,11 @@ let DOCUMENTACAO = [
     "id": "P008",
     "obra": "1000 CASAS - TRIUNFO",
     "status": "Ativo",
-    "vig_cto": "2026-04-10",
+    "vig_cto": 46122,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "Contratado",
-    "src_vig": "2026-12-31",
+    "src_vig": 46387,
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "N/A",
@@ -2080,11 +2083,11 @@ let DOCUMENTACAO = [
     "id": "P006",
     "obra": "1000 CASAS - PINHAL",
     "status": "Ativo",
-    "vig_cto": "2026-04-10",
+    "vig_cto": 46122,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "Contratado",
-    "src_vig": "2026-12-31",
+    "src_vig": 46387,
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "N/A",
@@ -2112,11 +2115,11 @@ let DOCUMENTACAO = [
     "id": "P005",
     "obra": "1000 CASAS - MARQUES DE SOUZA",
     "status": "Ativo",
-    "vig_cto": "2026-04-10",
+    "vig_cto": 46122,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "Contratado",
-    "src_vig": "2026-11-10",
+    "src_vig": 46336,
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "N/A",
@@ -2144,11 +2147,11 @@ let DOCUMENTACAO = [
     "id": "P009",
     "obra": "1000 CASAS - RESTINGA SECA",
     "status": "Ativo",
-    "vig_cto": "2026-05-02",
+    "vig_cto": 46144,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "Contratado",
-    "src_vig": "2026-06-30",
+    "src_vig": 46203,
     "cf_st": "N/A",
     "cf_vig": "",
     "ga_st": "N/A",
@@ -2176,7 +2179,7 @@ let DOCUMENTACAO = [
     "id": "P010",
     "obra": "1000 CASAS - ELDORADO DO SUL",
     "status": "Ativo",
-    "vig_cto": "2026-06-27",
+    "vig_cto": 46200,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "Pendente",
@@ -2208,7 +2211,7 @@ let DOCUMENTACAO = [
     "id": "1.26.01589",
     "obra": "GNR LARA VILA VELHA",
     "status": "Ativo",
-    "vig_cto": "2026-05-30",
+    "vig_cto": 46172,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "N/A",
@@ -2239,7 +2242,7 @@ let DOCUMENTACAO = [
     "id": "1.26.01590",
     "obra": "GNR LARA MAUÁ",
     "status": "Ativo",
-    "vig_cto": "2026-06-29",
+    "vig_cto": 46202,
     "sre_st": "N/A",
     "sre_vig": "",
     "src_st": "N/A",
@@ -2445,6 +2448,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46151,
     "data_rec_real": 46134,
+    "dias_atraso": 0,
     "farol": 1,
     "obs": "Medição 3"
   },
@@ -2460,6 +2464,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46151,
     "data_rec_real": 46134,
+    "dias_atraso": 0,
     "farol": 1,
     "obs": "Reajuste Medição 3 (7,52%)"
   },
@@ -2507,6 +2512,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46151,
     "data_rec_real": 46134,
+    "dias_atraso": 0,
     "farol": 1,
     "obs": "Medição 3"
   },
@@ -2522,6 +2528,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46151,
     "data_rec_real": 46134,
+    "dias_atraso": 0,
     "farol": 1,
     "obs": "Reajuste Medição 3 (7,32%)"
   },
@@ -2537,6 +2544,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46151,
     "data_rec_real": 46134,
+    "dias_atraso": 0,
     "farol": 1,
     "obs": "Medição 1 + 1A"
   },
@@ -2552,6 +2560,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46151,
     "data_rec_real": 46134,
+    "dias_atraso": 0,
     "farol": 1,
     "obs": "Reajuste Medição 1 + 1A"
   },
@@ -2579,22 +2588,6 @@ let MEDICOES = [
     "tipo": "Medição",
     "data_med": 46105,
     "valor": 130112.36,
-    "data_nf": null,
-    "prazo_pgto": 30,
-    "data_rec_prev": null,
-    "data_rec_real": null,
-    "dias_atraso": 0,
-    "farol": 2,
-    "obs": "Em análise SEHAB."
-  },
-  {
-    "id_seq": "med_0014",
-    "id": "P006",
-    "cliente": "1000 CASAS - MARQUES DE SOUZA",
-    "valor_contrato": 1539999.9,
-    "tipo": "Medição",
-    "data_med": 46105,
-    "valor": 178931.08,
     "data_nf": null,
     "prazo_pgto": 30,
     "data_rec_prev": null,
@@ -2711,6 +2704,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46087,
     "data_rec_real": 46128,
+    "dias_atraso": 0,
     "farol": 1,
     "obs": ""
   },
@@ -2726,6 +2720,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46087,
     "data_rec_real": 46128,
+    "dias_atraso": 0,
     "farol": 1,
     "obs": ""
   },
@@ -2764,7 +2759,7 @@ let MEDICOES = [
   {
     "id_seq": "med_0027",
     "id": "1.25.1492",
-    "cliente": "ANGO AMERICAN COZINHA",
+    "cliente": "ANGLO AMERICAN COZINHA",
     "valor_contrato": 7847131.2,
     "tipo": "Medição",
     "data_med": 45953,
@@ -2780,7 +2775,7 @@ let MEDICOES = [
   {
     "id_seq": "med_0028",
     "id": "1.25.1492",
-    "cliente": "ANGO AMERICAN COZINHA",
+    "cliente": "ANGLO AMERICAN COZINHA",
     "valor_contrato": 7847131.2,
     "tipo": "Medição",
     "data_med": 45985,
@@ -2796,7 +2791,7 @@ let MEDICOES = [
   {
     "id_seq": "med_0029",
     "id": "1.25.1492",
-    "cliente": "ANGO AMERICAN COZINHA",
+    "cliente": "ANGLO AMERICAN COZINHA",
     "valor_contrato": 7847131.2,
     "tipo": "Medição",
     "data_med": 46009,
@@ -2812,7 +2807,7 @@ let MEDICOES = [
   {
     "id_seq": "med_0030",
     "id": "1.25.1492",
-    "cliente": "ANGO AMERICAN COZINHA",
+    "cliente": "ANGLO AMERICAN COZINHA",
     "valor_contrato": 7847131.2,
     "tipo": "Medição",
     "data_med": 45704,
@@ -2828,7 +2823,7 @@ let MEDICOES = [
   {
     "id_seq": "med_0031",
     "id": "1.25.1492",
-    "cliente": "ANGO AMERICAN COZINHA",
+    "cliente": "ANGLO AMERICAN COZINHA",
     "valor_contrato": 7847131.2,
     "tipo": "Medição",
     "data_med": 45704,
@@ -2844,7 +2839,7 @@ let MEDICOES = [
   {
     "id_seq": "med_0032",
     "id": "1.25.1492",
-    "cliente": "ANGO AMERICAN COZINHA",
+    "cliente": "ANGLO AMERICAN COZINHA",
     "valor_contrato": 7847131.2,
     "tipo": "Medição",
     "data_med": 45727,
@@ -3509,6 +3504,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46163,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3524,6 +3520,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46163,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3539,6 +3536,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46174,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3554,6 +3552,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46175,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3569,6 +3568,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46175,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3584,6 +3584,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46176,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3599,6 +3600,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46176,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3614,6 +3616,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46176,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3629,6 +3632,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46177,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3644,6 +3648,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46177,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3659,6 +3664,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46177,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3674,6 +3680,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46180,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3689,6 +3696,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46180,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3704,6 +3712,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46182,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3719,6 +3728,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46187,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3734,6 +3744,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46188,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3749,6 +3760,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46188,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3764,6 +3776,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46189,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3779,6 +3792,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46189,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3794,6 +3808,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46189,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3809,6 +3824,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46189,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3824,6 +3840,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46189,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3839,6 +3856,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46194,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3854,6 +3872,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46195,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3869,6 +3888,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46195,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3884,6 +3904,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46197,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3899,6 +3920,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46198,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3914,6 +3936,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46198,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3929,6 +3952,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46198,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3944,6 +3968,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46198,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3959,6 +3984,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46198,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3974,6 +4000,7 @@ let MEDICOES = [
     "prazo_pgto": 90,
     "data_rec_prev": 46212,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -3981,15 +4008,14 @@ let MEDICOES = [
     "id_seq": "med_0105",
     "id": "1.26.01589",
     "cliente": "GNR LARA VILA VELHA",
-    "valor_contrato": 3529097.21,
+    "valor_contrato": 0,
     "tipo": "Medição",
     "data_med": null,
-    "valor": 888274.3,
+    "valor": 882274.3,
     "data_nf": 46055,
     "prazo_pgto": 20,
     "data_rec_prev": 46138,
     "data_rec_real": 46063,
-    "dias_atraso": 0,
     "farol": 1,
     "obs": ""
   },
@@ -4021,6 +4047,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46139,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": "Faturamento autorizado em 16/04/26."
   },
@@ -4036,6 +4063,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": null,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": "Medição 2 - Em análise técnica SEHAB."
   },
@@ -4051,6 +4079,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": null,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": "Reajuste Medição 2."
   },
@@ -4066,6 +4095,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": null,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": "Medição 1 + 1A - Em análise técnica SEHAB."
   },
@@ -4081,6 +4111,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": null,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": "Reajuste Medição 1 + 1A."
   },
@@ -4096,6 +4127,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46155,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4111,6 +4143,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46155,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4126,6 +4159,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46155,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4141,6 +4175,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46155,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4156,6 +4191,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46155,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4171,6 +4207,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46155,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4186,6 +4223,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46155,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4201,6 +4239,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46155,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4216,6 +4255,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46156,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4231,6 +4271,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46156,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4246,6 +4287,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46156,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4261,6 +4303,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46156,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4276,6 +4319,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46156,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4291,6 +4335,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46156,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4306,6 +4351,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46156,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4321,6 +4367,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46164,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4336,6 +4383,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46164,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4351,6 +4399,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46164,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4366,6 +4415,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46164,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4381,6 +4431,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46164,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4396,6 +4447,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46164,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4411,6 +4463,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46185,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4426,6 +4479,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46185,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4441,6 +4495,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46185,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4456,6 +4511,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46185,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4471,6 +4527,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46185,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4486,6 +4543,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46185,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4501,6 +4559,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46185,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4516,6 +4575,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46185,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4531,6 +4591,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46186,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4546,6 +4607,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46186,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4561,6 +4623,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46186,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4576,6 +4639,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46186,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4591,6 +4655,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46186,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4606,6 +4671,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46186,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4621,6 +4687,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46186,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4636,6 +4703,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46194,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4651,6 +4719,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46194,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4666,6 +4735,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46194,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4681,6 +4751,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46194,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4696,6 +4767,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46194,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4711,6 +4783,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46194,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4726,6 +4799,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46215,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4741,6 +4815,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46215,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4756,6 +4831,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46215,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4771,6 +4847,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46215,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4786,6 +4863,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46215,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4801,6 +4879,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46215,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4816,6 +4895,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46215,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4831,6 +4911,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46215,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4846,6 +4927,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46216,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4861,6 +4943,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46216,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4876,6 +4959,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46216,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4891,6 +4975,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46216,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4906,6 +4991,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46216,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4921,6 +5007,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46216,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4936,6 +5023,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46216,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4951,6 +5039,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46224,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4966,6 +5055,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46224,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4981,6 +5071,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46224,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -4996,6 +5087,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46224,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5011,6 +5103,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46224,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5026,6 +5119,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46224,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5041,6 +5135,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46245,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5056,6 +5151,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46245,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5071,6 +5167,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46245,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5086,6 +5183,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46245,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5101,6 +5199,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46245,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5116,6 +5215,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46245,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5131,6 +5231,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46245,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5146,6 +5247,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46245,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5161,6 +5263,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46246,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5176,6 +5279,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46246,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5191,6 +5295,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46246,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5206,6 +5311,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46246,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5221,6 +5327,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46246,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5236,6 +5343,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46246,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5251,6 +5359,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46246,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5266,6 +5375,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46254,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5281,6 +5391,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46254,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5296,6 +5407,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46254,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5311,6 +5423,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46254,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5326,6 +5439,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46254,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5341,6 +5455,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46254,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5356,6 +5471,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46275,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5371,6 +5487,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46275,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5386,6 +5503,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46275,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5401,6 +5519,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46275,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5416,6 +5535,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46275,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5431,6 +5551,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46275,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5446,6 +5567,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46275,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5461,6 +5583,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46275,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5476,6 +5599,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46276,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5491,6 +5615,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46276,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5506,6 +5631,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46276,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5521,6 +5647,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46276,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5536,6 +5663,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46276,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5551,6 +5679,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46276,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5566,6 +5695,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46276,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5581,6 +5711,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46284,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5596,6 +5727,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46284,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5611,6 +5743,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46284,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5626,6 +5759,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46284,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5641,6 +5775,7 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46284,
     "data_rec_real": null,
+    "dias_atraso": 0,
     "farol": 2,
     "obs": ""
   },
@@ -5656,6 +5791,67 @@ let MEDICOES = [
     "prazo_pgto": 30,
     "data_rec_prev": 46284,
     "data_rec_real": null,
+    "dias_atraso": 0,
+    "farol": 2,
+    "obs": ""
+  },
+  {
+    "id_seq": "med_1777396179132_iiafyx",
+    "id": "P001",
+    "cliente": "1000 CASAS - SALVADOR DO SUL",
+    "valor_contrato": 0,
+    "tipo": "Medição",
+    "data_med": null,
+    "valor": 37708.95,
+    "data_nf": 46050,
+    "prazo_pgto": 30,
+    "data_rec_prev": 46080,
+    "data_rec_real": 46080,
+    "farol": 1,
+    "obs": ""
+  },
+  {
+    "id_seq": "med_1777396235595_fbzgf5",
+    "id": "P001",
+    "cliente": "1000 CASAS - SALVADOR DO SUL",
+    "valor_contrato": 0,
+    "tipo": "Medição",
+    "data_med": null,
+    "valor": 107948.89,
+    "data_nf": 46050,
+    "prazo_pgto": 30,
+    "data_rec_prev": 46080,
+    "data_rec_real": 46080,
+    "farol": 1,
+    "obs": ""
+  },
+  {
+    "id_seq": "med_1777396293403_2p0q5s",
+    "id": "P001",
+    "cliente": "1000 CASAS - SALVADOR DO SUL",
+    "valor_contrato": 0,
+    "tipo": "Medição",
+    "data_med": null,
+    "valor": 106680.65,
+    "data_nf": 46063,
+    "prazo_pgto": 30,
+    "data_rec_prev": 46093,
+    "data_rec_real": 46093,
+    "farol": 1,
+    "obs": ""
+  },
+  {
+    "id_seq": "med_1777396376378_29bh5c",
+    "id": "P001",
+    "cliente": "1000 CASAS - SALVADOR DO SUL",
+    "valor_contrato": 0,
+    "tipo": "Medição",
+    "data_med": null,
+    "valor": 71923.89,
+    "data_nf": 46121,
+    "prazo_pgto": 30,
+    "data_rec_prev": 46151,
+    "data_rec_real": null,
     "farol": 2,
     "obs": ""
   }
@@ -5664,334 +5860,208 @@ let MEDICOES = [
 let PESQUISAS = [
   {
     "id_seq": "sat_0001",
-    "incl_rel": false,
     "id": "1.24.01332",
     "cliente": "BN ENGENHARIA",
-    "data": "2026-03-16",
-    "nivel": "Parcialmente Satisfeito",
+    "data": 46097,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "O CLIENTE NÃO RESPONDEU A NOSSA SOLICITAÇÃO DA PESQUISA. SEM COMENTÁRIOS.",
     "qualidade": "",
     "seguranca": "",
     "equipe": "",
     "comunicacao": "",
-    "comentarios": ""
+    "incl_rel": false
   },
   {
     "id_seq": "sat_0002",
-    "incl_rel": false,
     "id": "1.25.1492",
-    "cliente": "ANGO AMERICAN COZINHA",
-    "data": "2026-03-16",
-    "nivel": "Satisfeito",
+    "cliente": "ANGLO AMERICAN COZINHA",
+    "data": 46097,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "Retornos ágeis, com pontuais demoras.",
     "qualidade": "Reforçar conferência final.",
     "seguranca": "",
     "equipe": "Equipe prestativa.",
     "comunicacao": "Comunicação ágil.",
-    "comentarios": ""
+    "incl_rel": false
   },
   {
     "id_seq": "sat_0003",
-    "incl_rel": false,
     "id": "1.25.01433",
-    "cliente": "BARBOSA MELLO\nEm 18/03/26 tivemos uma formalização da pesquisa conforme registro no próximo Slide.",
-    "data": "2026-03-16",
-    "nivel": "Parcialmente Satisfeito",
+    "cliente": "BARBOSA MELLO\r\nEm 18/03/26 tivemos uma formalização da pesquisa conforme registro no próximo Slide.",
+    "data": 46097,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "Solicitado mais agilidade nas tratativas.",
     "qualidade": "Qualidade ainda em avaliação pela Contratante.",
     "seguranca": "",
     "equipe": "Equipe aberta à tratativas de campo.",
     "comunicacao": "",
-    "comentarios": ""
+    "incl_rel": false
   },
   {
     "id_seq": "sat_0004",
-    "incl_rel": false,
     "id": "1.25.01530",
     "cliente": "CSN",
-    "data": "2026-03-10",
-    "nivel": "Parcialmente Satisfeito",
+    "data": 46091,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "Cobrado aderência ao cronograma.",
     "qualidade": "Correções pontuais necessárias.",
     "seguranca": "",
     "equipe": "Necessita mais alinhamento.",
     "comunicacao": "Exige maior integração prévia.",
-    "comentarios": ""
-  },
-  {
-    "id_seq": "sat_0005",
-    "incl_rel": false,
-    "id": "",
-    "cliente": "",
-    "data": "2026-03-25",
-    "nivel": "Insatisfeito",
-    "prazo": "Cliente insatisfeito com o atraso no cronograma da edificação P15: a entrega, prevista para 14/04/26, está com tendência para 23/04/26. Também aponta falhas na mobilização de equipamentos e na disponibilidade de operador para execução do plano de recuperação. Foi feito um alerta prévio, antes de eventual notificação, e o cliente mantém 14/04/26 como prazo final.",
-    "qualidade": "",
-    "seguranca": "",
-    "equipe": "",
-    "comunicacao": "",
-    "comentarios": ""
-  },
-  {
-    "id_seq": "sat_0006",
-    "incl_rel": false,
-    "id": "",
-    "cliente": "",
-    "data": "2026-04-02",
-    "nivel": "Parcialmente Satisfeito",
-    "prazo": "Cliente apontou falhas de alinhamento, planejamento e controle de qualidade, com retrabalhos e avarias em campo que impactaram a percepção final da entrega (foi necessária a retirada da escada do site para refazer a pintura na filial de Contagem).",
-    "qualidade": "",
-    "seguranca": "",
-    "equipe": "",
-    "comunicacao": "",
-    "comentarios": ""
-  },
-  {
-    "id_seq": "sat_0007",
-    "incl_rel": false,
-    "id": "",
-    "cliente": "",
-    "data": "2026-04-15",
-    "nivel": "Parcialmente Satisfeito",
-    "prazo": "O cliente permanece parcialmente insatisfeito, pois a equipe de campo ainda não apresenta o desempenho esperado para recuperação do cronograma, mesmo com o apoio disponibilizado de mão de obra, cedido pelo próprio cliente, para acelerar a conclusão da obra.",
-    "qualidade": "",
-    "seguranca": "",
-    "equipe": "",
-    "comunicacao": "",
-    "comentarios": ""
+    "incl_rel": false
   },
   {
     "id_seq": "sat_0008",
-    "incl_rel": false,
     "id": "1.25.01540",
     "cliente": "SERRA VERDE",
-    "data": "2026-03-16",
-    "nivel": "Parcialmente Satisfeito",
+    "data": 46097,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "Houve atraso pontual.",
     "qualidade": "Ajustes atendidos adequadamente.",
     "seguranca": "",
     "equipe": "Boa resposta da equipe.",
     "comunicacao": "Comunicação adequada.",
-    "comentarios": ""
-  },
-  {
-    "id_seq": "sat_0009",
-    "incl_rel": false,
-    "id": "",
-    "cliente": "",
-    "data": "2026-03-31",
-    "nivel": "Parcialmente Satisfeito",
-    "prazo": "O cliente demonstrou insatisfação pontual após o recebimento do módulo, em razão do descolamento do piso vinílico identificado um dia após a entrega do produto final.",
-    "qualidade": "",
-    "seguranca": "",
-    "equipe": "",
-    "comunicacao": "",
-    "comentarios": ""
-  },
-  {
-    "id_seq": "sat_0010",
-    "incl_rel": false,
-    "id": "",
-    "cliente": "",
-    "data": "2026-04-14",
-    "nivel": "Parcialmente Satisfeito",
-    "prazo": "O cliente manteve as considerações apontadas na pesquisa anterior, e solicita celeridade nas tratativas da manutenção pós-obra.",
-    "qualidade": "",
-    "seguranca": "",
-    "equipe": "",
-    "comunicacao": "",
-    "comentarios": ""
+    "incl_rel": false
   },
   {
     "id_seq": "sat_0011",
-    "incl_rel": false,
     "id": "1.25.01564",
     "cliente": "USIMINAS",
-    "data": "2026-03-16",
-    "nivel": "Satisfeito",
+    "data": 46097,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "Boa percepção do andamento.",
     "qualidade": "Boa aceitação da condução.",
     "seguranca": "Atuação reconhecida.",
     "equipe": "Equipe engajada.",
     "comunicacao": "Comunicação positiva.",
-    "comentarios": ""
-  },
-  {
-    "id_seq": "sat_0012",
-    "incl_rel": false,
-    "id": "",
-    "cliente": "",
-    "data": "2023-03-24",
-    "nivel": "Insatisfeito",
-    "prazo": "Cliente demonstra insatisfação em virtude do desvio do cronograma validado, cujo término inicialmente previsto para 22/05/26, foi alterado para 19/06/26. Em virtude deste cenário, recebemos uma notificação em 24/03/26.",
-    "qualidade": "",
-    "seguranca": "",
-    "equipe": "",
-    "comunicacao": "",
-    "comentarios": ""
-  },
-  {
-    "id_seq": "sat_0013",
-    "incl_rel": false,
-    "id": "",
-    "cliente": "",
-    "data": "2026-04-02",
-    "nivel": "Satisfeito",
-    "prazo": "Cliente sinalizou satisfação com a agilidade na resposta e com o plano de ação apresentado para mitigação do desvio e recuperação parcial do prazo do cronograma.",
-    "qualidade": "",
-    "seguranca": "",
-    "equipe": "",
-    "comunicacao": "",
-    "comentarios": ""
-  },
-  {
-    "id_seq": "sat_0014",
-    "incl_rel": false,
-    "id": "",
-    "cliente": "",
-    "data": "2026-04-15",
-    "nivel": "Parcialmente Satisfeito",
-    "prazo": "O cliente demonstrou insatisfação em relação ao início de atraso no cronograma, decorrente da falha na vistoria do munck, com risco de impacto nas próximas etapas. Foi reforçado que não será aceito desvio da data final de 08/06/26, sendo necessária a recuperação do atraso diretamente em campo.",
-    "qualidade": "",
-    "seguranca": "",
-    "equipe": "",
-    "comunicacao": "",
-    "comentarios": ""
+    "incl_rel": false
   },
   {
     "id_seq": "sat_0015",
-    "incl_rel": false,
     "id": "1.25.01526",
     "cliente": "GRÃOS DO PIAUÍ - 55 MÓDULOS E ESTR. METÁLICA",
-    "data": "2026-03-12",
-    "nivel": "Insatisfeito",
+    "data": 46093,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "Atrasos e reprogramações.",
     "qualidade": "Ajustes em andamento.",
     "seguranca": "",
     "equipe": "Foi solicitado maior previsibilidade das entregas.",
     "comunicacao": "Solicitado mais alinhamento nas comunicações.",
-    "comentarios": ""
+    "incl_rel": false
   },
   {
     "id_seq": "sat_0016",
-    "incl_rel": false,
     "id": "1.25.01578",
     "cliente": "GRÃOS DO PIAUÍ - OBRAS CIVIS",
-    "data": "2026-03-12",
-    "nivel": "Insatisfeito",
+    "data": 46093,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "",
     "qualidade": "",
     "seguranca": "",
     "equipe": "",
     "comunicacao": "",
-    "comentarios": ""
+    "incl_rel": false
   },
   {
     "id_seq": "sat_0017",
-    "incl_rel": false,
     "id": "1.26.01580",
     "cliente": "GRÃOS DO PIAUÍ - PERFURAÇÃO POÇOS",
-    "data": "2026-03-12",
-    "nivel": "Insatisfeito",
+    "data": 46093,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "",
     "qualidade": "",
     "seguranca": "",
     "equipe": "",
     "comunicacao": "",
-    "comentarios": ""
+    "incl_rel": false
   },
   {
     "id_seq": "sat_0018",
-    "incl_rel": false,
     "id": "1.24.01395",
     "cliente": "1000 CASAS",
-    "data": "2026-03-16",
-    "nivel": "Parcialmente Satisfeito",
+    "data": 46097,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "O CLIENTE NÃO RESPONDEU A NOSSA SOLICITAÇÃO DA PESQUISA. SEM COMENTÁRIOS.",
     "qualidade": "",
     "seguranca": "",
     "equipe": "",
     "comunicacao": "",
-    "comentarios": ""
+    "incl_rel": false
   },
   {
     "id_seq": "sat_0019",
-    "incl_rel": false,
     "id": "1.25.01470",
     "cliente": "VIRTU SANTO ANTÔNIO DOS LOPES",
-    "data": "2026-03-16",
-    "nivel": "Parcialmente Satisfeito",
+    "data": 46097,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "Atendimento bom, com pendências.",
     "qualidade": "Ressalvas em materiais e acabamento.",
     "seguranca": "",
     "equipe": "Equipe prestativa, com ressalvas na montagem.",
     "comunicacao": "Comunicação bem avaliada.",
-    "comentarios": ""
-  },
-  {
-    "id_seq": "sat_0020",
-    "incl_rel": false,
-    "id": "",
-    "cliente": "",
-    "data": "2026-04-02",
-    "nivel": "Parcialmente Satisfeito",
-    "prazo": "O cliente manteve as considerações apontadas na pesquisa anterior, realizada em 16/03/26.",
-    "qualidade": "",
-    "seguranca": "",
-    "equipe": "",
-    "comunicacao": "",
-    "comentarios": ""
+    "incl_rel": false
   },
   {
     "id_seq": "sat_0021",
-    "incl_rel": false,
     "id": "1.25.01455",
     "cliente": "ANGLO AMERICAN - 04 MÓDULOS",
-    "data": "2026-03-16",
-    "nivel": "Parcialmente Satisfeito",
+    "data": 46097,
+    "nivel": 3,
+    "comentario": "",
     "prazo": "O CLIENTE NÃO RESPONDEU A NOSSA SOLICITAÇÃO DA PESQUISA. SEM COMENTÁRIOS.",
     "qualidade": "",
     "seguranca": "",
     "equipe": "",
     "comunicacao": "",
-    "comentarios": ""
+    "incl_rel": false
   }
 ];
 
 let OBSERVACOES = [
   {
-    "id": 1,
     "id_seq": "obs_0001",
+    "id": "1",
     "obra": "BN ENGENHARIA",
     "tipo": "Cronograma",
     "semana": 16,
     "cor": "y",
     "titulo": "Pendência Liberação 17º Pavto",
-    "texto": "• Cliente informou necessidade de mais 3 semanas para a finalização dos banheiros do 23º ao 27º pavtos.\n• Previsão de liberação do 17º Pavto pelo cliente em 11/05/26.\n"
+    "texto": "• Cliente informou necessidade de mais 3 semanas para a finalização dos banheiros do 23º ao 27º pavtos.\r\n• Previsão de liberação do 17º Pavto pelo cliente em 11/05/26."
   },
   {
-    "id": 2,
     "id_seq": "obs_0002",
+    "id": "2",
     "obra": "ÁGUAS DO RIO",
     "tipo": "Cronograma",
     "semana": 16,
     "cor": "g",
     "titulo": "Risco de atraso",
-    "texto": "• Cliente solicitou inclusão de atividade em nosso cronograma, entre os dias 15/05 a 29/05/26 para montagem de equipamento  da AEGEA.\n\n"
+    "texto": "• Cliente solicitou inclusão de atividade em nosso cronograma, entre os dias 15/05 a 29/05/26 para montagem de equipamento  da AEGEA."
   },
   {
-    "id": 6,
     "id_seq": "obs_0006",
+    "id": "6",
     "obra": "BN ENGENHARIA",
     "tipo": "Geral da Semana",
     "semana": 16,
     "cor": "y",
     "titulo": "",
-    "texto": "• 04 Banheiros prontos para ser realizado o check list com o cliente.\n• O cliente pontuou que o check list só será realizado após o recebimento do laudo do teste hidráulico por banheiro, realizado em fábrica."
+    "texto": "• 04 Banheiros prontos para ser realizado o check list com o cliente.\r\n• O cliente pontuou que o check list só será realizado após o recebimento do laudo do teste hidráulico por banheiro, realizado em fábrica."
   },
   {
-    "id": 8,
     "id_seq": "obs_1777032687418_0fj1cg",
+    "id": "8",
     "obra": "ÁGUAS DO RIO",
     "tipo": "Geral da Semana",
     "semana": 16,
@@ -6000,48 +6070,48 @@ let OBSERVACOES = [
     "texto": "• Essa logística de instalação dos equipamentos por parte do Cliente está sendo analisada junto à obra, para saber se haverá impacto em nosso cronograma."
   },
   {
-    "id": 9,
     "id_seq": "obs_1777032907918_p0mml1",
+    "id": "9",
     "obra": "GRÃOS DO PIAUÍ - 55 MÓDULOS E ESTR. METÁLICA",
     "tipo": "Cronograma",
     "semana": 16,
     "cor": "r",
     "titulo": "Entrega Praças P9 e P10",
-    "texto": "• Cliente exige entrega das praças P9 e P10 até 26/04/26 e 03/05/2026, respectivamente. \n• Plano de ação apresentado para o cumprimento do prazo."
+    "texto": "• Cliente exige entrega das praças P9 e P10 até 26/04/26 e 03/05/2026, respectivamente. \r\n• Plano de ação apresentado para o cumprimento do prazo."
   },
   {
-    "id": 10,
+    "id": "10",
     "id_seq": "obs_1777036203979_t9mqp7",
     "obra": "GRÃOS DO PIAUÍ - 55 MÓDULOS E ESTR. METÁLICA",
     "tipo": "Geral da Semana",
     "semana": 16,
     "cor": "r",
-    "titulo": "Paralisação Montagem Cobertura do BSO P10.",
-    "texto": "• Em virtude a proximidade da rede elétrica, a atividade de montagem da cobertura do BSO da praça P10 foi paralisada, a pedido do TST CMC. A rede está sendo desenergizada por parte da CS Grãos para que esta atividade prossiga com segurança."
+    "titulo": "Notificação P10.",
+    "texto": "• Em virtude a proximidade da rede elétrica, a atividade de montagem da cobertura do BSO da praça P10 foi paralisada, a pedido do TST CMC. A rede está sendo desenergizada por parte da CS Grãos para que esta atividade prossiga com segurança.\n• Fomos notificados em 24/04/26, em relação à obra da P10: incompatibilidade de projeto de fundação e estrutura metálica / Possível flecha em uma das vigas da estrutura metálica / Solicitação de comprovação técnica de estabilidade e segurança da estrutura / Pendência de fornecimento de materiais / Envio de cronograma atualizado de entrega dos materiais / Exigência de resposta formal imediata."
   },
   {
-    "id": 11,
+    "id": "11",
     "id_seq": "obs_1777036560905_2o2ktl",
     "obra": "GRÃOS DO PIAUÍ - OBRAS CIVIS",
     "tipo": "Geral da Semana",
     "semana": 16,
     "cor": "r",
     "titulo": "Carregamento / Acessibilidade / ART.",
-    "texto": "• A carga da estrutura pesada da P9 e materiais do BSO da P10, chegaram na obra em 23/04/26, e o descarregamento ocorrendo em 24/04/26.\n• O cliente questionou sobre a acessibilidade dos banheiros, que não foi considerada. Assunto já direcionado à Engenharia CMC e Nota Técnica já respondida ao Cliente com as considerações deste projeto.\n• ART solicitada pelo cliente referente ao laudo da Estrutura Metálica - Assunto também já direcionado para a Engenharia CMC."
+    "texto": "• A carga da estrutura pesada da P9 e materiais do BSO da P10, chegaram na obra em 23/04/26, e o descarregamento ocorrendo em 24/04/26.\n• O cliente questionou sobre a acessibilidade dos banheiros, que não foi considerada. Assunto já direcionado à Engenharia CMC e Nota Técnica já respondida ao Cliente com as considerações deste projeto. Além de solicitação da ART de Projeto. \n• ART solicitada pelo cliente referente ao laudo da Estrutura Metálica - Assunto também já direcionado para a Engenharia CMC."
   },
   {
-    "id": 12,
     "id_seq": "obs_1777037653061_z8cxgb",
+    "id": "12",
     "obra": "CSN",
     "tipo": "Geral da Semana",
     "semana": 16,
     "cor": "y",
     "titulo": "Alinhamentos Finais Entrega P15 / Topografia / Aditivo",
-    "texto": "• Cliente questiona alguns itens inseridos na proposta técnica apresentada - instalações de SPCI - Assunto direcionado para análise da Engenharia e Comercial.\n• Além disso, a inclusão de um balcão de granito na cozinha, inserido também na proposta técnica e não detalhado no layout.\n• O cliente solicita o fornecimento dos chuveiros para os testes nos banheiros - assunto também já conduzido com o Comercial e Filial de Contagem.\n• Pendente o de acordo do cliente da subcontratação da Maxobra para a segunda etapa (Prédio Topografia).\n• Aditivo de prazo regularizado - até 30/09/26."
+    "texto": "• Cliente questiona alguns itens inseridos na proposta técnica apresentada - instalações de SPCI - Assunto direcionado para análise da Engenharia e Comercial.\r\n• Além disso, a inclusão de um balcão de granito na cozinha, inserido também na proposta técnica e não detalhado no layout.\r\n• O cliente solicita o fornecimento dos chuveiros para os testes nos banheiros - assunto também já conduzido com o Comercial e Filial de Contagem.\r\n• Pendente o de acordo do cliente da subcontratação da Maxobra para a segunda etapa (Prédio Topografia).\r\n• Aditivo de prazo regularizado - até 30/09/26."
   },
   {
-    "id": 13,
     "id_seq": "obs_1777037686356_bizuqm",
+    "id": "13",
     "obra": "CSN",
     "tipo": "Cronograma",
     "semana": 16,
@@ -6050,18 +6120,18 @@ let OBSERVACOES = [
     "texto": "• Entrega da primeira Edificação P15 programada para o dia 28/04/26, conforme alinhado em reunião com o cliente no dia 24/04/26."
   },
   {
-    "id": 14,
+    "id": "14",
     "id_seq": "obs_1777038191412_fsp92f",
     "obra": "CSN",
     "tipo": "Financeiro",
     "semana": 16,
     "cor": "r",
     "titulo": "Antecipação de Notas.",
-    "texto": "• Em relação à antecipação das notas já faturadas deste contrato: assunto sendo tratado internamente, onde estava pendente a regularização dentro do sistema do Cliente. Prazo ainda não definido pela CSN."
+    "texto": "• Em relação à antecipação das notas já faturadas deste contrato: cadastro já aprovado na CSN, para seguir a análise junto ao Banco que será responsável pelo pagamento."
   },
   {
-    "id": 15,
     "id_seq": "obs_1777038956426_bgsef4",
+    "id": "15",
     "obra": "USIMINAS",
     "tipo": "Cronograma",
     "semana": 16,
@@ -6070,8 +6140,8 @@ let OBSERVACOES = [
     "texto": "• Solicitado pelo o cliente a postergação do prazo acordado inicialmente - que era 08/06/26, em virtude de situações internas, com extensão a princípio até setembro/26."
   },
   {
-    "id": 16,
     "id_seq": "obs_1777047532734_k1v91e",
+    "id": "16",
     "obra": "USIMINAS",
     "tipo": "Financeiro",
     "semana": 16,
@@ -6080,8 +6150,8 @@ let OBSERVACOES = [
     "texto": "• Faturamento realizado do 1º BM - R$94K, mesmo com a extensão."
   },
   {
-    "id": 17,
     "id_seq": "obs_1777048207808_7c4194",
+    "id": "17",
     "obra": "USIMINAS",
     "tipo": "Geral da Semana",
     "semana": 16,
@@ -6090,8 +6160,8 @@ let OBSERVACOES = [
     "texto": "• Em virtude da solicitação da Usiminas de extensão de prazo, a CMC poderá suspender a fabricação do sobreteto e a filial de Mirassol a suspensão da fabricação do módulo refrigerado."
   },
   {
-    "id": 18,
     "id_seq": "obs_1777048978659_ob4l78",
+    "id": "18",
     "obra": "GNR LARA VILA VELHA",
     "tipo": "Cronograma",
     "semana": 16,
@@ -6100,28 +6170,28 @@ let OBSERVACOES = [
     "texto": "• Término projetado com atraso de 28 dias, em relação ao cronograma aprovado."
   },
   {
-    "id": 19,
     "id_seq": "obs_1777049242008_0cye1i",
+    "id": "19",
     "obra": "GNR LARA VILA VELHA",
     "tipo": "Geral da Semana",
     "semana": 16,
     "cor": "n",
     "titulo": "Canteiro de Obras",
-    "texto": "• Solicitado a adequação do Canteiro de Obras para a retomada da obra, paralisada parcialmente desde o dia 07/04/26.\n• Cliente solicita um plano de ação para a recuperação do atraso.\n• Plano de Qualidade com demandas a serem regularizadas, quem compõem as entregas deste projeto.\n• Pendência do histograma definido pela MAXOBRA da equipe de campo.\n• Preposto retirado da obra de Mauá e mobilizado em Vila Velha em 22/04/26.\n"
+    "texto": "• Solicitado a adequação do Canteiro de Obras para a retomada da obra, paralisada parcialmente desde o dia 07/04/26.\r\n• Cliente solicita um plano de ação para a recuperação do atraso.\r\n• Plano de Qualidade com demandas a serem regularizadas, quem compõem as entregas deste projeto.\r\n• Pendência do histograma definido pela MAXOBRA da equipe de campo.\r\n• Preposto retirado da obra de Mauá e mobilizado em Vila Velha em 22/04/26."
   },
   {
-    "id": 20,
     "id_seq": "obs_1777049596319_0n58ox",
+    "id": "20",
     "obra": "GNR LARA MAUÁ",
     "tipo": "Cronograma",
     "semana": 16,
     "cor": "r",
     "titulo": "Área ainda não liberada",
-    "texto": "• Área não liberada pelo cliente. Inicialmente estava programada a liberação para o dia 17/04/26 e posteriormente postergada para o dia 27/04/26. \n• Cronograma ainda não validado pelo cliente."
+    "texto": "• Área não liberada pelo cliente. Inicialmente estava programada a liberação para o dia 17/04/26 e posteriormente postergada para o dia 27/04/26. \r\n• Cronograma ainda não validado pelo cliente."
   },
   {
-    "id": 21,
     "id_seq": "obs_1777049701382_zb9t1q",
+    "id": "21",
     "obra": "GNR LARA MAUÁ",
     "tipo": "Geral da Semana",
     "semana": 16,
@@ -6130,54 +6200,64 @@ let OBSERVACOES = [
     "texto": "• Relatório de Sondagem apontou fragilidade do solo e não atingimento da resistência prevista em projeto."
   },
   {
-    "id": 22,
+    "id": "22",
     "id_seq": "obs_1777049845166_5u5hjd",
     "obra": "1000 CASAS - MARQUES DE SOUZA",
     "tipo": "Financeiro",
     "semana": 16,
     "cor": "y",
     "titulo": "Medição em análise SEHAB",
-    "texto": "• BM em análise técnica junto à SEHAB (R$657K) desde o dia 23/04/26.\n• Valores recebidos dos faturamentos de Salvador do Sul, Feliz e Faxinal do Soturno."
+    "texto": "• Autorizado em 24/04/26 o faturamento de (R$657K), referente ao município de Marques de Souza. Nota ainda não emitida.\n• Valores recebidos dos faturamentos de Salvador do Sul, Feliz e Faxinal do Soturno."
   },
   {
-    "id": 23,
+    "id": "23",
     "id_seq": "obs_1777050189133_6td9g8",
-    "obra": "",
+    "obra": "1000 CASAS",
     "tipo": "Geral da Semana",
     "semana": 16,
     "cor": "y",
-    "titulo": "1000 CASAS - SERAFINA CORRÊA / RS",
-    "texto": "• Termo de Contrato de Serafina Corrêa (10 CASAS) - assinado em 14/04/26.\n• Resposta da notificação de Restinga Seca, realizada em 23/04/26 (assunto: atraso no cronograma).\n• SERRA VERDE - Manutenção programada com data prevista de entrega no cliente para 27/04/26.\n• SERRA VERDE - Pendente regularização do TAC que está em análise com o Suprimentos. Programada uma reunião para o dia 27/04/26 para tratar este assunto, além de regularização de documentos (adequação do as-built e ART).\n• SERRA VERDE - Fase 2 referente ao contrato assinado, ainda não validada pelo Cliente."
+    "titulo": "SERAFINA CORRÊA / RS",
+    "texto": "• Termo de Contrato de Serafina Corrêa (10 CASAS) - assinado em 14/04/26.\n"
   },
   {
-    "id": 24,
+    "id": "24",
     "id_seq": "obs_1777050667381_9am75x",
-    "obra": "",
+    "obra": "SERRA VERDE",
     "tipo": "Financeiro",
     "semana": 16,
     "cor": "y",
-    "titulo": "SERRA VERDE",
-    "texto": "• Medição enviada, em análise pelo cliente (108k) - depende de validação do TAC. Foram retirados da medição o valor correspondente a SPDA 2k, e Munck 7k. "
+    "titulo": "Medição",
+    "texto": "• Medição enviada, em análise pelo cliente (108k) - depende de validação do TAC. Foram retirados da medição o valor correspondente a SPDA 2k, e Munck 7k.\n• Considerando o adiantamento de 50k, temos a receber 58k da fase 1."
   },
   {
-    "id": 25,
-    "id_seq": "obs_1777050845904_wyi7rq",
-    "obra": "",
-    "tipo": "Financeiro",
-    "semana": 16,
-    "cor": "n",
-    "titulo": "SERRA VERDE",
-    "texto": "• Considerando o adiantamento de 50k, temos a receber 58k da fase 1."
-  },
-  {
-    "id": 26,
+    "id": "26",
     "id_seq": "obs_1777053884007_lwqpix",
-    "obra": "",
+    "obra": "VIRTU SANTO ANTÔNIO DOS LOPES",
     "tipo": "Financeiro",
     "semana": 16,
     "cor": "n",
-    "titulo": "VIRTU SANTO ANTÔNIO DOS LOPES",
+    "titulo": "Aguardando manutenção da obra",
     "texto": "• Pagamento pendente mediante manutenção solicitada pelo Cliente - Infiltração."
+  },
+  {
+    "id": 8,
+    "id_seq": "obs_1777129748946_7i148t",
+    "obra": "1000 CASAS - RESTINGA SECA",
+    "tipo": "Geral da Semana",
+    "semana": 16,
+    "cor": "r",
+    "titulo": "Notificação Prazo",
+    "texto": "• Resposta da notificação de Restinga Seca, realizada em 23/04/26 (assunto: atraso no cronograma).\n"
+  },
+  {
+    "id": 9,
+    "id_seq": "obs_1777129785770_uwnzg9",
+    "obra": "SERRA VERDE",
+    "tipo": "Geral da Semana",
+    "semana": 16,
+    "cor": "y",
+    "titulo": "Medição / Manutenção",
+    "texto": "• SERRA VERDE - Manutenção programada com data prevista de entrega no cliente para 27/04/26.\n• SERRA VERDE - Pendente regularização do TAC que está em análise com o Suprimentos. Programada uma reunião para o dia 27/04/26 para tratar este assunto, além de regularização de documentos (adequação do as-built e ART).\n• SERRA VERDE - Fase 2 referente ao contrato assinado, ainda não validada pelo Cliente."
   }
 ];
 
@@ -6231,7 +6311,7 @@ const DOCUMENTACAO_DATE_CORRECTIONS_BY_OBRA = {
     "gp_vig": "",
     "geo_vig": ""
   },
-  "ANGO AMERICAN COZINHA": {
+  "ANGLO AMERICAN COZINHA": {
     "vig_cto": "",
     "sre_vig": "",
     "src_vig": "",
@@ -6670,6 +6750,7 @@ const PAGE_TITLES={dashboard:'Dashboard Geral',projetos:'Base de Projetos',crono
 const PAGE_RENDERS={projetos:renderProjetos,cronograma:renderCronograma,rdo:renderRDO,seguros:renderGarantias,arts:renderArts,medicoes:renderMedicoes,satisfacao:renderSatisfacao,observacoes:renderObservacoes,relatorios:initRelatorio};
 // Exclusões independentes por aba: permite ocultar/remover um projeto de uma página sem afetar as demais.
 let EXCLUIDOS_ABA = {cronograma:[]};
+let SAT_RELATORIO_OBS = '';
 function projetoKey(id, obra){return String(id||'')+'|'+String(obra||'');}
 // Oculta apenas nas listas de seleção as opções importadas com ID curto numérico (ex.: "2 — Obra", "23 — Obra").
 // Mantém os dados nas bases, relatórios e tabelas; apenas evita duplicidade/confusão nos selects.
@@ -7276,15 +7357,15 @@ function renderRDO(){
       </td>
       <td><code style="font-size:11px;color:var(--tx2)">${r.id}</code></td>
       <td><strong>${r.obra}</strong></td>
-      <td>${fmtV(r.atualizacao)}</td><td style="text-align:center">${rdoDot(r.atualizacao)}</td>
-      <td>${fmtV(r.enviado)}</td><td style="text-align:center">${rdoDot(r.enviado)}</td>
-      <td>${fmtV(r.assinado)}</td><td style="text-align:center">${rdoDotAssinado(r)}</td>
+      <td style="text-align:center;padding-right:4px">${rdoDot(r.atualizacao)}</td><td style="padding-left:2px">${fmtV(r.atualizacao)}</td>
+      <td style="text-align:center;padding-right:4px">${rdoDot(r.enviado)}</td><td style="padding-left:2px">${fmtV(r.enviado)}</td>
+      <td style="text-align:center;padding-right:4px">${rdoDotAssinado(r)}</td><td style="padding-left:2px">${fmtV(r.assinado)}</td>
       <td>${r.resp||'—'}</td><td>${r.modelo||'—'}</td><td>${r.histograma||'—'}</td>
       <td style="text-align:center;font-weight:600">${dias!=null?dias+'d':'—'}</td>
       <td>${stB}</td>
       <td style="font-size:11px;color:var(--tx3);max-width:140px">${r.obs||'—'}</td>
     </tr>`;
-  }).join('')||'<tr><td colspan="14" style="text-align:center;padding:24px;color:var(--tx3)">Nenhum registro.</td></tr>';
+  }).join('')||'<tr><td colspan="15" style="text-align:center;padding:24px;color:var(--tx3)">Nenhum registro.</td></tr>';
 }
 // ─── DOCUMENTAÇÃO ────────────────────────────────────────────────────────────
 let _activeDocTab='garantias';
@@ -7383,6 +7464,15 @@ function openDocEdit(idx){
   document.getElementById('mo-doc-title').textContent='Editar Documentação — '+(PROJETOS[parseInt(sel.value,10)]?.obra||'');
   openMo('mo-doc');
 }
+function docChecklistManualFlag(d,campo){
+  return !!(d && (d[campo+'_manual']===true || d[campo+'_manual']==='true' || d[campo+'_manual']===1 || d[campo+'_manual']==='1'));
+}
+function docEffectiveChecklistValue(d,campo){
+  const val=(d?.[campo]||'-');
+  if(val==='Concluído' || val==='N/A') return val;
+  if(val==='Pendente' && docChecklistManualFlag(d,campo)) return 'Pendente';
+  return docChecklistObrigatorio(d) ? 'Pendente' : '-';
+}
 function loadDocData(){
   const segSel=document.getElementById('dd-proj');
   const artSel=document.getElementById('dd-proj-arts');
@@ -7411,8 +7501,11 @@ function loadDocData(){
   if(chkOutros){chkOutros.checked=!!outros;document.getElementById('dd-art-outros').style.display=outros?'block':'none';}
   document.getElementById('dd-art-outros').value=outros;
   // docs
-  [['hbe','hbe'],['hbc','hbc'],['mtr','mtr'],['chi','chi'],['che','che'],['te','te'],['atc','atc']].forEach(([fid,key])=>{
+  [['hbe','hbe'],['hbc','hbc'],['mtr','mtr']].forEach(([fid,key])=>{
     const el=document.getElementById('dd-'+fid);if(el)el.value=d[key]||'-';
+  });
+  [['chi','chi'],['che','che'],['te','te'],['atc','atc']].forEach(([fid,key])=>{
+    const el=document.getElementById('dd-'+fid);if(el)el.value=docEffectiveChecklistValue(d,key);
   });
 }
 function salvarDoc(){
@@ -7429,8 +7522,27 @@ function salvarDoc(){
   d.crono_st=document.getElementById('dd-crono-st').value;
   d.art_tipos=[...document.querySelectorAll('#dd-art-types input[type=checkbox]:checked')].map(cb=>cb.value).filter(v=>v!=='Outros').map(mapArtTipoToStored);
   d.art_outros=document.getElementById('chk-outros').checked?document.getElementById('dd-art-outros').value:'';
-  [['hbe','hbe'],['hbc','hbc'],['mtr','mtr'],['chi','chi'],['che','che'],['te','te'],['atc','atc']].forEach(([fid,key])=>{
+  [['hbe','hbe'],['hbc','hbc'],['mtr','mtr']].forEach(([fid,key])=>{
     const el=document.getElementById('dd-'+fid);if(el)d[key]=el.value;
+  });
+  [['chi','chi'],['che','che'],['te','te'],['atc','atc']].forEach(([fid,key])=>{
+    const el=document.getElementById('dd-'+fid); if(!el) return;
+    const v=el.value||'-';
+    if(v==='Concluído' || v==='N/A'){
+      d[key]=v;
+      d[key+'_manual']=true;
+    }else if(v==='Pendente'){
+      if(docChecklistObrigatorio(d)){
+        d[key]='';
+        d[key+'_manual']=false;
+      }else{
+        d[key]='Pendente';
+        d[key+'_manual']=true;
+      }
+    }else{
+      d[key]='';
+      d[key+'_manual']=false;
+    }
   });
   closeMo('mo-doc');renderDocs();updateBadges();refreshResumoAutomatico();
   dbAfterSaveDoc(d);
@@ -7449,16 +7561,8 @@ function buildSegGarObs(d){
   return items.length?items.join(' · '):'—';
 }
 function checklistAlert(d,campo){
-  // faltando 30 dias para a obra acabar, sinalizar como PENDENTE se ainda não concluído
-  const proj=PROJETOS.find(p=>p.id===d.id&&p.obra===d.obra);
-  const val=d[campo];
-  if(val==='-'||!val){
-    if(proj&&proj.tendencia){
-      const diasFim=proj.tendencia-TODAY_XL;
-      if(diasFim<=30&&diasFim>0)return'<span class="badge br" title="Obra termina em '+diasFim+'d">Pendente</span>';
-    }
-    return'<span style="color:var(--tx3)">—</span>';
-  }
+  const val=docEffectiveChecklistValue(d,campo);
+  if(!val || val==='-') return '<span style="color:var(--tx3)">—</span>';
   return bDoc(val);
 }
 function renderGarantias(){
@@ -7516,7 +7620,7 @@ function renderArts(){
   const data=DOCUMENTACAO.filter(d=>(!q||d.obra.toLowerCase().includes(q)||d.id.toLowerCase().includes(q))&&(!fart||d.art_st===fart)&&(!fst||d.status===fst));
   const pendArt=data.filter(d=>d.art_st==='Pendente').length;
   const emitArt=data.filter(d=>d.art_st==='Emitida').length;
-  const pendDoc=data.filter(d=>[d.chi,d.che,d.te,d.atc].some(v=>v==='Pendente')).length;
+  const pendDoc=data.filter(d=>['chi','che','te','atc'].some(k=>docEffectiveChecklistValue(d,k)==='Pendente')).length;
   const kpiEl=document.getElementById('kpi-arts');
   if(kpiEl)kpiEl.innerHTML=`
     <div class="kpi bl"><div class="kpi-lbl">Projetos</div><div class="kpi-val">${data.length}</div></div>
@@ -7562,6 +7666,25 @@ function refreshResumoAutomatico(){
 
 // ─── MEDIÇÕES ────────────────────────────────────────────────────────────────
 let _editMedIdx=null;
+function medProjSelectChanged(){
+  const sel=document.getElementById('fm-proj');
+  const inp=document.getElementById('fm-cliente-manual');
+  if(!sel||!inp) return;
+  const pv=sel.value||'';
+  const si=pv.indexOf('|');
+  inp.value=si>=0?pv.slice(si+1):'';
+}
+function ensureMedicaoOption(id,cliente){
+  const sel=document.getElementById('fm-proj');
+  if(!sel) return;
+  const val=(id||'')+'|'+(cliente||'');
+  if(![...sel.options].some(o=>o.value===val)){
+    const o=document.createElement('option');
+    o.value=val;
+    o.textContent=(id?`${id} — `:'')+(cliente||'Obra sem nome')+' (registro da aba Medições)';
+    sel.appendChild(o);
+  }
+}
 function openMedicaoModal(idx){
   _editMedIdx=idx;
   fillObraSelectFromReferencias(document.getElementById('fm-proj'),{mode:'idobra'});
@@ -7569,12 +7692,16 @@ function openMedicaoModal(idx){
   if(idx===null){
     ['fm-data-med','fm-data-nf','fm-prev-rec','fm-real-rec','fm-obs'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('fm-valor').value='';document.getElementById('fm-prazo').value='30';
+    const fmClienteManual=document.getElementById('fm-cliente-manual'); if(fmClienteManual) fmClienteManual.value='';
+    medProjSelectChanged();
     document.getElementById('fm-tipo').value='Medição';
     document.getElementById('fm-dias-row').style.display='none';
   } else {
     const m=MEDICOES[idx];
+    ensureMedicaoOption(m.id,m.cliente);
     const si=document.getElementById('fm-proj').querySelector(`option[value="${m.id}|${m.cliente}"]`);
     if(si)document.getElementById('fm-proj').value=m.id+'|'+m.cliente;
+    const fmClienteManual=document.getElementById('fm-cliente-manual'); if(fmClienteManual) fmClienteManual.value=m.cliente||'';
     document.getElementById('fm-tipo').value=m.tipo;
     document.getElementById('fm-data-med').value=xl2iso(m.data_med);
     document.getElementById('fm-valor').value=m.valor;
@@ -7611,8 +7738,10 @@ function salvarMedicao(keepOpen=false){
   const medIsNew=_editMedIdx===null;
   const existente=medIsNew?null:MEDICOES[_editMedIdx];
   const pv=document.getElementById('fm-proj').value;if(!pv)return;
-  const si=pv.indexOf('|');const id=pv.slice(0,si);const cliente=pv.slice(si+1);
-  const proj=PROJETOS.find(p=>p.id===id&&p.obra===cliente) || PROJETOS.find(p=>p.id===id) || null;
+  const si=pv.indexOf('|');const id=pv.slice(0,si);const clienteSelecionado=pv.slice(si+1);
+  const clienteManual=(document.getElementById('fm-cliente-manual')?.value||'').trim();
+  const cliente=clienteManual||clienteSelecionado;
+  const proj=PROJETOS.find(p=>p.id===id&&p.obra===cliente) || PROJETOS.find(p=>p.id===id&&p.obra===clienteSelecionado) || PROJETOS.find(p=>p.id===id) || null;
   const dataNF=document.getElementById('fm-data-nf').value;
   const prev=document.getElementById('fm-prev-rec').value||null;
   const real=document.getElementById('fm-real-rec').value||null;
@@ -7620,7 +7749,7 @@ function salvarMedicao(keepOpen=false){
   let farol=2;
   if(real)farol=1;
   else if(prev&&prev<hoje)farol=3;
-  const novo={id_seq:existente?.id_seq||nextSeq('med'),id,cliente,valor_contrato:proj?.valor||0,tipo:document.getElementById('fm-tipo').value,
+  const novo={id_seq:existente?.id_seq||nextSeq('med'),id,cliente,valor_contrato:(proj?.valor ?? existente?.valor_contrato ?? 0),tipo:document.getElementById('fm-tipo').value,
     data_med:str2xl(document.getElementById('fm-data-med').value),
     valor:parseFloat(document.getElementById('fm-valor').value)||0,
     data_nf:str2xl(dataNF),prazo_pgto:parseInt(document.getElementById('fm-prazo').value)||30,
@@ -7636,6 +7765,7 @@ function salvarMedicao(keepOpen=false){
     document.getElementById('fm-prazo').value='30';
     document.getElementById('fm-dias-row').style.display='none';
     document.getElementById('fm-proj').value=projAtual;
+    medProjSelectChanged();
     _editMedIdx=null;
     document.getElementById('mo-med-title').textContent='Novo Lançamento';
     return;
@@ -7811,10 +7941,16 @@ function satComentarioHtml(p, compact=false){
 
   return `<div style="display:flex;flex-direction:column;gap:${compact?'3px':'4px'}">${campos.map(([lbl,val])=>bubble(lbl,val,false)).join('')}</div>`;
 }
+function saveSatRelObs(v){
+  SAT_RELATORIO_OBS = v || '';
+  saveToStorage();
+}
 function renderSatisfacao(){
   const semAtu=getSemanaAtual();
   const ff=document.getElementById('ss-nivel').value;
   const fp=document.getElementById('ss-proj').value;
+  const satObsEl=document.getElementById('sat-rel-obs');
+  if(satObsEl && satObsEl.value !== (SAT_RELATORIO_OBS || '')) satObsEl.value = SAT_RELATORIO_OBS || '';
   // Populate project filter
   const selP=document.getElementById('ss-proj');
   if(selP.options.length<=1){PROJETOS.forEach(p=>{const o=document.createElement('option');o.value=p.id+'|'+p.obra;o.textContent=p.id+' — '+p.obra;selP.appendChild(o);});}
@@ -8166,6 +8302,58 @@ function updateReportCutoffField(){
 function getReportFootnote(){
   return `* Com comentários atualizados até a data do envio deste relatório: ${getReportEmissionLabel()}.`;
 }
+
+// Ajustes v23 — regras executivas de exportação/PDF sem alterar lançamentos
+function getProjetoForDoc(d){
+  const kd=normalizeObraKey(d?.obra||'');
+  return PROJETOS.find(p=>(String(p.id||'')===String(d?.id||'')) || normalizeObraKey(p.obra||'')===kd) || null;
+}
+function isProjetoEmAndamento(p){
+  if(!p || p.status!=='Ativo') return false;
+  if(!p.tendencia || isNaN(p.tendencia)) return true;
+  return daysFromToday(p.tendencia) >= 0;
+}
+function docTrendDays(d){
+  const p=getProjetoForDoc(d);
+  if(!p || !p.tendencia || isNaN(p.tendencia)) return null;
+  return daysFromToday(p.tendencia);
+}
+function docChecklistObrigatorio(d){
+  const dias=docTrendDays(d);
+  return dias !== null && dias <= 30;
+}
+function docEffectiveChecklistValueExport(d, field){
+  return docEffectiveChecklistValue(d, field);
+}
+function docFieldIsPending(d, field){
+  if(['chi','che','te','atc'].includes(field)) return docEffectiveChecklistValueExport(d, field)==='Pendente';
+  const v=d?.[field];
+  return v==='Pendente';
+}
+function countDocPendenciasExecutivas(d){
+  if(!d || d.status!=='Ativo') return 0;
+  let n=0;
+  // Conta somente os campos VISÍVEIS no relatório que aparecem com o texto "Pend.".
+  // Seg./Gar. é uma coluna consolidada: mesmo havendo mais de um seguro/garantia pendente, conta apenas 1 "Pend." visível.
+  if(d.art_st==='Pendente') n++;
+  if([d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st].some(v=>v==='Pendente')) n++;
+  if(d.crono_st==='Pendente') n++;
+  ['chi','che','te','atc'].forEach(f=>{
+    if(docEffectiveChecklistValueExport(d,f)==='Pendente') n++;
+  });
+  return n;
+}
+function docHasPendenciaExecutiva(d){
+  return countDocPendenciasExecutivas(d) > 0;
+}
+function docStatusHtmlExport(d, field){
+  const v=['chi','che','te','atc'].includes(field) ? docEffectiveChecklistValueExport(d, field) : (d?.[field]||'-');
+  if(!v||v==='-')return'<span style="color:#667085">—</span>';
+  if(v==='N/A')return'<span style="color:#667085">N/A</span>';
+  if(v==='Pendente')return'<span style="color:#c43d3d;font-weight:700">Pend.</span>';
+  if(v==='Contratado'||v==='Emitida'||v==='Concluído'||v==='Assinado')return'<span style="color:#198754;font-weight:700">✓</span>';
+  return'<span style="color:'+relAmber+';font-weight:700">'+v+'</span>';
+}
 function initRelatorio(){
   updateReportCutoffField();
 }
@@ -8179,6 +8367,10 @@ function gerarRelatorio(){
   const cons=getMedCons();
   const tC=cons.reduce((s,m)=>s+(m.contrato||0),0);
   const tR=cons.reduce((s,m)=>s+m.rec,0);
+  const isLightTheme=getRelTonalidade()==='light';
+  const relWarn=isLightTheme?'#9A6700':'#ffc107';
+  const relAmber=isLightTheme?'#B54708':'#d98200';
+  const relColor=(c)=>(isLightTheme && (c==='#ffc107' || c==='#d98200')) ? relAmber : c;
   const ativos=PROJETOS.filter(p=>p.status==='Ativo').length;
   const atrasados=PROJETOS.filter(p=>p.alerta==='⚠ Atraso').length;
   const S=(c,l,v)=>`<div style="background:#1a1a1a;border-radius:8px;padding:12px;border-top:3px solid ${c}"><div style="font-size:10px;color:#888;text-transform:uppercase">${l}</div><div style="font-size:20px;font-weight:700;color:${c};margin-top:4px">${v}</div></div>`;
@@ -8203,16 +8395,16 @@ function gerarRelatorio(){
   if(document.getElementById('ri-rdo').checked){
     html+=`<section class="rel-module" data-title="RDO"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">RDO</span>Status das Obras</div>
-    <table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed"><colgroup><col style="width:7%"><col style="width:19%"><col style="width:9%"><col style="width:3%"><col style="width:9%"><col style="width:3%"><col style="width:9%"><col style="width:3%"><col style="width:13%"><col style="width:9%"><col style="width:10%"><col style="width:6%"></colgroup><thead><tr style="background:#1a1a1a">
-      ${['ID','Obra','Última Atualiz.','⬤','Enviado','⬤','Assinado','⬤','Responsável','Modelo','Histograma','Status'].map(h=>TH(h,'white-space:normal;word-break:normal;overflow-wrap:normal')).join('')}
+    <table class="rdo-export-table" style="width:100%;border-collapse:collapse;font-size:10.5px;table-layout:fixed"><colgroup><col style="width:7%"><col style="width:23%"><col style="width:0.8%"><col style="width:8.2%"><col style="width:0.8%"><col style="width:8.2%"><col style="width:0.8%"><col style="width:8.2%"><col style="width:12.4%"><col style="width:8.5%"><col style="width:12.6%"><col style="width:8.5%"></colgroup><thead><tr style="background:#1a1a1a">
+      ${['ID','Obra','','Última Atualiz.','','Enviado','','Assinado','Responsável','Modelo','Histograma','Status'].map((h,i)=>TH(h,(i===2||i===4||i===6)?'text-align:center;white-space:normal;word-break:normal;overflow-wrap:normal':'white-space:normal;word-break:normal;overflow-wrap:normal')).join('')}
     </tr></thead><tbody>
-    ${RDO.map(r=>{const st=getRdoStatus(r);const c=st==='Atualizado'?'#48c774':st==='Pendente'?'#ff6b6b':'#ffc107';
+    ${RDO.map(r=>{const st=getRdoStatus(r);const c=st==='Atualizado'?'#48c774':st==='Pendente'?'#ff6b6b':relWarn;
       // Same logic as RDO tab: green<=7d, red>7d, yellow=text/special; assinado=green if ==enviado
       const fd=v=>{
-        if(!v||v==='NÃO INICIADA')return{txt:'<span style="color:#aaa">NÃO INICIADA</span>',dot:'🟡'};
-        if(v==='PENDENTE')return{txt:'<span style="color:#ffc107;font-weight:600">PENDENTE</span>',dot:'🟡'};
-        if(isNaN(v))return{txt:v,dot:'🟡'};
-        const d=TODAY_XL-v;return{txt:xl2str(v),dot:d<=7?'🟢':'🔴'};
+        if(!v||v==='NÃO INICIADA')return{txt:'<span style="color:#aaa">NÃO INICIADA</span>',dot:'<span class="export-dot export-dot-y"></span>'};
+        if(v==='PENDENTE')return{txt:'<span style="color:'+relWarn+';font-weight:600">PENDENTE</span>',dot:'<span class="export-dot export-dot-y"></span>'};
+        if(isNaN(v))return{txt:v,dot:'<span class="export-dot export-dot-y"></span>'};
+        const d=TODAY_XL-v;return{txt:xl2str(v),dot:d<=7?'<span class="export-dot export-dot-g"></span>':'<span class="export-dot export-dot-r"></span>'};
       };
       const fdAssinado=r=>{
         if(r.assinado&&!isNaN(r.assinado)&&r.enviado&&!isNaN(r.enviado)&&r.assinado===r.enviado)
@@ -8220,48 +8412,47 @@ function gerarRelatorio(){
         return fd(r.assinado);
       };
       const a=fd(r.atualizacao),e=fd(r.enviado),s=fdAssinado(r);
-      return`<tr style="border-bottom:1px solid #222">${TD(r.id,'color:#d7d7d7;font-family:monospace;font-size:10px;font-weight:600')}${TD(r.obra,'font-weight:500;color:#ffffff;white-space:normal;overflow-wrap:break-word;word-break:normal') }<td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${a.txt}</td><td style="padding:6px 10px;text-align:center">${a.dot}</td><td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${e.txt}</td><td style="padding:6px 10px;text-align:center">${e.dot}</td><td style="padding:6px 10px;color:#f4f4f4;font-weight:700">${s.txt}</td><td style="padding:6px 10px;text-align:center">${s.dot}</td>${TD(r.resp||'—','color:#e2e2e2;overflow-wrap:anywhere;word-break:break-word')}${TD(r.modelo||'—','color:#e2e2e2;overflow-wrap:anywhere;word-break:break-word')}${TD(r.histograma||'—','color:#e2e2e2;overflow-wrap:anywhere;word-break:break-word;font-size:9px')}<td style="padding:6px 8px;color:${c};font-weight:800;white-space:nowrap">${st}</td></tr>`;
+      return`<tr style="border-bottom:1px solid #222">${TD(r.id,'color:#d7d7d7;font-family:monospace;font-size:10px;font-weight:600')}${TD(r.obra,'font-weight:500;color:#ffffff;white-space:normal;overflow-wrap:break-word;word-break:normal') }<td style="padding:6px 12px 6px 2px;text-align:left">${a.dot}</td><td style="padding:6px 4px 6px 6px;color:#f4f4f4;font-weight:700;white-space:nowrap">${a.txt}</td><td style="padding:6px 12px 6px 2px;text-align:left">${e.dot}</td><td style="padding:6px 4px 6px 6px;color:#f4f4f4;font-weight:700;white-space:nowrap">${e.txt}</td><td style="padding:6px 12px 6px 2px;text-align:left">${s.dot}</td><td style="padding:6px 4px 6px 6px;color:#f4f4f4;font-weight:700;white-space:nowrap">${s.txt}</td>${TD(r.resp||'—','color:#e2e2e2;overflow-wrap:anywhere;word-break:break-word')}${TD(r.modelo||'—','color:#e2e2e2;overflow-wrap:anywhere;word-break:break-word')}${TD(r.histograma||'—','color:#e2e2e2;overflow-wrap:anywhere;word-break:break-word;font-size:9px')}<td style="padding:6px 8px;color:${c};font-weight:800;white-space:nowrap">${st}</td></tr>`;
     }).join('')}
     </tbody></table></div></section>`;
   }
 
   if(document.getElementById('ri-docs').checked){
-    const docsPend=DOCUMENTACAO.filter(d=>d.status==='Ativo'&&(d.art_st==='Pendente'||[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st].some(s=>s==='Pendente'))).length;
-    const artsEmit=DOCUMENTACAO.filter(d=>d.art_st==='Emitida').length;
-    const ctosVenc=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0&&d.status==='Ativo').length;
-    const ctosOk=DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)>=0&&d.status==='Ativo').length;
+    const docsAtivasEmAndamento=DOCUMENTACAO.filter(d=>d.status==='Ativo' && isProjetoEmAndamento(getProjetoForDoc(d)));
+    const docsPend=docsAtivasEmAndamento.reduce((n,d)=>n+countDocPendenciasExecutivas(d),0);
+    const artsEmit=docsAtivasEmAndamento.filter(d=>d.art_st==='Emitida').length;
+    const ctosVenc=docsAtivasEmAndamento.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0).length;
+    const ctosOk=docsAtivasEmAndamento.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)>=0).length;
     html+=`<section class="rel-module" data-title="Documentação"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">DOCUMENTAÇÃO</span>Seguros, ARTs e Conformidade</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-      ${[['#4a9eff','Cadastrados',DOCUMENTACAO.length],['#ff6b6b','Pendências',docsPend],['#48c774','ARTs Emitidas',artsEmit],['#ff6b6b','Contratos Vencidos',ctosVenc]].map(([c,l,v])=>`<div style="background:#1a1a1a;border-radius:8px;padding:12px;border-top:3px solid ${c}"><div style="font-size:10px;color:#888;text-transform:uppercase">${l}</div><div style="font-size:22px;font-weight:700;color:${c};margin-top:4px">${v}</div></div>`).join('')}
+      ${[['#E87722','Obras em andamento',docsAtivasEmAndamento.length],['#E87722','Pendências',docsPend],['#E87722','ARTs Emitidas',artsEmit],['#E87722','Contratos Vencidos',ctosVenc]].map(([c,l,v])=>`<div style="background:#1a1a1a;border-radius:8px;padding:12px;border-top:3px solid ${c}"><div style="font-size:10px;color:#888;text-transform:uppercase">${l}</div><div style="font-size:22px;font-weight:700;color:${c};margin-top:4px">${v}</div></div>`).join('')}
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a1a1a">
-      ${['ID','Obra','Status','ART','Seg./Gar.','Crono.','Chk.Int','Chk.Ext','Termo','Atestado','Vigência Cto.','Dias'].map(h=>`<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #333;color:#888;font-size:9px;text-transform:uppercase;white-space:nowrap">${h}</th>`).join('')}
+      ${['Obra','Status','ART','Seg./Gar.','Crono.','Chk.Int','Chk.Ext','Termo','Atestado','Vigência Cto.','Dias'].map(h=>`<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #333;color:#888;font-size:9px;text-transform:uppercase;white-space:nowrap">${h}</th>`).join('')}
     </tr></thead><tbody>
-    ${(()=>{function fSt(s){if(!s||s==='-'||s==='N/A')return'<span style=\"color:#555\">N/A</span>';if(s==='Pendente')return'<span style=\"color:#ff6b6b;font-weight:700\">Pend.</span>';if(s==='Contratado'||s==='Emitida'||s==='Concluído'||s==='Assinado')return'<span style=\"color:#48c774\">✓</span>';return'<span style=\"color:#ffc107\">'+s+'</span>';}
-      return DOCUMENTACAO.filter(d=>d.status==='Ativo').map(d=>{
+    ${(()=>{function fSt(s){if(!s||s==='-'||s==='N/A')return'<span style="color:#667085">N/A</span>';if(s==='Pendente')return'<span style="color:#c43d3d;font-weight:700">Pend.</span>';if(s==='Contratado'||s==='Emitida'||s==='Concluído'||s==='Assinado')return'<span style="color:#198754;font-weight:700">✓</span>';return'<span style="color:'+relAmber+';font-weight:700">'+s+'</span>';}
+      return docsAtivasEmAndamento.map(d=>{
         const dias=d.vig_cto?daysFromToday(d.vig_cto):null;
-        const dC=dias===null?'#888':dias<0?'#ff6b6b':dias<=30?'#ffc107':'#48c774';
+        const dC=dias===null?'#888':dias<0?'#ff6b6b':dias<=30?relWarn:'#48c774';
         const dT=dias===null?'—':dias+'d';
         const sg=[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st];
         const sC=sg.some(s=>s==='Pendente')?'#ff6b6b':sg.some(s=>s==='Contratado')?'#48c774':'#555';
         const sT=sg.some(s=>s==='Pendente')?'Pend.':sg.some(s=>s==='Contratado')?'Contr.':'N/A';
         return '<tr style="border-bottom:1px solid #222">'
-          +'<td style="padding:4px 8px;font-size:9px;font-family:monospace;color:#aaa">'+d.id+'</td>'
-          +'<td style="padding:4px 8px;font-weight:500;max-width:140px;overflow:hidden;text-overflow:ellipsis">'+d.obra+'</td>'
-          +'<td style="padding:4px 8px"><span style="font-size:9px;color:'+(d.status==='Ativo'?'#4a9eff':'#888')+'">'+d.status+'</span></td>'
-          +'<td style="padding:4px 8px">'+fSt(d.art_st)+'</td>'
-          +'<td style="padding:4px 8px;color:'+sC+'">'+sT+'</td>'
-          +'<td style="padding:4px 8px">'+fSt(d.crono_st)+'</td>'
-          +'<td style="padding:4px 8px">'+fSt(d.chi)+'</td>'
-          +'<td style="padding:4px 8px">'+fSt(d.che)+'</td>'
-          +'<td style="padding:4px 8px">'+fSt(d.te)+'</td>'
-          +'<td style="padding:4px 8px">'+fSt(d.atc)+'</td>'
-          +'<td style="padding:4px 8px;font-size:9px;color:'+dC+'">'+(dateToBR(d.vig_cto)||'—')+'</td>'
-          +'<td style="padding:4px 8px;color:'+dC+';font-weight:700">'+dT+'</td>'
-          +'</tr>';
-      }).join('');})()}
-    </tbody></table></div></section>`;
+          + '<td style="padding:4px 8px;font-weight:600;max-width:220px;white-space:normal;overflow-wrap:break-word;color:#f3f3f3">'+d.obra+'</td>'
+          + '<td style="padding:4px 8px"><span style="font-size:9px;color:'+(d.status==='Ativo'?'#4a9eff':'#888')+'">'+d.status+'</span></td>'
+          + '<td style="padding:4px 8px">'+fSt(d.art_st)+'</td>'
+          + '<td style="padding:4px 8px;color:'+sC+'">'+sT+'</td>'
+          + '<td style="padding:4px 8px">'+fSt(d.crono_st)+'</td>'
+          + '<td style="padding:4px 8px">'+docStatusHtmlExport(d,'chi')+'</td>'
+          + '<td style="padding:4px 8px">'+docStatusHtmlExport(d,'che')+'</td>'
+          + '<td style="padding:4px 8px">'+docStatusHtmlExport(d,'te')+'</td>'
+          + '<td style="padding:4px 8px">'+docStatusHtmlExport(d,'atc')+'</td>'
+          + '<td style="padding:4px 8px;font-size:9px;color:'+relColor(dC)+'">'+(dateToBR(d.vig_cto)||'—')+'</td>'
+          + '<td style="padding:4px 8px;color:'+relColor(dC)+';font-weight:700">'+dT+'</td>'
+          + '</tr>';
+      }).join('');})()}</tbody></table></div></section>`;
   }
   if(document.getElementById('ri-crono').checked){
     const projsCronoRel=PROJETOS.filter(p=>!isProjetoExcluidoDaAba('cronograma',p.id,p.obra));
@@ -8273,13 +8464,13 @@ function gerarRelatorio(){
           <span style="color:#48c774;font-size:12px;margin-left:8px">🟢 ${noPrazo} No Prazo</span>
           <span style="color:#ff6b6b;font-size:12px;margin-left:8px">🔴 ${projsCronoRel.filter(p=>p.status==='Ativo').length-noPrazo} Atrasadas</span>
         </div>
-        <table class="crono-export-table" style="width:100%;border-collapse:collapse;font-size:8.2px;table-layout:fixed"><colgroup><col style="width:7%"><col style="width:25%"><col style="width:8.5%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:3.5%"><col style="width:8%"><col style="width:8%"><col style="width:6%"></colgroup><thead><tr style="background:#1a1a1a">
-          ${['ID','Obra','Início','Prazo Contr.','Prazo Cli.','Tendência','⬤','% Prev.','% Real.','Ader.'].map(h=>TH(h,'white-space:normal;word-break:normal;overflow-wrap:normal')).join('')}
+        <table class="crono-export-table" style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed"><colgroup><col style="width:31%"><col style="width:8.7%"><col style="width:9.5%"><col style="width:9.5%"><col style="width:10.6%"><col style="width:0.5%"><col style="width:8.85%"><col style="width:8.85%"><col style="width:12.5%"></colgroup><thead><tr style="background:#1a1a1a">
+          ${[['Obra','text-align:left'],['Início','text-align:left'],['Prazo Contr.','text-align:left'],['Prazo Cli.','text-align:left'],['Tendência','text-align:left'],['⬤','text-align:left;position:relative;left:-30px'],['% Prev.','text-align:center'],['% Real.','text-align:center'],['Ader.','text-align:center']].map(([h,al])=>TH(h,al+';white-space:normal;word-break:normal;overflow-wrap:normal')).join('')}
         </tr></thead><tbody>
         ${projsCronoRel.filter(p=>p.status==='Ativo'||p.status==='Encerrado').map(p=>{
-          const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const fc=f==='g'?'#48c774':f==='y'?'#ffc107':'#ff6b6b';
-          const row=`<tr style="border-bottom:1px solid #222">${TD(p.id,'color:#c8c8c8;font-family:monospace;font-size:10px')}${TD(p.obra,'font-weight:700;color:#f3f3f3;white-space:normal;overflow-wrap:break-word;word-break:normal;line-height:1.15')}${TD(xl2str(p.inicio),'color:#e0e0e0;font-weight:600;white-space:nowrap')}${TD(xl2str(p.prazo_cont),`color:${cronoDateColor(p.prazo_cont)};font-weight:600;white-space:nowrap`)}${TD(xl2str(p.prazo_cli),`color:${cronoDateColor(p.prazo_cli)};font-weight:600;white-space:nowrap`)}<td style="padding:5px 8px;color:${cronoDateColor(p.tendencia)};font-weight:700;white-space:nowrap">${xl2str(p.tendencia)}</td><td style="padding:6px 10px;text-align:center">${f==='g'?'🟢':f==='y'?'🟡':'🔴'}</td>${TD(av.prev!=null?av.prev.toFixed(1)+'%':'—','text-align:center;white-space:nowrap')}${TD(av.real!=null?av.real.toFixed(1)+'%':'—',`text-align:center;color:${fc};white-space:nowrap`)}${TD(av.prev&&av.real?(av.real/av.prev*100).toFixed(0)+'%':'—','text-align:center;white-space:nowrap')}</tr>`;
-          const sub=(p.parciais||[]).map(par=>`<tr style="border-bottom:1px solid #222;background:rgba(232,119,34,.05)"><td></td><td style="padding:5px 8px 5px 16px;color:#ffd2b0;font-size:8.5px;font-weight:700;white-space:normal;overflow-wrap:break-word;word-break:normal;line-height:1.15">↳ ${par.nome}</td>${TD(xl2str(par.inicio),'color:#e0e0e0;font-weight:600;white-space:nowrap')}${TD(xl2str(par.prazo_cont),`color:${cronoDateColor(par.prazo_cont)};font-weight:600;white-space:nowrap`)}<td style="padding:5px 8px;color:${par.prazo_cli?cronoDateColor(par.prazo_cli):'#ff6b6b'};font-weight:600;white-space:nowrap">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="padding:5px 8px;color:${cronoDateColor(par.tendencia)};font-weight:700;white-space:nowrap">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`).join('');
+          const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const fc=f==='g'?'#48c774':f==='y'?relWarn:'#ff6b6b';const contCor=relColor(cronoDateColor(p.prazo_cont));const cliCor=relColor(cronoDateColor(p.prazo_cli));const tendCor=relColor(cronoDateColor(p.tendencia));
+          const row=`<tr style="border-bottom:1px solid #222">${TD(p.obra,'font-weight:700;color:#f3f3f3;white-space:normal;overflow-wrap:break-word;word-break:normal;line-height:1.15')}${TD(xl2str(p.inicio),'color:#111;font-weight:700;white-space:nowrap')}${TD(xl2str(p.prazo_cont),`color:${contCor};font-weight:600;white-space:nowrap`)}${TD(xl2str(p.prazo_cli),`color:${cliCor};font-weight:600;white-space:nowrap`)}<td style="padding:5px 0 5px 6px;color:${tendCor};font-weight:700;white-space:nowrap">${xl2str(p.tendencia)}</td><td style="padding:5px 0 5px 0;text-align:left;position:relative;left:-30px"><span class="export-dot ${f==='g'?'export-dot-g':f==='y'?'export-dot-y':'export-dot-r'}"></span></td>${TD(av.prev!=null?av.prev.toFixed(1)+'%':'—','text-align:center;white-space:nowrap')}${TD(av.real!=null?av.real.toFixed(1)+'%':'—',`text-align:center;color:${fc};white-space:nowrap`)}${TD(av.prev&&av.real?(av.real/av.prev*100).toFixed(0)+'%':'—','text-align:center;white-space:nowrap')}</tr>`;
+          const sub=(p.parciais||[]).map(par=>{const parContCor=relColor(cronoDateColor(par.prazo_cont));const parCliCor=par.prazo_cli?relColor(cronoDateColor(par.prazo_cli)):'#ff6b6b';const parTendCor=relColor(cronoDateColor(par.tendencia));return`<tr style="border-bottom:1px solid #222;background:rgba(232,119,34,.05)"><td style="padding:5px 8px 5px 16px;color:#ffd2b0;font-size:10.2px;font-weight:700;white-space:normal;overflow-wrap:break-word;word-break:normal;line-height:1.15">↳ ${par.nome}</td>${TD(xl2str(par.inicio),'color:#111;font-weight:700;white-space:nowrap')}${TD(xl2str(par.prazo_cont),`color:${parContCor};font-weight:600;white-space:nowrap`)}<td style="padding:5px 8px;color:${parCliCor};font-weight:600;white-space:nowrap">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="padding:5px 4px 5px 6px;color:${parTendCor};font-weight:700;white-space:nowrap">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`}).join('');
           return row+sub;
         }).join('')}
         </tbody></table>
@@ -8303,15 +8494,15 @@ function gerarRelatorio(){
       <div>
         <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:10px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">FINANCEIRO</span>Medições, Faturamentos e Recebimentos</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
-          ${[['#4a9eff','Carteira',tots.c],['#48c774','Medido',tots.m],['#E87722','Faturado',tots.f],['#48c774','Recebido',tots.r],['#ff6b6b','NF Vencida',tots.nv],['#ffc107','A Receber',tots.ar]].map(([c,l,v])=>S(c,l,fmtR(v))).join('')}
+          ${[['#E87722','Carteira',tots.c],['#E87722','Medido',tots.m],['#E87722','Faturado',tots.f],['#E87722','Recebido',tots.r],['#E87722','NF Vencida',tots.nv],['#E87722','A Receber',tots.ar]].map(([c,l,v])=>S(c,l,fmtR(v))).join('')}
         </div>
-        <table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed"><colgroup><col style="width:8%"><col style="width:22%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:6%"><col style="width:9%"><col style="width:9%"><col style="width:10%"></colgroup><thead><tr style="background:#1a1a1a">
-          ${['ID','Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber','Pend. à Faturar'].map(h=>TH(h,'white-space:normal;word-break:normal;overflow-wrap:normal')).join('')}
+        <table class="med-export-table" style="width:100%;border-collapse:collapse;font-size:9.8px;table-layout:fixed"><colgroup><col style="width:24%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:12%"></colgroup><thead><tr style="background:#1a1a1a">
+          ${['Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber','Pend. à Faturar'].map(h=>TH(h,'white-space:normal;word-break:normal;overflow-wrap:normal')).join('')}
         </tr></thead><tbody>
         ${c2.map(m=>{const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—';
-          return`<tr style="border-bottom:1px solid #222">${TD(m.id,'color:#aaa;font-family:monospace;font-size:9px;white-space:nowrap')}${TD(m.cliente,'font-size:9px')}${[m.contrato,m.med,m.fat].map(v=>TD(fmtR(v),'text-align:right;color:#ccc;white-space:nowrap')).join('')}<td style="padding:5px 8px;text-align:right;color:#48c774;white-space:nowrap">${fmtR(m.rec)}</td>${TD(pct,'text-align:right;white-space:nowrap')}<td style="padding:5px 8px;text-align:right;color:#ff6b6b;white-space:nowrap">${m.nfv>0?fmtR(m.nfv):'—'}</td><td style="padding:5px 8px;text-align:right;white-space:nowrap">${m.ar>0?fmtR(m.ar):'—'}</td><td style="padding:5px 8px;text-align:right;white-space:nowrap;color:#ffc107">${m.pf>0?fmtR(m.pf):'—'}</td></tr>`;
+          return`<tr style="border-bottom:1px solid #222">${TD(m.cliente,'font-size:9.6px;font-weight:700;white-space:normal;overflow-wrap:break-word;word-break:normal')}${[m.contrato,m.med,m.fat].map(v=>TD(fmtR(v),'text-align:right;color:#667085;font-weight:600;white-space:nowrap')).join('')}<td style="padding:5px 8px;text-align:right;color:#48c774;white-space:nowrap">${fmtR(m.rec)}</td>${TD(pct,'text-align:right;white-space:nowrap')}<td style="padding:5px 8px;text-align:right;color:#ff6b6b;white-space:nowrap">${m.nfv>0?fmtR(m.nfv):'—'}</td><td style="padding:5px 8px;text-align:right;white-space:nowrap">${m.ar>0?fmtR(m.ar):'—'}</td><td style="padding:5px 8px;text-align:right;white-space:nowrap;color:#E87722;font-weight:700">${m.pf>0?fmtR(m.pf):'—'}</td></tr>`;
         }).join('')}
-        <tr style="background:#1a1a1a;font-weight:700"><td colspan="2" style="padding:7px 8px">TOTAL GERAL</td>${[tots.c,tots.m,tots.f].map(v=>TD(fmtR(v),'text-align:right;font-weight:700;white-space:nowrap')).join('')}<td style="padding:7px 8px;text-align:right;color:#48c774;font-weight:700;white-space:nowrap">${fmtR(tots.r)}</td>${TD(tots.c?(tots.r/tots.c*100).toFixed(0)+'%':'—','text-align:right;font-weight:700;white-space:nowrap')}<td style="padding:7px 8px;text-align:right;color:#ff6b6b;font-weight:700;white-space:nowrap">${fmtR(tots.nv)}</td><td style="padding:7px 8px;text-align:right;font-weight:700;white-space:nowrap">${fmtR(tots.ar)}</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#ffc107;white-space:nowrap">${fmtR(tots.pf)}</td></tr>
+        <tr style="background:#1a1a1a;font-weight:700"><td style="padding:7px 8px">TOTAL GERAL</td>${[tots.c,tots.m,tots.f].map(v=>TD(fmtR(v),'text-align:right;font-weight:700;white-space:nowrap')).join('')}<td style="padding:7px 8px;text-align:right;color:#48c774;font-weight:700;white-space:nowrap">${fmtR(tots.r)}</td>${TD(tots.c?(tots.r/tots.c*100).toFixed(0)+'%':'—','text-align:right;font-weight:700;white-space:nowrap')}<td style="padding:7px 8px;text-align:right;color:#ff6b6b;font-weight:700;white-space:nowrap">${fmtR(tots.nv)}</td><td style="padding:7px 8px;text-align:right;font-weight:700;white-space:nowrap">${fmtR(tots.ar)}</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#E87722;white-space:nowrap">${fmtR(tots.pf)}</td></tr>
         </tbody></table>
       </div>
       <div>
@@ -8327,15 +8518,17 @@ function gerarRelatorio(){
 
   if(document.getElementById('ri-sat').checked){
     const satToShow=PESQUISAS.filter(p=>p.incl_rel);
+    const satObs=(SAT_RELATORIO_OBS||'').trim();
     html+=`<section class="rel-module" data-title="Satisfação"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">SATISFAÇÃO</span>Avaliação de Satisfação</div>
+    ${(!satToShow.length && satObs)?`<div style="background:#1a1a1a;border-left:3px solid #E87722;border-radius:0 6px 6px 0;padding:10px 12px;margin:0 0 12px;color:${isLightTheme?'#344054':'#d8d8d8'};font-size:11px;line-height:1.55;white-space:pre-wrap">${satObs}</div>`:''}
     <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a1a1a">
       ${['Data','ID','Cliente','Geral','Comentário / Dimensões'].map(TH).join('')}
     </tr></thead><tbody>
-    ${satToShow.map(p=>{const f=satFace(p.nivel);const c=p.nivel==='Satisfeito'?'#48c774':p.nivel==='Insatisfeito'?'#ff6b6b':'#ffc107';
+    ${satToShow.length ? satToShow.map(p=>{const f=satFace(p.nivel);const c=p.nivel==='Satisfeito'?'#48c774':p.nivel==='Insatisfeito'?'#ff6b6b':relWarn;
       const comment=satComentarioHtml(p,true);
       return`<tr style="border-bottom:1px solid #222">${TD(new Date(p.data).toLocaleDateString('pt-BR'),'color:#e0e0e0;font-weight:600')}${TD(p.id,'color:#c8c8c8;font-family:monospace;font-size:10px')}${TD(p.cliente,'font-weight:700;color:#f3f3f3')}<td style="padding:6px 10px;color:${c};font-weight:700"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:26px;line-height:1">${f.e}</span><span>${f.l}</span></div></td><td style="padding:6px 10px;color:#d8d8d8;max-width:300px;font-size:11px">${comment}</td></tr>`;
-    }).join('')}
+    }).join('') : `<tr><td colspan="5" style="padding:12px 10px;color:${isLightTheme?'#667085':'#a8a8a8'};text-align:center">Nenhuma pesquisa de satisfação incluída para esta semana.</td></tr>`}
     </tbody></table></div></section>`;
   }
 
@@ -8421,8 +8614,8 @@ function exportarPPTX(){
   if(sections.length < checkedMods.length){console.warn('A exportação encontrou menos módulos do que quadrinhos marcados.', {checkedMods, sections:sections.map(s=>s.dataset.title)});}
   const theme=relThemeColors();
   const isLight=getRelTonalidade()==='light';
-  const slides=sections.map(sec=>`<div class="slide"><div class="s-hdr"><div><div class="s-tag">${sec.dataset.title||'Módulo'}</div><div class="s-sub">${semana}</div></div><div style="text-align:right;font-size:11px;color:${isLight?'#667085':'#cfcfcf'}"><div style="color:#E87722;font-weight:800">${semana}</div><div>Corte: ${corteDate}</div><div>${emissor}</div></div></div><div class="s-body">${themeReportHtml(sec.innerHTML)}</div></div>`).join('');
-  const pptHtml=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório ${semana} — Grupo Lafaete</title><style>*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;font-synthesis-weight:none;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision}body{background:${theme.page};padding:20px}.slide{width:1280px;min-height:720px;background:${theme.slide};margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:${theme.shadow};display:flex;flex-direction:column}.s-hdr{background:${theme.hdr};padding:18px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #E87722}.s-tag{font-size:20px;font-weight:800;color:#E87722}.s-sub{font-size:12px;color:${theme.muted};margin-top:3px}.s-body{padding:20px 32px;flex:1;overflow:visible;color:${theme.text}}table{width:100%;border-collapse:collapse}thead{display:table-header-group}tfoot{display:table-footer-group}.s-hdr{break-after:avoid;page-break-after:avoid}.slide{break-inside:auto;page-break-inside:auto}th,td{border-bottom:1px solid #eee;padding:4px 6px;vertical-align:top;font-size:9px;color:#111;line-height:1.25;overflow-wrap:normal;word-break:normal}th{background:#f0f0f0;color:#555;font-size:8.5px;text-transform:uppercase}.crono-relatorio>div>div{display:grid!important;grid-template-columns:1fr!important;gap:14px!important}.med-relatorio>div>div{display:block!important}.med-relatorio table{margin-top:10px!important}.crono-export-table{table-layout:fixed!important}.crono-export-table th,.crono-export-table td{font-size:7.6px!important;line-height:1.12!important;padding:3px 4px!important;vertical-align:middle!important}.crono-export-table th{font-size:7px!important}.crono-export-table td:nth-child(2),.crono-export-table th:nth-child(2){white-space:normal!important;overflow-wrap:break-word!important;word-break:normal!important}.s-body div,.s-body span{max-width:100%;overflow-wrap:break-word;word-break:normal}.s-body [style*=\"white-space:pre-wrap\"]{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.money,.date,.pct,td[style*=\"white-space:nowrap\"],th[style*=\"white-space:nowrap\"]{white-space:nowrap!important;word-break:keep-all!important;overflow-wrap:normal!important} @media print{@page{size:1280px 720px landscape;margin:0}body{background:none;padding:0}.slide{box-shadow:none;margin:0;page-break-after:always}}</style></head><body><div class="slide"><div style="background:${isLight?'#ffffff':'#1a1a1a'};border:1px solid ${isLight?'#e5e7eb':'#1a1a1a'};flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px"><img src="${LOGO_URI}" style="height:80px;object-fit:contain;margin-bottom:36px" alt="Grupo Lafaete"><div style="font-size:48px;font-weight:900;color:#E87722;text-align:center;line-height:1.1">Relatório Semanal</div><div style="font-size:24px;font-weight:600;color:${isLight?'#111827':'#ffffff'};margin:10px 0 4px">Gestão de Projetos Especiais</div><div style="font-size:18px;color:#E87722;font-weight:800;margin:16px 0 6px">${semana}</div><div style="font-size:14px;color:${isLight?'#344054':'#d0d0d0'}">Data de Corte: ${corteDate}* · Emissão: ${envioDate}</div><div style="font-size:13px;color:${isLight?'#667085':'#999'};margin-top:8px">${emissor}</div><div style="font-size:12px;color:${isLight?'#667085':'#aaa'};margin-top:20px;text-align:center;max-width:720px;line-height:1.45">${corteNota}</div></div></div>${slides}</body></html>`;
+  const slides=sections.map(sec=>`<div class="slide ${((sec.dataset.title||'').toLowerCase().includes('medi'))?'med-slide':''}"><div class="s-hdr"><div><div class="s-tag">${sec.dataset.title||'Módulo'}</div><div class="s-sub">${semana}</div></div><div style="text-align:right;font-size:11px;color:${isLight?'#667085':'#cfcfcf'}"><div style="color:#E87722;font-weight:800">${semana}</div><div>Corte: ${corteDate}</div><div>${emissor}</div></div></div><div class="s-body">${themeReportHtml(sec.innerHTML)}</div></div>`).join('');
+  const pptHtml=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório ${semana} — Grupo Lafaete</title><style>*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;font-synthesis-weight:none;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision}body{background:${theme.page};padding:20px}.slide{width:1280px;min-height:720px;background:${theme.slide};margin:0 auto 24px;overflow:visible;page-break-after:always;box-shadow:${theme.shadow};display:flex;flex-direction:column}.s-hdr{background:${theme.hdr};padding:18px 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #E87722}.s-tag{font-size:20px;font-weight:800;color:#E87722}.s-sub{font-size:12px;color:${theme.muted};margin-top:3px}.s-body{padding:20px 32px;flex:1;overflow:visible;color:${theme.text}}table{width:100%;border-collapse:collapse}thead{display:table-header-group}tfoot{display:table-footer-group}.s-hdr{break-after:avoid;page-break-after:avoid}.slide{break-inside:auto;page-break-inside:auto}th,td{border-bottom:1px solid #eee;padding:4px 6px;vertical-align:top;font-size:9px;color:#111;line-height:1.25;overflow-wrap:normal;word-break:normal}th{background:#f0f0f0;color:#555;font-size:8.5px;text-transform:uppercase}.crono-relatorio>div>div{display:grid!important;grid-template-columns:1fr!important;gap:14px!important}.med-relatorio>div>div{display:block!important}.med-relatorio table{margin-top:10px!important}.crono-export-table{table-layout:fixed!important}.crono-export-table th,.crono-export-table td{font-size:10.4px!important;line-height:1.22!important;padding:3.6px 4.4px!important;vertical-align:middle!important}.crono-export-table th{font-size:9.2px!important}.crono-export-table td:nth-child(1),.crono-export-table th:nth-child(1){white-space:normal!important;overflow-wrap:break-word!important;word-break:normal!important}.s-body div,.s-body span{max-width:100%;overflow-wrap:break-word;word-break:normal}.s-body [style*=\"white-space:pre-wrap\"]{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.export-dot{display:inline-block;width:10px;height:10px;min-width:10px;min-height:10px;border-radius:50%;vertical-align:middle;flex:0 0 10px}.export-dot-g{background:#00c875}.export-dot-r{background:#ff3131}.export-dot-y{background:#ffbf00}.rdo-export-table th,.rdo-export-table td{font-size:9.6px!important}.med-export-table th,.med-export-table td{font-size:9.2px!important;line-height:1.18!important}.med-slide .s-body{padding-top:12px}.money,.date,.pct,td[style*=\"white-space:nowrap\"],th[style*=\"white-space:nowrap\"]{white-space:nowrap!important;word-break:keep-all!important;overflow-wrap:normal!important} @media print{@page{size:1280px 720px landscape;margin:0}body{background:none;padding:0}.slide{box-shadow:none;margin:0;page-break-after:always}}</style></head><body><div class="slide"><div style="background:${isLight?'#ffffff':'#1a1a1a'};border:1px solid ${isLight?'#e5e7eb':'#1a1a1a'};flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px"><img src="${LOGO_URI}" style="height:80px;object-fit:contain;margin-bottom:36px" alt="Grupo Lafaete"><div style="font-size:48px;font-weight:900;color:#E87722;text-align:center;line-height:1.1">Relatório Semanal</div><div style="font-size:24px;font-weight:600;color:${isLight?'#111827':'#ffffff'};margin:10px 0 4px">Gestão de Projetos Especiais</div><div style="font-size:18px;color:#E87722;font-weight:800;margin:16px 0 6px">${semana}</div><div style="font-size:14px;color:${isLight?'#344054':'#d0d0d0'}">Data de Corte: ${corteDate}* · Emissão: ${envioDate}</div><div style="font-size:13px;color:${isLight?'#667085':'#999'};margin-top:8px">${emissor}</div><div style="font-size:12px;color:${isLight?'#667085':'#aaa'};margin-top:20px;text-align:center;max-width:720px;line-height:1.45">${corteNota}</div></div></div>${slides}</body></html>`;
   const blob=new Blob([pptHtml],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url; a.download=`Relatorio-GrupoLafaete-${semana.replace(/\s+/g,'-')}.html`; a.click(); URL.revokeObjectURL(url);
@@ -8445,8 +8638,8 @@ function printRelatorio(){
   if(sections.length < checkedMods.length){console.warn('A impressão encontrou menos módulos do que quadrinhos marcados.', {checkedMods, sections:sections.map(s=>s.dataset.title)});}
   const theme=relThemeColors();
   const isLight=getRelTonalidade()==='light';
-  const slides=sections.map(sec=>`<section class="slide"><div class="s-hdr"><div><div class="s-tag">${sec.dataset.title||'Módulo'}</div><div class="s-sub">${semana}</div></div><div style="text-align:right;font-size:11px;color:${isLight?'#667085':'#cfcfcf'}"><div style="color:#E87722;font-weight:800">${semana}</div><div>Corte: ${corteDate}</div><div>${emissor}</div></div></div><div class="s-body">${themeReportHtml(sec.innerHTML)}</div></section>`).join('');
-  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${semana}</title><style>@page{size:297mm 210mm;margin:8mm}*{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-synthesis-weight:none;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision}html,body{width:297mm;min-height:210mm;margin:0;background:${theme.slide}}.slide{width:281mm;min-height:194mm;page-break-after:always;break-after:page;background:${theme.slide};overflow:visible}.s-hdr{background:${theme.hdr};padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #E87722}.s-tag{font-size:16px;font-weight:800;color:#E87722}.s-sub{font-size:10px;color:${theme.muted};margin-top:2px}.s-body{padding:14px 18px;overflow:visible;color:${theme.text};break-before:avoid;page-break-before:avoid}.s-hdr{break-after:avoid;page-break-after:avoid}.slide{break-inside:auto;page-break-inside:auto}table{width:100%!important;border-collapse:collapse;table-layout:auto}thead{display:table-header-group}tfoot{display:table-footer-group}th,td{border-bottom:1px solid #ddd;padding:4px 6px;vertical-align:top;font-size:9px;color:#111;line-height:1.28;overflow-wrap:anywhere;word-break:break-word;font-weight:400}th{background:#f0f0f0!important;color:#555!important;font-size:8px;text-transform:uppercase;font-weight:700}.crono-relatorio>div>div{display:grid!important;grid-template-columns:1fr!important;gap:14px!important}.med-relatorio>div>div{display:block!important}.med-relatorio table{margin-top:10px!important}.crono-export-table{table-layout:fixed!important}.crono-export-table th,.crono-export-table td{font-size:7px!important;line-height:1.12!important;padding:2.5px 3px!important;vertical-align:middle!important}.crono-export-table th{font-size:6.6px!important}.crono-export-table td:nth-child(2),.crono-export-table th:nth-child(2){white-space:normal!important;overflow-wrap:break-word!important;word-break:normal!important}.report-obra,strong{font-weight:700!important}.s-body div,.s-body span{max-width:100%;overflow-wrap:anywhere;word-break:break-word}.s-body [style*=\"white-space:pre-wrap\"]{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.money{white-space:nowrap}</style></head><body><section class="slide"><div style="background:${isLight?'#ffffff':'#1a1a1a'};border:1px solid ${isLight?'#e5e7eb':'#1a1a1a'};min-height:194mm;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px"><img src="${LOGO_URI}" style="height:64px;object-fit:contain;margin-bottom:28px"><div style="font-size:38px;font-weight:900;color:#E87722;line-height:1.1;text-align:center">Relatório Semanal</div><div style="font-size:20px;font-weight:600;color:${isLight?'#111827':'#fff'};margin-top:8px">Gestão de Projetos Especiais</div><div style="font-size:16px;color:#E87722;font-weight:800;margin-top:14px">${semana}</div><div style="font-size:12px;color:${isLight?'#344054':'#ddd'};margin-top:8px">Data de Corte: ${corteDate}* · Emissão: ${envioDate}</div><div style="font-size:11px;color:${isLight?'#667085':'#aaa'};margin-top:8px">${emissor}</div><div style="font-size:10px;color:${isLight?'#667085':'#aaa'};margin-top:16px;text-align:center;max-width:620px;line-height:1.4">${corteNota}</div></div></section>${slides}</body></html>`;
+  const slides=sections.map(sec=>`<section class="slide ${((sec.dataset.title||'').toLowerCase().includes('medi'))?'med-slide':''}"><div class="s-hdr"><div><div class="s-tag">${sec.dataset.title||'Módulo'}</div><div class="s-sub">${semana}</div></div><div style="text-align:right;font-size:11px;color:${isLight?'#667085':'#cfcfcf'}"><div style="color:#E87722;font-weight:800">${semana}</div><div>Corte: ${corteDate}</div><div>${emissor}</div></div></div><div class="s-body">${themeReportHtml(sec.innerHTML)}</div></section>`).join('');
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>${semana}</title><style>@page{size:297mm 210mm;margin:8mm}*{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-synthesis-weight:none;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision}html,body{width:297mm;min-height:210mm;margin:0;background:${theme.slide}}.slide{width:281mm;min-height:194mm;page-break-after:always;break-after:page;background:${theme.slide};overflow:visible}.s-hdr{background:${theme.hdr};padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #E87722}.s-tag{font-size:16px;font-weight:800;color:#E87722}.s-sub{font-size:10px;color:${theme.muted};margin-top:2px}.s-body{padding:14px 18px;overflow:visible;color:${theme.text};break-before:avoid;page-break-before:avoid}.s-hdr{break-after:avoid;page-break-after:avoid}.slide{break-inside:auto;page-break-inside:auto}table{width:100%!important;border-collapse:collapse;table-layout:auto}thead{display:table-header-group}tfoot{display:table-footer-group}th,td{border-bottom:1px solid #ddd;padding:4px 6px;vertical-align:top;font-size:9px;color:#111;line-height:1.28;overflow-wrap:anywhere;word-break:break-word;font-weight:400}th{background:#f0f0f0!important;color:#555!important;font-size:8px;text-transform:uppercase;font-weight:700}.crono-relatorio>div>div{display:grid!important;grid-template-columns:1fr!important;gap:14px!important}.med-relatorio>div>div{display:block!important}.med-relatorio table{margin-top:10px!important}.crono-export-table{table-layout:fixed!important}.crono-export-table th,.crono-export-table td{font-size:9.6px!important;line-height:1.22!important;padding:3.2px 3.8px!important;vertical-align:middle!important}.crono-export-table th{font-size:8.8px!important}.crono-export-table td:nth-child(1),.crono-export-table th:nth-child(1){white-space:normal!important;overflow-wrap:break-word!important;word-break:normal!important}.report-obra,strong{font-weight:700!important}.s-body div,.s-body span{max-width:100%;overflow-wrap:anywhere;word-break:break-word}.s-body [style*=\"white-space:pre-wrap\"]{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.export-dot{display:inline-block;width:9px;height:9px;min-width:9px;min-height:9px;border-radius:50%;vertical-align:middle;flex:0 0 9px}.export-dot-g{background:#00c875}.export-dot-r{background:#ff3131}.export-dot-y{background:#ffbf00}.rdo-export-table th,.rdo-export-table td{font-size:8.8px!important}.rdo-export-table td,.rdo-export-table th,.crono-export-table td,.crono-export-table th,.med-export-table td,.med-export-table th{font-weight:500!important}.crono-export-table th,.crono-export-table td{font-size:9.6px!important;line-height:1.22!important;padding:3.2px 3.8px!important}.crono-export-table td:nth-child(1),.crono-export-table th:nth-child(1){white-space:normal!important;overflow-wrap:break-word!important;word-break:normal!important}.med-export-table th,.med-export-table td{font-size:8.8px!important;line-height:1.16!important}.med-slide{page-break-before:auto!important;break-before:auto!important}.med-slide .s-body{padding-top:10px;page-break-before:avoid!important;break-before:avoid!important}.money{white-space:nowrap}</style></head><body><section class="slide"><div style="background:${isLight?'#ffffff':'#1a1a1a'};border:1px solid ${isLight?'#e5e7eb':'#1a1a1a'};min-height:194mm;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px"><img src="${LOGO_URI}" style="height:64px;object-fit:contain;margin-bottom:28px"><div style="font-size:38px;font-weight:900;color:#E87722;line-height:1.1;text-align:center">Relatório Semanal</div><div style="font-size:20px;font-weight:600;color:${isLight?'#111827':'#fff'};margin-top:8px">Gestão de Projetos Especiais</div><div style="font-size:16px;color:#E87722;font-weight:800;margin-top:14px">${semana}</div><div style="font-size:12px;color:${isLight?'#344054':'#ddd'};margin-top:8px">Data de Corte: ${corteDate}* · Emissão: ${envioDate}</div><div style="font-size:11px;color:${isLight?'#667085':'#aaa'};margin-top:8px">${emissor}</div><div style="font-size:10px;color:${isLight?'#667085':'#aaa'};margin-top:16px;text-align:center;max-width:620px;line-height:1.4">${corteNota}</div></div></section>${slides}</body></html>`;
   const w=window.open('','_blank'); w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>w.print(),300);
 }
 // ─── INIT ────────────────────────────────────────────────────────────────────
@@ -8479,13 +8672,14 @@ function buildStoragePayload() {
     OBSERVACOES,
     AVANCOS,
     EXCLUIDOS_ABA,
+    SAT_RELATORIO_OBS,
   };
 }
 
 
 // Backup SIOG incorporado em 24/04/2026 para preservar os lançamentos já realizados.
 const EMBEDDED_BACKUP_DATA = {
-  "ts": 1777131354396,
+  "ts": 1777401043668,
   "PROJETOS": [
     {
       "id": "1.24.01332",
@@ -9044,7 +9238,7 @@ const EMBEDDED_BACKUP_DATA = {
     },
     {
       "id": "1.25.1492",
-      "obra": "ANGO AMERICAN COZINHA",
+      "obra": "ANGLO AMERICAN COZINHA",
       "status": "Concluído",
       "vig_cto": "",
       "sre_st": "N/A",
@@ -10033,22 +10227,6 @@ const EMBEDDED_BACKUP_DATA = {
       "obs": "Em análise SEHAB."
     },
     {
-      "id_seq": "med_0014",
-      "id": "P006",
-      "cliente": "1000 CASAS - MARQUES DE SOUZA",
-      "valor_contrato": 1539999.9,
-      "tipo": "Medição",
-      "data_med": 46105,
-      "valor": 178931.08,
-      "data_nf": null,
-      "prazo_pgto": 30,
-      "data_rec_prev": null,
-      "data_rec_real": null,
-      "dias_atraso": 0,
-      "farol": 2,
-      "obs": "Em análise SEHAB."
-    },
-    {
       "id_seq": "med_0017",
       "id": "1.25.01470",
       "cliente": "VIRTU SANTO ANTÔNIO DOS LOPES",
@@ -10211,7 +10389,7 @@ const EMBEDDED_BACKUP_DATA = {
     {
       "id_seq": "med_0027",
       "id": "1.25.1492",
-      "cliente": "ANGO AMERICAN COZINHA",
+      "cliente": "ANGLO AMERICAN COZINHA",
       "valor_contrato": 7847131.2,
       "tipo": "Medição",
       "data_med": 45953,
@@ -10227,7 +10405,7 @@ const EMBEDDED_BACKUP_DATA = {
     {
       "id_seq": "med_0028",
       "id": "1.25.1492",
-      "cliente": "ANGO AMERICAN COZINHA",
+      "cliente": "ANGLO AMERICAN COZINHA",
       "valor_contrato": 7847131.2,
       "tipo": "Medição",
       "data_med": 45985,
@@ -10243,7 +10421,7 @@ const EMBEDDED_BACKUP_DATA = {
     {
       "id_seq": "med_0029",
       "id": "1.25.1492",
-      "cliente": "ANGO AMERICAN COZINHA",
+      "cliente": "ANGLO AMERICAN COZINHA",
       "valor_contrato": 7847131.2,
       "tipo": "Medição",
       "data_med": 46009,
@@ -10259,7 +10437,7 @@ const EMBEDDED_BACKUP_DATA = {
     {
       "id_seq": "med_0030",
       "id": "1.25.1492",
-      "cliente": "ANGO AMERICAN COZINHA",
+      "cliente": "ANGLO AMERICAN COZINHA",
       "valor_contrato": 7847131.2,
       "tipo": "Medição",
       "data_med": 45704,
@@ -10275,7 +10453,7 @@ const EMBEDDED_BACKUP_DATA = {
     {
       "id_seq": "med_0031",
       "id": "1.25.1492",
-      "cliente": "ANGO AMERICAN COZINHA",
+      "cliente": "ANGLO AMERICAN COZINHA",
       "valor_contrato": 7847131.2,
       "tipo": "Medição",
       "data_med": 45704,
@@ -10291,7 +10469,7 @@ const EMBEDDED_BACKUP_DATA = {
     {
       "id_seq": "med_0032",
       "id": "1.25.1492",
-      "cliente": "ANGO AMERICAN COZINHA",
+      "cliente": "ANGLO AMERICAN COZINHA",
       "valor_contrato": 7847131.2,
       "tipo": "Medição",
       "data_med": 45727,
@@ -11460,15 +11638,14 @@ const EMBEDDED_BACKUP_DATA = {
       "id_seq": "med_0105",
       "id": "1.26.01589",
       "cliente": "GNR LARA VILA VELHA",
-      "valor_contrato": 3529097.21,
+      "valor_contrato": 0,
       "tipo": "Medição",
       "data_med": null,
-      "valor": 888274.3,
+      "valor": 882274.3,
       "data_nf": 46055,
       "prazo_pgto": 20,
       "data_rec_prev": 46138,
       "data_rec_real": 46063,
-      "dias_atraso": 0,
       "farol": 1,
       "obs": ""
     },
@@ -13247,6 +13424,66 @@ const EMBEDDED_BACKUP_DATA = {
       "dias_atraso": 0,
       "farol": 2,
       "obs": ""
+    },
+    {
+      "id_seq": "med_1777396179132_iiafyx",
+      "id": "P001",
+      "cliente": "1000 CASAS - SALVADOR DO SUL",
+      "valor_contrato": 0,
+      "tipo": "Medição",
+      "data_med": null,
+      "valor": 37708.95,
+      "data_nf": 46050,
+      "prazo_pgto": 30,
+      "data_rec_prev": 46080,
+      "data_rec_real": 46080,
+      "farol": 1,
+      "obs": ""
+    },
+    {
+      "id_seq": "med_1777396235595_fbzgf5",
+      "id": "P001",
+      "cliente": "1000 CASAS - SALVADOR DO SUL",
+      "valor_contrato": 0,
+      "tipo": "Medição",
+      "data_med": null,
+      "valor": 107948.89,
+      "data_nf": 46050,
+      "prazo_pgto": 30,
+      "data_rec_prev": 46080,
+      "data_rec_real": 46080,
+      "farol": 1,
+      "obs": ""
+    },
+    {
+      "id_seq": "med_1777396293403_2p0q5s",
+      "id": "P001",
+      "cliente": "1000 CASAS - SALVADOR DO SUL",
+      "valor_contrato": 0,
+      "tipo": "Medição",
+      "data_med": null,
+      "valor": 106680.65,
+      "data_nf": 46063,
+      "prazo_pgto": 30,
+      "data_rec_prev": 46093,
+      "data_rec_real": 46093,
+      "farol": 1,
+      "obs": ""
+    },
+    {
+      "id_seq": "med_1777396376378_29bh5c",
+      "id": "P001",
+      "cliente": "1000 CASAS - SALVADOR DO SUL",
+      "valor_contrato": 0,
+      "tipo": "Medição",
+      "data_med": null,
+      "valor": 71923.89,
+      "data_nf": 46121,
+      "prazo_pgto": 30,
+      "data_rec_prev": 46151,
+      "data_rec_real": null,
+      "farol": 2,
+      "obs": ""
     }
   ],
   "PESQUISAS": [
@@ -13267,7 +13504,7 @@ const EMBEDDED_BACKUP_DATA = {
     {
       "id_seq": "sat_0002",
       "id": "1.25.1492",
-      "cliente": "ANGO AMERICAN COZINHA",
+      "cliente": "ANGLO AMERICAN COZINHA",
       "data": 46097,
       "nivel": 3,
       "comentario": "",
@@ -13798,7 +14035,8 @@ const EMBEDDED_BACKUP_DATA = {
   },
   "EXCLUIDOS_ABA": {
     "cronograma": []
-  }
+  },
+  "SAT_RELATORIO_OBS": ""
 };
 
 function saveToStorage() {
@@ -13841,6 +14079,7 @@ function applyStorageData(data) {
   if(data.OBSERVACOES && data.OBSERVACOES.length)   OBSERVACOES   = data.OBSERVACOES;
   if(data.AVANCOS)                                  AVANCOS       = data.AVANCOS;
   if(data.EXCLUIDOS_ABA)                            EXCLUIDOS_ABA = data.EXCLUIDOS_ABA;
+  if(typeof data.SAT_RELATORIO_OBS === 'string')    SAT_RELATORIO_OBS = data.SAT_RELATORIO_OBS;
   applyDocumentacaoDateCorrections();
 }
 
