@@ -289,6 +289,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <!-- Correção v25: relatório de Documentação conta Pendências somente pelos campos visíveis com texto Pend. -->
 <!-- Correção v28: valores em cinza mais forte no quadro de Medições do relatório PPT/PDF -->
 <!-- Correção v40: ações à esquerda nas abas restantes e Observações Livres alinhadas à esquerda -->
+<!-- Correção v41: Data de Corte manual preservada no relatório/PPT e previsão de recebimento automática/editável nas medições -->
 <!-- Correção v39: edição de obras excluídas/inativas nas abas, Salvar+, botões à esquerda e arraste de comentários -->
 </head>
 <body>
@@ -723,7 +724,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
     <div class="card-title">Configurar Relatório Executivo</div>
     <div class="fr">
       <div class="fg"><label>Semana de Referência</label><input type="text" id="rel-semana" value="Semana 16"/></div>
-      <div class="fg"><label>Data de Corte</label><input type="date" id="rel-corte"/></div>
+      <div class="fg"><label>Data de Corte</label><input type="date" id="rel-corte" title="Edite manualmente quando quiser usar uma data de corte diferente da automática."/></div>
     </div>
     <div class="fr">
       <div class="fg"><label>Responsável pela Emissão</label><input type="text" id="rel-emissor" value="Diretoria de Projetos Especiais"/></div>
@@ -902,8 +903,8 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
     <div class="fr"><div class="fg"><label>Projeto *</label><select id="fm-proj" onchange="medProjSelectChanged()"></select></div><div class="fg"><label>Tipo *</label><select id="fm-tipo"><option>Medição</option><option>Adiantamento</option><option>Recebimento</option></select></div></div>
     <div class="fg"><label>Nome da obra / cliente <small style="color:var(--tx3)">(permite corrigir obra excluída/inativa)</small></label><input type="text" id="fm-cliente-manual" placeholder="Ex.: ANGLO AMERICAN COZINHA"/></div>
     <div class="fr"><div class="fg"><label>Data da Medição</label><input type="date" id="fm-data-med"/></div><div class="fg"><label>Valor (R$) *</label><input type="number" id="fm-valor" step="0.01" min="0"/></div></div>
-    <div class="fr"><div class="fg"><label>Data Emissão NF</label><input type="date" id="fm-data-nf"/></div><div class="fg"><label>Prazo Contratual de Pgto (dias)</label><input type="number" id="fm-prazo" value="30" oninput="calcPrevRec()"/></div></div>
-    <div class="fr"><div class="fg"><label>Data Prevista Recebimento <small style="color:var(--tx3)">(auto)</small></label><input type="date" id="fm-prev-rec"/></div><div class="fg"><label>Data Real Recebimento</label><input type="date" id="fm-real-rec" oninput="calcFarolMed()"/></div></div>
+    <div class="fr"><div class="fg"><label>Data Emissão NF</label><input type="date" id="fm-data-nf" oninput="calcPrevRec()"/></div><div class="fg"><label>Prazo Contratual de Pgto (dias)</label><input type="number" id="fm-prazo" value="30" oninput="calcPrevRec()"/></div></div>
+    <div class="fr"><div class="fg"><label>Data Prevista Recebimento <small style="color:var(--tx3)">(auto)</small></label><input type="date" id="fm-prev-rec" oninput="calcFarolMed()"/></div><div class="fg"><label>Data Real Recebimento</label><input type="date" id="fm-real-rec" oninput="calcFarolMed()"/></div></div>
     <div class="fg" id="fm-dias-row" style="display:none"><label>Dias de Atraso</label><input type="text" id="fm-dias" readonly style="color:var(--r2);font-weight:600"/></div>
     <div class="fg"><label>Observações</label><textarea id="fm-obs" rows="2"></textarea></div>
     <div class="mo-ft"><button class="btn" onclick="closeMo('mo-med')">Cancelar</button><button class="btn btn-bl" onclick="salvarMedicao(true)">Salvar e +</button><button class="btn btn-or" onclick="salvarMedicao()">Salvar</button></div>
@@ -7729,10 +7730,23 @@ function openMedicaoModal(idx){
   }
   openMo('mo-med');
 }
+function addDaysISO(iso,days){
+  if(!iso)return'';
+  const p=String(iso).split('-').map(Number);
+  if(p.length!==3 || p.some(isNaN))return'';
+  const d=new Date(Date.UTC(p[0],p[1]-1,p[2]));
+  d.setUTCDate(d.getUTCDate()+(parseInt(days)||0));
+  const y=d.getUTCFullYear();
+  const m=String(d.getUTCMonth()+1).padStart(2,'0');
+  const day=String(d.getUTCDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 function calcPrevRec(){
   const nf=document.getElementById('fm-data-nf').value;
-  const prazo=parseInt(document.getElementById('fm-prazo').value)||30;
-  if(nf){const d=new Date(nf);d.setDate(d.getDate()+prazo);document.getElementById('fm-prev-rec').value=d.toISOString().slice(0,10);}
+  const prazo=parseInt(document.getElementById('fm-prazo').value)||0;
+  const prevEl=document.getElementById('fm-prev-rec');
+  if(nf && prevEl) prevEl.value=addDaysISO(nf,prazo);
+  calcFarolMed();
 }
 function calcFarolMed(){
   const real=document.getElementById('fm-real-rec').value;
@@ -7758,7 +7772,9 @@ function salvarMedicao(keepOpen=false){
   const cliente=clienteManual||clienteSelecionado;
   const proj=PROJETOS.find(p=>p.id===id&&p.obra===cliente) || PROJETOS.find(p=>p.id===id&&p.obra===clienteSelecionado) || PROJETOS.find(p=>p.id===id) || null;
   const dataNF=document.getElementById('fm-data-nf').value;
-  const prev=document.getElementById('fm-prev-rec').value||null;
+  const prevEl=document.getElementById('fm-prev-rec');
+  if(dataNF && prevEl && !prevEl.value) calcPrevRec();
+  const prev=prevEl?.value||null;
   const real=document.getElementById('fm-real-rec').value||null;
   const hoje=new Date().toISOString().slice(0,10);
   let farol=2;
@@ -8318,11 +8334,26 @@ function getReportCutoffDate(){
   return previousFriday;
 }
 function getReportCutoffISO(){return localISODate(getReportCutoffDate());}
-function getReportCutoffLabel(){return fmtDateBR(getReportCutoffDate());}
-function getReportEmissionLabel(){return fmtDateBR(new Date());}
-function updateReportCutoffField(){
+function isoToBR(iso){
+  if(!iso)return'';
+  const p=String(iso).split('-');
+  if(p.length!==3)return iso;
+  return `${p[2]}/${p[1]}/${p[0]}`;
+}
+function getManualReportCutoffISO(){
   const el=document.getElementById('rel-corte');
-  if(el) el.value=getReportCutoffISO();
+  return el?.value || '';
+}
+function getReportCutoffLabel(){
+  // Se o usuário preencher manualmente a Data de Corte, essa data passa a ser usada
+  // na pré-visualização, PDF/impressão e PowerPoint. Se estiver vazia, usa a regra automática.
+  const manual=getManualReportCutoffISO();
+  return manual ? isoToBR(manual) : fmtDateBR(getReportCutoffDate());
+}
+function getReportEmissionLabel(){return fmtDateBR(new Date());}
+function updateReportCutoffField(force=false){
+  const el=document.getElementById('rel-corte');
+  if(el && (force || !el.value)) el.value=getReportCutoffISO();
 }
 function getReportFootnote(){
   return `* Com comentários atualizados até a data do envio deste relatório: ${getReportEmissionLabel()}.`;
