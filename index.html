@@ -289,7 +289,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <!-- Correção v25: relatório de Documentação conta Pendências somente pelos campos visíveis com texto Pend. -->
 <!-- Correção v28: valores em cinza mais forte no quadro de Medições do relatório PPT/PDF -->
 <!-- Correção v40: ações à esquerda nas abas restantes e Observações Livres alinhadas à esquerda -->
-<!-- Correção v41: Data de Corte manual preservada no relatório/PPT e previsão de recebimento automática/editável nas medições -->
+<!-- Correção v42: Data de Corte manual em dd/mm/aa preservada no relatório/PPT/PDF e previsão de recebimento automática/editável nas medições -->
 <!-- Correção v39: edição de obras excluídas/inativas nas abas, Salvar+, botões à esquerda e arraste de comentários -->
 </head>
 <body>
@@ -724,7 +724,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
     <div class="card-title">Configurar Relatório Executivo</div>
     <div class="fr">
       <div class="fg"><label>Semana de Referência</label><input type="text" id="rel-semana" value="Semana 16"/></div>
-      <div class="fg"><label>Data de Corte</label><input type="date" id="rel-corte" title="Edite manualmente quando quiser usar uma data de corte diferente da automática."/></div>
+      <div class="fg"><label>Data de Corte</label><input type="text" id="rel-corte" placeholder="dd/mm/aaaa" title="Edite manualmente no formato dd/mm/aaaa ou dd/mm/aa quando quiser usar uma data de corte diferente da automática."/></div>
     </div>
     <div class="fr">
       <div class="fg"><label>Responsável pela Emissão</label><input type="text" id="rel-emissor" value="Diretoria de Projetos Especiais"/></div>
@@ -8340,20 +8340,34 @@ function isoToBR(iso){
   if(p.length!==3)return iso;
   return `${p[2]}/${p[1]}/${p[0]}`;
 }
+function parseBRDateToISO(value){
+  const raw=String(value||'').trim();
+  if(!raw)return'';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;
+  const m=raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/);
+  if(!m)return'';
+  let dd=m[1].padStart(2,'0');
+  let mm=m[2].padStart(2,'0');
+  let yyyy=m[3];
+  if(yyyy.length===2)yyyy='20'+yyyy;
+  const dt=new Date(Number(yyyy),Number(mm)-1,Number(dd),12,0,0);
+  if(dt.getFullYear()!==Number(yyyy)||dt.getMonth()!==Number(mm)-1||dt.getDate()!==Number(dd))return'';
+  return `${yyyy}-${mm}-${dd}`;
+}
 function getManualReportCutoffISO(){
   const el=document.getElementById('rel-corte');
-  return el?.value || '';
+  return parseBRDateToISO(el?.value || '');
 }
 function getReportCutoffLabel(){
   // Se o usuário preencher manualmente a Data de Corte, essa data passa a ser usada
-  // na pré-visualização, PDF/impressão e PowerPoint. Se estiver vazia, usa a regra automática.
+  // na pré-visualização, PDF/impressão e PowerPoint. Aceita 24/04/26, 24/04/2026 ou 2026-04-24.
   const manual=getManualReportCutoffISO();
   return manual ? isoToBR(manual) : fmtDateBR(getReportCutoffDate());
 }
 function getReportEmissionLabel(){return fmtDateBR(new Date());}
 function updateReportCutoffField(force=false){
   const el=document.getElementById('rel-corte');
-  if(el && (force || !el.value)) el.value=getReportCutoffISO();
+  if(el && (force || !String(el.value||'').trim())) el.value=fmtDateBR(getReportCutoffDate());
 }
 function getReportFootnote(){
   return `* Com comentários atualizados até a data do envio deste relatório: ${getReportEmissionLabel()}.`;
