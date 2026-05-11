@@ -293,6 +293,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <!-- Correção v43: Faróis exportados como caractere colorido para não sumirem ao imprimir o PowerPoint em PDF -->
 <!-- Correção v44: Datas da Pesquisa de Satisfação sem perda de 1 dia e remoção da coluna ID na aba/relatório -->
 <!-- Correção v45: Agrupamento do histórico de satisfação por obra, ordem decrescente e destaque apenas da pesquisa atual -->
+<!-- Correção v46: PowerPoint da satisfação agrupado por cliente, históricos antigos legíveis e coluna Geral reduzida -->
 <!-- Correção v39: edição de obras excluídas/inativas nas abas, Salvar+, botões à esquerda e arraste de comentários -->
 </head>
 <body>
@@ -7989,7 +7990,8 @@ function satWeekKeyFromMs(ms){
   return monday.getUTCFullYear()+'-'+String(monday.getUTCMonth()+1).padStart(2,'0')+'-'+String(monday.getUTCDate()).padStart(2,'0');
 }
 function satClienteKey(p){
-  return (String(p?.id||'').trim() || 'SEM_ID')+'|'+normalizeObraKey(p?.cliente||p?.obra||'');
+  // Agrupa o histórico pelo nome da obra/cliente, para a impressão/PPT não intercalar outras obras entre pesquisas do mesmo cliente.
+  return normalizeObraKey(p?.cliente||p?.obra||p?.id||'SEM_CLIENTE');
 }
 function getSatisfacaoGroupedRows(list){
   const base=(list||[]).slice();
@@ -8622,13 +8624,20 @@ function gerarRelatorio(){
     html+=`<section class="rel-module" data-title="Satisfação"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">SATISFAÇÃO</span>Avaliação de Satisfação</div>
     ${(!satToShowRows.length && satObs)?`<div style="background:#1a1a1a;border-left:3px solid #E87722;border-radius:0 6px 6px 0;padding:10px 12px;margin:0 0 12px;color:${isLightTheme?'#344054':'#d8d8d8'};font-size:11px;line-height:1.55;white-space:pre-wrap">${satObs}</div>`:''}
-    <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a1a1a">
+    <table class="sat-export-table" style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed"><colgroup><col style="width:8%"><col style="width:20%"><col style="width:11%"><col style="width:61%"></colgroup><thead><tr style="background:#1a1a1a">
       ${['Data','Cliente','Geral','Comentário / Dimensões'].map(TH).join('')}
     </tr></thead><tbody>
     ${satToShowRows.length ? satToShowRows.map(({p,isCurrent})=>{const f=satFace(p.nivel);const c=p.nivel==='Satisfeito'?'#48c774':p.nivel==='Insatisfeito'?'#ff6b6b':relWarn;
       const comment=satComentarioHtml(p,true);
-      const oldStyle=isCurrent?'':'opacity:.62;';
-      return`<tr style="border-bottom:1px solid #222;${oldStyle}">${TD(dateToBR(p.data),isCurrent?'color:#e0e0e0;font-weight:600':'color:#b8c0cc;font-weight:600')}${TD(p.cliente,isCurrent?'font-weight:700;color:#f3f3f3':'font-weight:700;color:#b8c0cc')}<td style="padding:6px 10px;color:${c};font-weight:700"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:26px;line-height:1">${f.e}</span><span>${f.l}</span></div></td><td style="padding:6px 10px;color:${isCurrent?'#d8d8d8':'#b8c0cc'};max-width:380px;font-size:11px">${comment}</td></tr>`;
+      const trBg=isCurrent?'transparent':(isLightTheme?'#fbfcff':'#171717');
+      const dateColor=isCurrent?(isLightTheme?'#111827':'#e0e0e0'):(isLightTheme?'#a7b0bd':'#8f98a6');
+      const clientColor=isCurrent?(isLightTheme?'#111827':'#f3f3f3'):(isLightTheme?'#8d98a8':'#8f98a6');
+      const commentColor=isCurrent?(isLightTheme?'#1f2933':'#d8d8d8'):(isLightTheme?'#7d8797':'#8b94a3');
+      const boxBg=isCurrent?'#eaf2ff':(isLightTheme?'#f3f6fb':'#202327');
+      const boxBd=isCurrent?'#9ec5ff':(isLightTheme?'#d8e0ec':'#303844');
+      const faceOpacity=isCurrent?'1':'.42';
+      const levelOpacity=isCurrent?'1':'.62';
+      return`<tr style="border-bottom:1px solid ${isLightTheme?'#e5e7eb':'#222'};background:${trBg}">${TD(dateToBR(p.data),`color:${dateColor};font-weight:600;white-space:nowrap`)}${TD(p.cliente,`font-weight:700;color:${clientColor};white-space:normal;overflow-wrap:break-word;word-break:normal`)}<td style="padding:6px 6px;color:${c};font-weight:700"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-start"><span style="font-size:24px;line-height:1;opacity:${faceOpacity}">${f.e}</span><span style="font-size:9.5px;opacity:${levelOpacity};white-space:nowrap">${f.l}</span></div></td><td style="padding:6px 8px;color:${commentColor};font-size:11px;line-height:1.42"><div style="background:${boxBg};border:1px solid ${boxBd};border-radius:8px;padding:7px 8px;line-height:1.45">${comment}</div></td></tr>`;
     }).join('') : `<tr><td colspan="4" style="padding:12px 10px;color:${isLightTheme?'#667085':'#a8a8a8'};text-align:center">Nenhuma pesquisa de satisfação incluída para esta semana.</td></tr>`}
     </tbody></table></div></section>`;
   }
@@ -8780,7 +8789,7 @@ function buildStoragePayload() {
 
 // Backup SIOG incorporado em 11/05/2026 a partir do arquivo informado pelo usuário.
 const EMBEDDED_BACKUP_DATA = {
-  "ts": 1778502744967,
+  "ts": 1778523425158,
   "PROJETOS": [
     {
       "id": "1.24.01332",
@@ -9166,7 +9175,7 @@ const EMBEDDED_BACKUP_DATA = {
       "resp": "JOYCE ALVES",
       "modelo": "RDOWEB",
       "histograma": "TERCEIRIZADO - EMPREITADA",
-      "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
+      "obs": ""
     },
     {
       "id": "P007",
@@ -9221,7 +9230,7 @@ const EMBEDDED_BACKUP_DATA = {
       "resp": "ÁGDA FURTADO",
       "modelo": "RDOWEB",
       "histograma": "TERCEIRIZADO - EMPREITADA",
-      "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
+      "obs": ""
     },
     {
       "id": "1.24.01395",
@@ -9243,7 +9252,7 @@ const EMBEDDED_BACKUP_DATA = {
       "resp": "PENDENTE",
       "modelo": "RDOWEB",
       "histograma": "ATÉ 30/04/2026",
-      "obs": ""
+      "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
     },
     {
       "id": "1.26.01589",
@@ -9254,7 +9263,7 @@ const EMBEDDED_BACKUP_DATA = {
       "resp": "BRUNA",
       "modelo": "MODELO CLIENTE",
       "histograma": "ATÉ 08/05/2026",
-      "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
+      "obs": ""
     },
     {
       "id": "1.26.01590",
@@ -9287,7 +9296,7 @@ const EMBEDDED_BACKUP_DATA = {
       "resp": "MURILO",
       "modelo": "RDOWEB",
       "histograma": "ATÉ 02/05/2026",
-      "obs": ""
+      "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
     },
     {
       "id": "1.25.01530",
@@ -9298,18 +9307,7 @@ const EMBEDDED_BACKUP_DATA = {
       "resp": "JOÃO VITOR",
       "modelo": "RDOWEB",
       "histograma": "ATÉ 30/04/2026",
-      "obs": ""
-    },
-    {
-      "id": "1.24.01395",
-      "obra": "1000 CASAS",
-      "atualizacao": "NÃO INICIADA",
-      "enviado": "NÃO INICIADA",
-      "assinado": "NÃO INICIADA",
-      "resp": "",
-      "modelo": "",
-      "histograma": "",
-      "obs": "Novo projeto"
+      "obs": "ATUALIZAÇÃO SEMANAL PENDENTE"
     }
   ],
   "DOCUMENTACAO": [
@@ -15551,6 +15549,244 @@ const EMBEDDED_BACKUP_DATA = {
       "equipe": "Equipe prestativa, com ressalvas na montagem.",
       "comunicacao": "Comunicação bem avaliada.",
       "id_seq": "sat_0019"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01530",
+      "cliente": "CSN",
+      "data": "2026-04-15",
+      "nivel": "Parcialmente Satisfeito",
+      "geral": "O cliente permanece parcialmente insatisfeito, pois a equipe de campo ainda não apresenta o desempenho esperado para recuperação do cronograma, mesmo com o apoio disponibilizado de mão de obra, cedido pelo próprio cliente, para acelerar a conclusão da obra.",
+      "prazo": "",
+      "qualidade": "",
+      "seguranca": "",
+      "equipe": "",
+      "comunicacao": "",
+      "id_seq": "sat_1778518102206_ta0fjx"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01530",
+      "cliente": "CSN",
+      "data": "2026-04-02",
+      "nivel": "Parcialmente Satisfeito",
+      "geral": "Cliente apontou falhas de alinhamento, planejamento e controle de qualidade, com retrabalhos e avarias em campo que impactaram a percepção final da entrega (foi necessária a retirada da escada do site para refazer a pintura na filial de Contagem).",
+      "prazo": "",
+      "qualidade": "",
+      "seguranca": "",
+      "equipe": "",
+      "comunicacao": "",
+      "id_seq": "sat_1778520260624_itykwo"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01530",
+      "cliente": "CSN",
+      "data": "2026-03-10",
+      "nivel": "Parcialmente Satisfeito",
+      "geral": "",
+      "prazo": "Cobrado aderência ao cronograma.",
+      "qualidade": "Correções pontuais necessárias.",
+      "seguranca": "",
+      "equipe": "Necessita mais alinhamento.",
+      "comunicacao": "Exige maior integração prévia.",
+      "id_seq": "sat_1778520316743_jkjb5n"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01530",
+      "cliente": "CSN",
+      "data": "2026-03-25",
+      "nivel": "Insatisfeito",
+      "geral": "Cliente insatisfeito com o atraso no cronograma da edificação P15: a entrega, prevista para 14/04/26, está com tendência para 23/04/26. Também aponta falhas na mobilização de equipamentos e na disponibilidade de operador para execução do plano de recuperação. Foi feito um alerta prévio, antes de eventual notificação, e o cliente mantém 14/04/26 como prazo final.",
+      "prazo": "",
+      "qualidade": "",
+      "seguranca": "",
+      "equipe": "",
+      "comunicacao": "",
+      "id_seq": "sat_1778520451269_nuoj0v"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01540",
+      "cliente": "SERRA VERDE",
+      "data": "2026-04-14",
+      "nivel": "Parcialmente Satisfeito",
+      "geral": "O cliente manteve as considerações apontadas na pesquisa anterior, e solicita celeridade nas tratativas da manutenção pós-obra.",
+      "prazo": "",
+      "qualidade": "",
+      "seguranca": "",
+      "equipe": "",
+      "comunicacao": "",
+      "id_seq": "sat_1778520567250_uddkjw"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01540",
+      "cliente": "SERRA VERDE",
+      "data": "2026-03-31",
+      "nivel": "Parcialmente Satisfeito",
+      "geral": "O cliente demonstrou insatisfação pontual após o recebimento do módulo, em razão do descolamento do piso vinílico identificado um dia após a entrega do produto final.",
+      "prazo": "",
+      "qualidade": "",
+      "seguranca": "",
+      "equipe": "",
+      "comunicacao": "",
+      "id_seq": "sat_1778520610065_6lvu4u"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01540",
+      "cliente": "SERRA VERDE",
+      "data": "2026-03-16",
+      "nivel": "Parcialmente Satisfeito",
+      "geral": "",
+      "prazo": "Houve atraso pontual.",
+      "qualidade": "Ajustes atendidos adequadamente.",
+      "seguranca": "",
+      "equipe": "Boa resposta da equipe.",
+      "comunicacao": "Comunicação adequada.",
+      "id_seq": "sat_1778520700495_s5ef05"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01564",
+      "cliente": "USIMINAS",
+      "data": "2026-04-15",
+      "nivel": "Parcialmente Satisfeito",
+      "geral": "O cliente demonstrou insatisfação em relação ao início de atraso no cronograma, decorrente da falha na vistoria do munck, com risco de impacto nas próximas etapas. Foi reforçado que não será aceito desvio da data final de 08/06/26, sendo necessária a recuperação do atraso diretamente em campo.",
+      "prazo": "",
+      "qualidade": "",
+      "seguranca": "",
+      "equipe": "",
+      "comunicacao": "",
+      "id_seq": "sat_1778521700307_waksmi"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01564",
+      "cliente": "USIMINAS",
+      "data": "2026-04-02",
+      "nivel": "Satisfeito",
+      "geral": "Cliente sinalizou satisfação com a agilidade na resposta e com o plano de ação apresentado para mitigação do desvio e recuperação parcial do prazo do cronograma.",
+      "prazo": "",
+      "qualidade": "",
+      "seguranca": "",
+      "equipe": "",
+      "comunicacao": "",
+      "id_seq": "sat_1778521738210_3o494d"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01564",
+      "cliente": "USIMINAS",
+      "data": "2026-03-24",
+      "nivel": "Insatisfeito",
+      "geral": "Cliente demonstra insatisfação em virtude do desvio do cronograma validado, cujo término inicialmente previsto para 22/05/26, foi alterado para 19/06/26. Em virtude deste cenário, recebemos uma notificação em 24/03/26.",
+      "prazo": "",
+      "qualidade": "",
+      "seguranca": "",
+      "equipe": "",
+      "comunicacao": "",
+      "id_seq": "sat_1778521794106_r9w2kd"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01564",
+      "cliente": "USIMINAS",
+      "data": "2026-03-16",
+      "nivel": "Satisfeito",
+      "geral": "",
+      "prazo": "Boa percepção do andamento.",
+      "qualidade": "Boa aceitação da condução.",
+      "seguranca": "Atuação reconhecida.",
+      "equipe": "Equipe engajada.",
+      "comunicacao": "Comunicação positiva.",
+      "id_seq": "sat_1778521892648_u3fuyf"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.1492",
+      "cliente": "ANGLO AMERICAN COZINHA",
+      "data": "2026-03-16",
+      "nivel": "Satisfeito",
+      "geral": "",
+      "prazo": "Retornos ágeis, com pontuais demoras.",
+      "qualidade": "Reforçar conferência final.",
+      "seguranca": "",
+      "equipe": "Equipe prestativa.",
+      "comunicacao": "Comunicação ágil.",
+      "id_seq": "sat_1778522019535_8sc8tz"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01526",
+      "cliente": "GRÃOS DO PIAUÍ - 55 MÓDULOS E ESTR. METÁLICA",
+      "data": "2026-03-12",
+      "nivel": "Insatisfeito",
+      "geral": "",
+      "prazo": "Atrasos e reprogramações.",
+      "qualidade": "Ajustes em andamento.",
+      "seguranca": "",
+      "equipe": "Foi solicitado maior previsibilidade das entregas.",
+      "comunicacao": "Solicitado mais alinhamento nas comunicações.",
+      "id_seq": "sat_1778522198647_60eshc"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01578",
+      "cliente": "GRÃOS DO PIAUÍ - OBRAS CIVIS",
+      "data": "2026-03-12",
+      "nivel": "Insatisfeito",
+      "geral": "",
+      "prazo": "Atrasos e reprogramações.",
+      "qualidade": "Ajustes em andamento.",
+      "seguranca": "",
+      "equipe": "Foi solicitado maior previsibilidade das entregas.",
+      "comunicacao": "Solicitado mais alinhamento nas comunicações.",
+      "id_seq": "sat_1778522429533_3grami"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.26.01580",
+      "cliente": "GRÃOS DO PIAUÍ - PERFURAÇÃO POÇOS",
+      "data": "2026-03-12",
+      "nivel": "Insatisfeito",
+      "geral": "",
+      "prazo": "Atrasos e reprogramações.",
+      "qualidade": "Ajustes em andamento.",
+      "seguranca": "",
+      "equipe": "Foi solicitado maior previsibilidade das entregas.",
+      "comunicacao": "Solicitado mais alinhamento nas comunicações.",
+      "id_seq": "sat_1778522904675_5shzm6"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01470",
+      "cliente": "VIRTU SANTO ANTÔNIO DOS LOPES",
+      "data": "2026-03-16",
+      "nivel": "Parcialmente Satisfeito",
+      "geral": "",
+      "prazo": "Atendimento bom, com pendências.",
+      "qualidade": "Ressalvas em materiais e acabamento.",
+      "seguranca": "",
+      "equipe": "Equipe prestativa, com ressalvas na montagem.",
+      "comunicacao": "Comunicação bem avaliada.",
+      "id_seq": "sat_1778523025173_hl6gnb"
+    },
+    {
+      "incl_rel": true,
+      "id": "1.25.01470",
+      "cliente": "VIRTU SANTO ANTÔNIO DOS LOPES",
+      "data": "2026-04-02",
+      "nivel": "Parcialmente Satisfeito",
+      "geral": "O cliente manteve as considerações apontadas na pesquisa anterior, realizada em 16/03/26.",
+      "prazo": "",
+      "qualidade": "",
+      "seguranca": "",
+      "equipe": "",
+      "comunicacao": "",
+      "id_seq": "sat_1778523104666_7r7y5z"
     }
   ],
   "OBSERVACOES": [
