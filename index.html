@@ -292,6 +292,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <!-- Correção v42: Data de Corte manual em dd/mm/aa preservada no relatório/PPT/PDF e previsão de recebimento automática/editável nas medições -->
 <!-- Correção v43: Faróis exportados como caractere colorido para não sumirem ao imprimir o PowerPoint em PDF -->
 <!-- Correção v44: Datas da Pesquisa de Satisfação sem perda de 1 dia e remoção da coluna ID na aba/relatório -->
+<!-- Correção v45: Agrupamento do histórico de satisfação por obra, ordem decrescente e destaque apenas da pesquisa atual -->
 <!-- Correção v39: edição de obras excluídas/inativas nas abas, Salvar+, botões à esquerda e arraste de comentários -->
 </head>
 <body>
@@ -7976,6 +7977,45 @@ function satComentarioHtml(p, compact=false){
 
   return `<div style="display:flex;flex-direction:column;gap:${compact?'3px':'4px'}">${campos.map(([lbl,val])=>bubble(lbl,val,false)).join('')}</div>`;
 }
+function satDateMs(p){
+  const d=parseAnyDateToUTC(p?.data);
+  return d ? d.getTime() : 0;
+}
+function satWeekKeyFromMs(ms){
+  if(!ms) return '';
+  const d=new Date(ms);
+  const day=d.getUTCDay() || 7;
+  const monday=new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day + 1));
+  return monday.getUTCFullYear()+'-'+String(monday.getUTCMonth()+1).padStart(2,'0')+'-'+String(monday.getUTCDate()).padStart(2,'0');
+}
+function satClienteKey(p){
+  return (String(p?.id||'').trim() || 'SEM_ID')+'|'+normalizeObraKey(p?.cliente||p?.obra||'');
+}
+function getSatisfacaoGroupedRows(list){
+  const base=(list||[]).slice();
+  const maxMs=base.reduce((m,p)=>Math.max(m,satDateMs(p)),0);
+  const currentWeek=satWeekKeyFromMs(maxMs);
+  const groups=new Map();
+  base.forEach(p=>{
+    const k=satClienteKey(p);
+    if(!groups.has(k)) groups.set(k,[]);
+    groups.get(k).push(p);
+  });
+  const orderedGroups=[...groups.values()].map(entries=>entries.sort((a,b)=>satDateMs(b)-satDateMs(a)))
+    .sort((a,b)=>{
+      const d=satDateMs(b[0])-satDateMs(a[0]);
+      if(d) return d;
+      return String(a[0]?.cliente||'').localeCompare(String(b[0]?.cliente||''),'pt-BR');
+    });
+  const rows=[];
+  orderedGroups.forEach(entries=>{
+    entries.forEach((p,idx)=>{
+      const isCurrentWeek=satWeekKeyFromMs(satDateMs(p))===currentWeek;
+      rows.push({p,idx:PESQUISAS.indexOf(p),isCurrent:idx===0 && isCurrentWeek});
+    });
+  });
+  return rows;
+}
 function saveSatRelObs(v){
   SAT_RELATORIO_OBS = v || '';
   saveToStorage();
@@ -7989,15 +8029,6 @@ function renderSatisfacao(){
   // Populate project filter
   const selP=document.getElementById('ss-proj');
   if(selP.options.length<=1){PROJETOS.forEach(p=>{const o=document.createElement('option');o.value=p.id+'|'+p.obra;o.textContent=p.id+' — '+p.obra;selP.appendChild(o);});}
-  // Group by client — find latest for each
-  const byClient={};
-  PESQUISAS.forEach(p=>{
-    const k=p.id+'|'+(p.cliente||p.obra||'');
-    if(!byClient[k])byClient[k]=[];
-    byClient[k].push(p);
-  });
-  // Sort each group by date desc
-  Object.keys(byClient).forEach(k=>{byClient[k].sort((a,b)=>(parseAnyDateToUTC(b.data)?.getTime()||0)-(parseAnyDateToUTC(a.data)?.getTime()||0));});
   const kpis=PESQUISAS;
   document.getElementById('kpi-sat').innerHTML=`
     <div class="kpi bl"><div class="kpi-lbl">Total Registros</div><div class="kpi-val">${kpis.length}</div></div>
@@ -8005,28 +8036,26 @@ function renderSatisfacao(){
     <div class="kpi y"><div class="kpi-lbl">😐 Parcialmente</div><div class="kpi-val">${kpis.filter(p=>p.nivel==='Parcialmente Satisfeito').length}</div></div>
     <div class="kpi r"><div class="kpi-lbl">😞 Insatisfeitos</div><div class="kpi-val">${kpis.filter(p=>p.nivel==='Insatisfeito').length}</div></div>
   `;
-  // Render: show all entries from clients that had updates (most recent bold, older dimmed)
+  // Render: agrupa por cliente/obra, ordena cada histórico por data decrescente e destaca apenas a atualização mais recente da semana
   let rows='';
-  Object.entries(byClient).forEach(([k,entries])=>{
-    // fp is "id|obra", k is "id|cliente" - match by id prefix
-    if(fp){const fpId=fp.split('|')[0];const kId=k.split('|')[0];if(fpId&&kId!==fpId)return;}
-    if(ff&&entries[0].nivel!==ff)return;
-    entries.forEach((p,idx)=>{
-      const isNew=idx===0;
-      const f=satFace(p.nivel);
-      const rowCls=isNew?'sat-row-new':'sat-row-old';
-      const comentCells=`<td style="font-size:12px;max-width:620px;white-space:normal;line-height:1.45">${satComentarioHtml(p)}</td>`;
-      const pIdx=PESQUISAS.indexOf(p);
-      const inclBtn=`<button class="dot ${p.incl_rel?'dg':'dgr'}" title="${p.incl_rel?'Incluir no relatório':'Excluir do relatório'}" onclick="toggleSatRel(${pIdx})"></button>`;
-      rows+=`<tr class="${rowCls}" style="font-style:normal">
-        <td class="acoes-left"><button class="btn btn-xs" onclick="editSat(${pIdx})" title="Editar">✏</button> <button class="btn btn-xs btn-r" onclick="deleteSat(${pIdx})" title="Excluir">✕</button></td>
-        <td style="text-align:center">${inclBtn}</td>
-        <td style="white-space:nowrap">${dateToBR(p.data)}</td>
-        <td style="white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis" title="${p.cliente}">${p.cliente}</td>
-        <td style="text-align:center"><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:36px;line-height:1;font-style:normal">${f.e}</span><span class="badge ${f.cls}" style="font-size:10px;font-style:normal">${f.l}</span></div></td>
-        ${comentCells}
-      </tr>`;
-    });
+  const satFiltered=PESQUISAS.filter(p=>{
+    if(fp){const fpId=fp.split('|')[0]; if(fpId && String(p.id||'')!==fpId) return false;}
+    if(ff && p.nivel!==ff) return false;
+    return true;
+  });
+  getSatisfacaoGroupedRows(satFiltered).forEach(({p,idx:pIdx,isCurrent})=>{
+    const f=satFace(p.nivel);
+    const rowCls=isCurrent?'sat-row-new':'sat-row-old';
+    const comentCells=`<td style="font-size:12px;max-width:620px;white-space:normal;line-height:1.45">${satComentarioHtml(p)}</td>`;
+    const inclBtn=`<button class="dot ${p.incl_rel?'dg':'dgr'}" title="${p.incl_rel?'Incluir no relatório':'Excluir do relatório'}" onclick="toggleSatRel(${pIdx})"></button>`;
+    rows+=`<tr class="${rowCls}" style="font-style:normal">
+      <td class="acoes-left"><button class="btn btn-xs" onclick="editSat(${pIdx})" title="Editar">✏</button> <button class="btn btn-xs btn-r" onclick="deleteSat(${pIdx})" title="Excluir">✕</button></td>
+      <td style="text-align:center">${inclBtn}</td>
+      <td style="white-space:nowrap">${dateToBR(p.data)}</td>
+      <td style="white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis" title="${p.cliente}">${p.cliente}</td>
+      <td style="text-align:center"><div style="display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:36px;line-height:1;font-style:normal">${f.e}</span><span class="badge ${f.cls}" style="font-size:10px;font-style:normal">${f.l}</span></div></td>
+      ${comentCells}
+    </tr>`;
   });
   if(!rows && PESQUISAS.length > 0){
     rows = `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--tx3)">Nenhum resultado para o filtro selecionado. <button class="btn btn-sm" onclick="document.getElementById('ss-proj').value='';document.getElementById('ss-nivel').value='';renderSatisfacao()">Limpar filtros</button></td></tr>`;
@@ -8588,17 +8617,18 @@ function gerarRelatorio(){
   }
 
   if(document.getElementById('ri-sat').checked){
-    const satToShow=PESQUISAS.filter(p=>p.incl_rel);
+    const satToShowRows=getSatisfacaoGroupedRows(PESQUISAS.filter(p=>p.incl_rel));
     const satObs=(SAT_RELATORIO_OBS||'').trim();
     html+=`<section class="rel-module" data-title="Satisfação"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
     <div style="font-size:14px;font-weight:700;color:#E87722;margin-bottom:12px"><span style="background:#E87722;color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;margin-right:8px">SATISFAÇÃO</span>Avaliação de Satisfação</div>
-    ${(!satToShow.length && satObs)?`<div style="background:#1a1a1a;border-left:3px solid #E87722;border-radius:0 6px 6px 0;padding:10px 12px;margin:0 0 12px;color:${isLightTheme?'#344054':'#d8d8d8'};font-size:11px;line-height:1.55;white-space:pre-wrap">${satObs}</div>`:''}
+    ${(!satToShowRows.length && satObs)?`<div style="background:#1a1a1a;border-left:3px solid #E87722;border-radius:0 6px 6px 0;padding:10px 12px;margin:0 0 12px;color:${isLightTheme?'#344054':'#d8d8d8'};font-size:11px;line-height:1.55;white-space:pre-wrap">${satObs}</div>`:''}
     <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a1a1a">
       ${['Data','Cliente','Geral','Comentário / Dimensões'].map(TH).join('')}
     </tr></thead><tbody>
-    ${satToShow.length ? satToShow.map(p=>{const f=satFace(p.nivel);const c=p.nivel==='Satisfeito'?'#48c774':p.nivel==='Insatisfeito'?'#ff6b6b':relWarn;
+    ${satToShowRows.length ? satToShowRows.map(({p,isCurrent})=>{const f=satFace(p.nivel);const c=p.nivel==='Satisfeito'?'#48c774':p.nivel==='Insatisfeito'?'#ff6b6b':relWarn;
       const comment=satComentarioHtml(p,true);
-      return`<tr style="border-bottom:1px solid #222">${TD(dateToBR(p.data),'color:#e0e0e0;font-weight:600')}${TD(p.cliente,'font-weight:700;color:#f3f3f3')}<td style="padding:6px 10px;color:${c};font-weight:700"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:26px;line-height:1">${f.e}</span><span>${f.l}</span></div></td><td style="padding:6px 10px;color:#d8d8d8;max-width:380px;font-size:11px">${comment}</td></tr>`;
+      const oldStyle=isCurrent?'':'opacity:.62;';
+      return`<tr style="border-bottom:1px solid #222;${oldStyle}">${TD(dateToBR(p.data),isCurrent?'color:#e0e0e0;font-weight:600':'color:#b8c0cc;font-weight:600')}${TD(p.cliente,isCurrent?'font-weight:700;color:#f3f3f3':'font-weight:700;color:#b8c0cc')}<td style="padding:6px 10px;color:${c};font-weight:700"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:26px;line-height:1">${f.e}</span><span>${f.l}</span></div></td><td style="padding:6px 10px;color:${isCurrent?'#d8d8d8':'#b8c0cc'};max-width:380px;font-size:11px">${comment}</td></tr>`;
     }).join('') : `<tr><td colspan="4" style="padding:12px 10px;color:${isLightTheme?'#667085':'#a8a8a8'};text-align:center">Nenhuma pesquisa de satisfação incluída para esta semana.</td></tr>`}
     </tbody></table></div></section>`;
   }
