@@ -297,6 +297,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <!-- Correção v39: edição de obras excluídas/inativas nas abas, Salvar+, botões à esquerda e arraste de comentários -->
 <!-- Correção v47: exportação PPT/PDF respeita a ordem classificada nas abas, preserva vigências manuais e exibe observação semanal da satisfação -->
 <!-- Correção v48: campos de checklist da Documentação permitem N/A manual, exibindo traço na tela e no relatório/PDF/PPT -->
+<!-- Correção v49: campos de documentos pendentes permitem salvar traço (-) manual sem voltar para Pendente automático -->
 </head>
 <body>
 
@@ -7529,6 +7530,9 @@ function docChecklistManualFlag(d,campo){
 }
 function docEffectiveChecklistValue(d,campo){
   const val=(d?.[campo]||'-');
+  // Permite sobrescrever manualmente a regra automática com traço (-).
+  // Quando o usuário seleciona '-' e salva, o campo fica manual e não volta para Pendência.
+  if(val==='-' && docChecklistManualFlag(d,campo)) return '-';
   if(val==='Concluído' || val==='N/A') return val;
   if(val==='Pendente' && docChecklistManualFlag(d,campo)) return 'Pendente';
   return docChecklistObrigatorio(d) ? 'Pendente' : '-';
@@ -7599,8 +7603,9 @@ function salvarDoc(keepOpen=false){
         d[key+'_manual']=true;
       }
     }else{
-      d[key]='';
-      d[key+'_manual']=false;
+      // Mantém o traço (-) como escolha manual válida, mesmo quando a regra automática indicaria Pendente.
+      d[key]='-';
+      d[key+'_manual']=true;
     }
   });
   renderDocs();updateBadges();refreshResumoAutomatico();
