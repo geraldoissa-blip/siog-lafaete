@@ -299,6 +299,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <!-- Correção v48: campos de checklist da Documentação permitem N/A manual, exibindo traço na tela e no relatório/PDF/PPT -->
 <!-- Correção v49: campos de documentos pendentes permitem salvar traço (-) manual sem voltar para Pendente automático -->
 <!-- Correção v50: traço (-) gravado no campo prevalece sobre regra automática de Pendente na aba ARTs & Documentos -->
+<!-- Correção v51: faróis do RDO congelados pela segunda-feira da semana do relatório -->
 </head>
 <body>
 
@@ -6288,6 +6289,17 @@ let OBSERVACOES = [
 // ─── UTILS// ─── UTILS ───────────────────────────────────────────────────────────────────
 const TODAY_XL = Math.round(Date.now()/86400000 + 25569);
 const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+// Correção v51: RDO com faróis congelados na segunda-feira da semana atual.
+// Evita que as cores mudem entre segunda e sexta apenas pela passagem dos dias.
+function getRdoReferenceMondayXL(){
+  const d=new Date();
+  d.setHours(0,0,0,0);
+  const day=d.getDay(); // 0=domingo, 1=segunda...
+  const diff=(day===0?-6:1-day);
+  d.setDate(d.getDate()+diff);
+  return Math.round(d.getTime()/86400000 + 25569);
+}
+const RDO_REFERENCE_XL = getRdoReferenceMondayXL();
 
 function xl2date(n){
   if(!n||isNaN(n))return null;
@@ -6743,8 +6755,9 @@ function bSegGar(items){
 function dotFarol(f,tip=''){return`<span class="dot d${f}" title="${tip}" style="cursor:help"></span>`;}
 function rdoDot(val){
   if(!val||isNaN(val))return dotFarol('y','Não iniciado / Pendente');
-  const d=TODAY_XL-val;
-  return d<=7?dotFarol('g',`OK — ${d}d atrás`):dotFarol('r',`Pendente — ${d}d sem atualização`);
+  const d=RDO_REFERENCE_XL-val;
+  const ref=xl2str(RDO_REFERENCE_XL);
+  return d<=7?dotFarol('g',`OK — ${d}d até a segunda-feira de referência (${ref})`):dotFarol('r',`Pendente — ${d}d sem atualização até a segunda-feira de referência (${ref})`);
 }
 function rdoDotAssinado(r){
   // Verde se assinado == enviado (cliente em dia), senão lógica normal
@@ -7328,9 +7341,9 @@ function getRdoStatus(r){
   const v=r.atualizacao;
   if(!v||v==='NÃO INICIADA')return'Não Iniciado';
   if(v==='PENDENTE')return'Pendente';
-  return(TODAY_XL-v)<=7?'Atualizado':'Pendente';
+  return(RDO_REFERENCE_XL-v)<=7?'Atualizado':'Pendente';
 }
-function getRdoDias(v){if(!v||isNaN(v))return null;return TODAY_XL-v;}
+function getRdoDias(v){if(!v||isNaN(v))return null;return RDO_REFERENCE_XL-v;}
 function setRdoField(fieldId, val){
   const el=document.getElementById(fieldId);
   el.value='';
@@ -7398,8 +7411,8 @@ function renderRDO(){
   const ni=RDO.filter(r=>getRdoStatus(r)==='Não Iniciado').length;
   document.getElementById('kpi-rdo').innerHTML=`
     <div class="kpi bl"><div class="kpi-lbl">Total em Campo</div><div class="kpi-val">${RDO.length}</div><div class="kpi-sub">Obras ativas</div></div>
-    <div class="kpi g"><div class="kpi-lbl">✅ Atualizadas</div><div class="kpi-val">${atu}</div><div class="kpi-sub">≤7 dias</div></div>
-    <div class="kpi r"><div class="kpi-lbl">⚠ Pendentes</div><div class="kpi-val">${pend}</div><div class="kpi-sub">&gt;7 dias</div></div>
+    <div class="kpi g"><div class="kpi-lbl">✅ Atualizadas</div><div class="kpi-val">${atu}</div><div class="kpi-sub">ref. segunda-feira</div></div>
+    <div class="kpi r"><div class="kpi-lbl">⚠ Pendentes</div><div class="kpi-val">${pend}</div><div class="kpi-sub">ref. segunda-feira</div></div>
     <div class="kpi y"><div class="kpi-lbl">Não Iniciadas</div><div class="kpi-val">${ni}</div></div>
   `;
   let data=RDO.filter(r=>{
