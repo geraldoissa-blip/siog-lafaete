@@ -6291,13 +6291,16 @@ const TODAY_XL = Math.round(Date.now()/86400000 + 25569);
 const TODAY = new Date(); TODAY.setHours(0,0,0,0);
 // Correção v51: RDO com faróis congelados na segunda-feira da semana atual.
 // Evita que as cores mudem entre segunda e sexta apenas pela passagem dos dias.
+function dateToExcelLocal(d){
+  // Converte uma data local para serial Excel sem interferência de fuso/horário de verão.
+  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())/86400000 + 25569);
+}
 function getRdoReferenceMondayXL(){
   const d=new Date();
-  d.setHours(0,0,0,0);
-  const day=d.getDay(); // 0=domingo, 1=segunda...
-  const diff=(day===0?-6:1-day);
-  d.setDate(d.getDate()+diff);
-  return Math.round(d.getTime()/86400000 + 25569);
+  d.setHours(12,0,0,0);
+  const daysSinceMonday=(d.getDay()+6)%7; // segunda=0 ... domingo=6
+  d.setDate(d.getDate()-daysSinceMonday);
+  return dateToExcelLocal(d);
 }
 const RDO_REFERENCE_XL = getRdoReferenceMondayXL();
 
