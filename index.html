@@ -300,6 +300,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <!-- Correção v49: campos de documentos pendentes permitem salvar traço (-) manual sem voltar para Pendente automático -->
 <!-- Correção v50: traço (-) gravado no campo prevalece sobre regra automática de Pendente na aba ARTs & Documentos -->
 <!-- Correção v51: faróis do RDO congelados pela segunda-feira da semana do relatório -->
+<!-- Correção v52: observação automática do RDO por status e ordenação padrão por ID nas abas -->
 </head>
 <body>
 
@@ -6304,6 +6305,27 @@ function getRdoReferenceMondayXL(){
 }
 const RDO_REFERENCE_XL = getRdoReferenceMondayXL();
 
+const _ID_COLLATOR = new Intl.Collator('pt-BR',{numeric:true,sensitivity:'base'});
+function compareIdNumerico(a,b){
+  const sa=String(a||'').trim();
+  const sb=String(b||'').trim();
+  if(sa && sb){
+    const c=_ID_COLLATOR.compare(sa,sb);
+    if(c) return c;
+  }else if(sa) return -1; else if(sb) return 1;
+  return 0;
+}
+function ordenarPorIdPadrao(arr,getId,getNome){
+  return [...(arr||[])].sort((a,b)=>compareIdNumerico(getId(a),getId(b)) || String(getNome(a)||'').localeCompare(String(getNome(b)||''),'pt-BR',{numeric:true,sensitivity:'base'}));
+}
+function aplicarObsAutomaticaRdo(r){
+  if(!r) return r;
+  const st=getRdoStatus(r);
+  if(st==='Atualizado') r.obs='-';
+  else if(st==='Pendente') r.obs='ATUALIZAÇÃO SEMANAL PENDENTE';
+  return r;
+}
+
 function xl2date(n){
   if(!n||isNaN(n))return null;
   // Offset 25569 = days from Excel epoch (1899-12-30) to Unix epoch
@@ -6972,7 +6994,7 @@ function salvarProjeto(keepOpen=false){
 function renderProjetos(){
   const q=(document.getElementById('sp-q').value||'').toLowerCase();
   const fst=document.getElementById('sp-status').value;
-  const data=PROJETOS.filter(p=>(!q||p.id.toLowerCase().includes(q)||p.obra.toLowerCase().includes(q)||(p.resp||'').toLowerCase().includes(q))&&(!fst||p.status===fst));
+  const data=ordenarPorIdPadrao(PROJETOS.filter(p=>(!q||p.id.toLowerCase().includes(q)||p.obra.toLowerCase().includes(q)||(p.resp||'').toLowerCase().includes(q))&&(!fst||p.status===fst)),p=>p.id,p=>p.obra);
   document.getElementById('tbody-proj').innerHTML=data.map(p=>{
     const idx=PROJETOS.indexOf(p);
     const f=cronoFarol(p);
@@ -7080,9 +7102,8 @@ function getProjetosDisponiveisDaAba(tab){
   }else if(tab==='projetos'){
     PROJETOS.forEach(p=>add(p.id,p.obra));
   }
-  return Array.from(map.values())
-    .filter(p=>!isOpcaoObraIdCurtoNumerico(p.id,p.obra))
-    .sort((a,b)=>a.obra.localeCompare(b.obra,'pt-BR'));
+  return ordenarPorIdPadrao(Array.from(map.values())
+    .filter(p=>!isOpcaoObraIdCurtoNumerico(p.id,p.obra)),p=>p.id,p=>p.obra);
 }
 function nomeDaAbaExclusao(tab){return {cronograma:'Cronograma',rdo:'RDO',seguros:'Seguros & Garantias',arts:'ARTs & Documentos',medicoes:'Medições & Financeiro',satisfacao:'Pesquisa de Satisfação',observacoes:'Observações Livres',projetos:'Base de Projetos'}[tab]||tab;}
 function excluirProjetoDaAbaPrompt(tab){
@@ -7192,13 +7213,13 @@ function renderCronograma(){
     <div class="kpi y"><div class="kpi-lbl">🟡 Atenção</div><div class="kpi-val">${ativos.length-noPrazo-atrasados}</div></div>
   `;
   let rows='';
-  PROJETOS.filter(p=>{
+  ordenarPorIdPadrao(PROJETOS.filter(p=>{
     if(isProjetoExcluidoDaAba('cronograma',p.id,p.obra)) return false;
     const m=!q||p.obra.toLowerCase().includes(q)||p.id.toLowerCase().includes(q);
     const cf=cronoFarol(p);
     const fok=!ff||(ff==='g'&&cf==='g')||(ff==='y'&&cf==='y')||(ff==='r'&&cf==='r');
     return m&&fok;
-  }).forEach(p=>{
+  }),p=>p.id,p=>p.obra).forEach(p=>{
     const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};
     const pct=v=>v!=null?v.toFixed(1)+'%':'—';
     const ader=av.prev&&av.real?(av.real/av.prev*100).toFixed(0)+'%':'—';
@@ -7375,7 +7396,7 @@ function getRdoFieldValue(fieldId){
 }
 function salvarRDO(keepOpen=false){
   rdoStoreCurrent(false);
-  const itens=Object.values(_rdoBatch);
+  const itens=Object.values(_rdoBatch).map(aplicarObsAutomaticaRdo);
   if(!itens.length){alert('Nenhuma alteração de RDO para salvar.');return;}
   itens.forEach(novo=>{
     const ei=RDO.findIndex(r=>r.id===novo.id&&r.obra===novo.obra);
@@ -7407,6 +7428,7 @@ function sortRDO(col){
   renderRDO();
 }
 function renderRDO(){
+  RDO.forEach(aplicarObsAutomaticaRdo);
   const q=(document.getElementById('sr-q').value||'').toLowerCase();
   const fs=document.getElementById('sr-status').value;
   const atu=RDO.filter(r=>getRdoStatus(r)==='Atualizado').length;
@@ -7418,10 +7440,10 @@ function renderRDO(){
     <div class="kpi r"><div class="kpi-lbl">⚠ Pendentes</div><div class="kpi-val">${pend}</div><div class="kpi-sub">ref. segunda-feira</div></div>
     <div class="kpi y"><div class="kpi-lbl">Não Iniciadas</div><div class="kpi-val">${ni}</div></div>
   `;
-  let data=RDO.filter(r=>{
+  let data=ordenarPorIdPadrao(RDO.filter(r=>{
     const m=!q||r.obra.toLowerCase().includes(q)||r.id.toLowerCase().includes(q);
     return m&&(!fs||getRdoStatus(r)===fs);
-  });
+  }),r=>r.id,r=>r.obra);
   if(_rdoSort.col){
     data=[...data].sort((a,b)=>{
       let va,vb;
@@ -7661,7 +7683,7 @@ function checklistAlert(d,campo){
 function renderGarantias(){
   const q=(document.getElementById('sg-q')?.value||'').toLowerCase();
   const fst=document.getElementById('sg-status')?.value||'';
-  const data=DOCUMENTACAO.filter(d=>(!q||d.obra.toLowerCase().includes(q)||d.id.toLowerCase().includes(q))&&(!fst||d.status===fst));
+  const data=ordenarPorIdPadrao(DOCUMENTACAO.filter(d=>(!q||d.obra.toLowerCase().includes(q)||d.id.toLowerCase().includes(q))&&(!fst||d.status===fst)),d=>d.id,d=>d.obra);
   const vencidos=data.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0&&d.status==='Ativo').length;
   const proxVenc=data.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)>=0&&daysFromToday(d.vig_cto)<=30&&d.status==='Ativo').length;
   const pendSeg=data.filter(d=>[d.sre_st,d.src_st,d.cf_st,d.ga_st,d.gp_st,d.geo_st].some(s=>s==='Pendente'||s==='Vencido')).length;
@@ -7710,7 +7732,7 @@ function renderArts(){
   const q=(document.getElementById('sa-q')?.value||'').toLowerCase();
   const fart=document.getElementById('sa-art')?.value||'';
   const fst=document.getElementById('sa-status')?.value||'';
-  const data=DOCUMENTACAO.filter(d=>(!q||d.obra.toLowerCase().includes(q)||d.id.toLowerCase().includes(q))&&(!fart||d.art_st===fart)&&(!fst||d.status===fst));
+  const data=ordenarPorIdPadrao(DOCUMENTACAO.filter(d=>(!q||d.obra.toLowerCase().includes(q)||d.id.toLowerCase().includes(q))&&(!fart||d.art_st===fart)&&(!fst||d.status===fst)),d=>d.id,d=>d.obra);
   const pendArt=data.filter(d=>d.art_st==='Pendente').length;
   const emitArt=data.filter(d=>d.art_st==='Emitida').length;
   const pendDoc=data.filter(d=>['chi','che','te','atc'].some(k=>docEffectiveChecklistValue(d,k)==='Pendente')).length;
@@ -7896,7 +7918,7 @@ function excluirMedicao(idx){
 function renderMedicoes(){
   const q=(document.getElementById('sm-q').value||'').toLowerCase();
   const all=getMedCons();
-  const cons=all.filter(m=>!q||m.cliente.toLowerCase().includes(q)||m.id.toLowerCase().includes(q));
+  const cons=ordenarPorIdPadrao(all.filter(m=>!q||m.cliente.toLowerCase().includes(q)||m.id.toLowerCase().includes(q)),m=>m.id,m=>m.cliente);
   const tC=all.reduce((s,m)=>s+(m.contrato||0),0);
   const tM=all.reduce((s,m)=>s+m.med,0);
   const tF=all.reduce((s,m)=>s+m.fat,0);
@@ -7941,7 +7963,7 @@ function renderMedicoes(){
     <td style="text-align:right;padding:8px 12px">${fmtR(tCons.ar)}</td>
     <td style="text-align:right;padding:8px 12px">${fmtR(tCons.pf)}</td>
   `;
-  const hist=MEDICOES.filter(m=>!q||m.cliente.toLowerCase().includes(q));
+  const hist=ordenarPorIdPadrao(MEDICOES.filter(m=>!q||m.cliente.toLowerCase().includes(q)||String(m.id||'').toLowerCase().includes(q)),m=>m.id,m=>m.cliente);
   const hoje=new Date().toISOString().slice(0,10);
   document.getElementById('tbody-med-hist').innerHTML=hist.map((m,i)=>{
     const prev=xl2iso(m.data_rec_prev)||'';
@@ -8077,11 +8099,7 @@ function getSatisfacaoGroupedRows(list){
     groups.get(k).push(p);
   });
   const orderedGroups=[...groups.values()].map(entries=>entries.sort((a,b)=>satDateMs(b)-satDateMs(a)))
-    .sort((a,b)=>{
-      const d=satDateMs(b[0])-satDateMs(a[0]);
-      if(d) return d;
-      return String(a[0]?.cliente||'').localeCompare(String(b[0]?.cliente||''),'pt-BR');
-    });
+    .sort((a,b)=>compareIdNumerico(a[0]?.id,b[0]?.id) || String(a[0]?.cliente||'').localeCompare(String(b[0]?.cliente||''),'pt-BR',{numeric:true,sensitivity:'base'}));
   const rows=[];
   orderedGroups.forEach(entries=>{
     entries.forEach((p,idx)=>{
@@ -8192,9 +8210,8 @@ function getProjetosReferenciados(includeBase=true){
   MEDICOES.forEach(m=>add(m.id,m.cliente));
   PESQUISAS.forEach(p=>add(p.id,p.cliente));
   OBSERVACOES.forEach(o=>add(o.id||'',o.obra));
-  return Array.from(map.values())
-    .filter(p=>!isOpcaoObraIdCurtoNumerico(p.id,p.obra))
-    .sort((a,b)=>a.obra.localeCompare(b.obra,'pt-BR'));
+  return ordenarPorIdPadrao(Array.from(map.values())
+    .filter(p=>!isOpcaoObraIdCurtoNumerico(p.id,p.obra)),p=>p.id,p=>p.obra);
 }
 function fillObraSelectFromReferencias(sel, opts={}){
   if(!sel) return;
@@ -8287,7 +8304,7 @@ function renderObservacoes(){
   if(selO.options.length<=1){fillObraSelectFromReferencias(selO,{firstHtml:'<option value="">Todas obras</option>',mode:'obra'});}
   // Observações Livres é uma área independente: não exibe comentários lançados nos painéis laterais de Cronograma ou Medições.
   const tiposLaterais = ['Cronograma','Financeiro'];
-  const data=OBSERVACOES.filter(o=>!tiposLaterais.includes(o.tipo)&&(!fs||String(o.semana)===fs)&&(!ft||o.tipo===ft)&&(!fo||o.obra===fo));
+  const data=ordenarPorIdPadrao(OBSERVACOES.filter(o=>!tiposLaterais.includes(o.tipo)&&(!fs||String(o.semana)===fs)&&(!ft||o.tipo===ft)&&(!fo||o.obra===fo)),o=>o.id || (PROJETOS.find(p=>p.obra===o.obra)?.id||''),o=>o.obra);
   document.getElementById('obs-lista').innerHTML=data.length?data.map(o=>{
     const colorClass='c-'+(o.cor||'n');
     const tagHtml=o.cor&&o.cor!=='n'?`<span class="obs-tag ${o.cor}">${o.cor==='g'?'🟢':o.cor==='y'?'🟡':'🔴'}</span>`:'';
@@ -8363,7 +8380,7 @@ function renderDashboard(){
   _charts.fin=new Chart(document.getElementById('ch-fin'),{type:'bar',
     data:{labels:['Carteira','Medido','Faturado','Recebido'],datasets:[{data:[tC/1e6,tM/1e6,tF/1e6,tR/1e6],backgroundColor:['#E87722aa','#28a745aa','#1a6fdbaa','#28c76faa'],borderColor:['#E87722','#28a745','#1a6fdb','#28c76f'],borderWidth:1}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>v.toFixed(1)+'M',color:tc},grid:{color:gc}},x:{ticks:{color:tc},grid:{display:false}}}}});
-  const avd=Object.entries(AVANCOS).filter(([k,v])=>v.prev!=null&&v.real!=null);
+  const avd=Object.entries(AVANCOS).filter(([k,v])=>v.prev!=null&&v.real!=null).sort((a,b)=>compareIdNumerico((a[0].split('|')[0]||''),(b[0].split('|')[0]||'')) || String(a[0].split('|')[1]||'').localeCompare(String(b[0].split('|')[1]||''),'pt-BR',{numeric:true,sensitivity:'base'}));
   const avH=Math.max(360,avd.length*36);
   document.getElementById('ch-av-wrap').style.height=avH+'px';
   _charts.av=new Chart(document.getElementById('ch-av'),{type:'bar',
@@ -8372,10 +8389,10 @@ function renderDashboard(){
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{color:lc,font:{size:11}}}},scales:{x:{max:100,ticks:{color:tc,callback:v=>v+'%'},grid:{color:gc}},y:{ticks:{color:tc,font:{size:11}},grid:{display:false}}}}});
   // Alertas
   const al=[];
-  PROJETOS.filter(p=>p.alerta==='⚠ Atraso'&&p.status==='Ativo').slice(0,5).forEach(p=>al.push(`<div class="alert al-r">⚠ <strong>${p.obra}</strong> — Tend.:${xl2str(p.tendencia)} · Prazo Cli.:${xl2str(p.prazo_cli)}</div>`));
-  DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0&&d.status==='Ativo').slice(0,3).forEach(d=>al.push(`<div class="alert al-o">📄 <strong>${d.obra}</strong> — Contrato vencido há ${Math.abs(daysFromToday(d.vig_cto))} dias.</div>`));
-  DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)>=0&&daysFromToday(d.vig_cto)<=30&&d.status==='Ativo').slice(0,3).forEach(d=>al.push(`<div class="alert al-y">⚠ <strong>${d.obra}</strong> — Contrato vence em ${daysFromToday(d.vig_cto)} dias (${dateToBR(d.vig_cto)}).</div>`));
-  RDO.filter(r=>getRdoStatus(r)==='Pendente').slice(0,4).forEach(r=>al.push(`<div class="alert al-y">📋 <strong>${r.obra}</strong> — RDO pendente (${getRdoDias(r.atualizacao)!=null?getRdoDias(r.atualizacao)+'d':'não iniciado'}).</div>`));
+  ordenarPorIdPadrao(PROJETOS.filter(p=>p.alerta==='⚠ Atraso'&&p.status==='Ativo'),p=>p.id,p=>p.obra).slice(0,5).forEach(p=>al.push(`<div class="alert al-r">⚠ <strong>${p.obra}</strong> — Tend.:${xl2str(p.tendencia)} · Prazo Cli.:${xl2str(p.prazo_cli)}</div>`));
+  ordenarPorIdPadrao(DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)<0&&d.status==='Ativo'),d=>d.id,d=>d.obra).slice(0,3).forEach(d=>al.push(`<div class="alert al-o">📄 <strong>${d.obra}</strong> — Contrato vencido há ${Math.abs(daysFromToday(d.vig_cto))} dias.</div>`));
+  ordenarPorIdPadrao(DOCUMENTACAO.filter(d=>d.vig_cto&&daysFromToday(d.vig_cto)>=0&&daysFromToday(d.vig_cto)<=30&&d.status==='Ativo'),d=>d.id,d=>d.obra).slice(0,3).forEach(d=>al.push(`<div class="alert al-y">⚠ <strong>${d.obra}</strong> — Contrato vence em ${daysFromToday(d.vig_cto)} dias (${dateToBR(d.vig_cto)}).</div>`));
+  ordenarPorIdPadrao(RDO.filter(r=>getRdoStatus(r)==='Pendente'),r=>r.id,r=>r.obra).slice(0,4).forEach(r=>al.push(`<div class="alert al-y">📋 <strong>${r.obra}</strong> — RDO pendente (${getRdoDias(r.atualizacao)!=null?getRdoDias(r.atualizacao)+'d':'não iniciado'}).</div>`));
   document.getElementById('dash-alertas').innerHTML=al.length?al.join(''):'<div style="color:var(--tx3);padding:16px;text-align:center">✅ Nenhum alerta crítico.</div>';
 }
 function populateAllSelects(){
@@ -8396,7 +8413,7 @@ function populateAllSelects(){
       el.value = prevVal || '';
     } else if (id === 'ce-proj') {
       // Avanços do cronograma continuam usando a Base de Projetos, pois dependem das datas/parciais do projeto.
-      const ativos=PROJETOS.filter(p => (p.status === 'Ativo' || p.status === 'Encerrado') && !isOpcaoObraIdCurtoNumerico(p.id,p.obra));
+      const ativos=ordenarPorIdPadrao(PROJETOS.filter(p => (p.status === 'Ativo' || p.status === 'Encerrado') && !isOpcaoObraIdCurtoNumerico(p.id,p.obra)),p=>p.id,p=>p.obra);
       el.innerHTML = ativos.map((p,i) => `<option value="${PROJETOS.indexOf(p)}">${p.id} — ${p.obra}</option>`).join('');
     } else if (id === 'dd-proj' || id === 'dd-proj-arts') {
       fillDocSelectsV39(el.value);
