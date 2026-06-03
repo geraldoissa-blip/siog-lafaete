@@ -8328,7 +8328,8 @@ function renderObservacoes(){
   if(selO.options.length<=1){fillObraSelectFromReferencias(selO,{firstHtml:'<option value="">Todas obras</option>',mode:'obra'});}
   // Observações Livres é uma área independente: não exibe comentários lançados nos painéis laterais de Cronograma ou Medições.
   const tiposLaterais = ['Cronograma','Financeiro'];
-  const data=ordenarPorIdPadrao(OBSERVACOES.filter(o=>!tiposLaterais.includes(o.tipo)&&(!fs||String(o.semana)===fs)&&(!ft||o.tipo===ft)&&(!fo||o.obra===fo)),o=>o.id || (PROJETOS.find(p=>p.obra===o.obra)?.id||''),o=>o.obra);
+  // Mantém a ordem manual definida pelo usuário ao arrastar as caixinhas de observações/comentários.
+  const data=OBSERVACOES.filter(o=>!tiposLaterais.includes(o.tipo)&&(!fs||String(o.semana)===fs)&&(!ft||o.tipo===ft)&&(!fo||o.obra===fo));
   document.getElementById('obs-lista').innerHTML=data.length?data.map(o=>{
     const colorClass='c-'+(o.cor||'n');
     const tagHtml=o.cor&&o.cor!=='n'?`<span class="obs-tag ${o.cor}">${o.cor==='g'?'🟢':o.cor==='y'?'🟡':'🔴'}</span>`:'';
@@ -17464,7 +17465,7 @@ function __siog_sort_arrays_by_id(){
   try{ DOCUMENTACAO=ordenarPorIdPadrao(DOCUMENTACAO,d=>d.id,d=>d.obra); }catch(_e){}
   try{ MEDICOES=ordenarPorIdPadrao(MEDICOES,m=>m.id,m=>m.cliente); }catch(_e){}
   try{ PESQUISAS=ordenarPorIdPadrao(PESQUISAS,p=>p.id,p=>p.cliente); }catch(_e){}
-  try{ OBSERVACOES=ordenarPorIdPadrao(OBSERVACOES,o=>o.id || (PROJETOS.find(p=>p.obra===o.obra)?.id||''),o=>o.obra); }catch(_e){}
+  // Observações/comentários não são ordenados automaticamente por ID para preservar a ordem manual das caixinhas.
 }
 function aplicarObsAutomaticaRdo(r){
   if(!r) return r;
