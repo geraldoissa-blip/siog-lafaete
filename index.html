@@ -662,7 +662,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
       <div class="card card-table mb16">
         <div class="card-title">Consolidado por Contrato</div>
         <div class="tw"><table>
-          <thead><tr><th>ID</th><th>Cliente / Obra</th><th>Contrato</th><th>Medido</th><th>Faturado</th><th>Recebido</th><th>% Rec.</th><th>NF Vencida</th><th>A Receber</th><th>Pendência à Faturar</th></tr></thead>
+          <thead><tr><th>Ações</th><th>ID</th><th>Cliente / Obra</th><th>Contrato</th><th>Medido</th><th>Faturado</th><th>Recebido</th><th>% Rec.</th><th>NF Vencida</th><th>A Receber</th><th>Pendência à Faturar</th></tr></thead>
           <tbody id="tbody-med-cons"></tbody>
           <tfoot><tr id="tfoot-med"></tr></tfoot>
         </table></div>
@@ -7915,6 +7915,29 @@ function excluirMedicao(idx){
   if(_sb && m.id_seq) sbDelete('medicoes','id_seq',m.id_seq,`Lançamento ${m.id} - ${m.cliente}`);
 }
 
+function excluirObraMedicoes(id, cliente){
+  // Exclui somente os lançamentos da aba Medições desta obra/cliente.
+  // Não altera a Base de Projetos nem outras abas.
+  const sid=String(id||'');
+  const scli=String(cliente||'');
+  const itens=MEDICOES.filter(m=>String(m.id||'')===sid && String(m.cliente||'')===scli);
+  if(!itens.length){
+    alert('Não há lançamentos para excluir nesta obra.');
+    return;
+  }
+  const msg=`Confirma a exclusão da obra "${scli}" da aba Medições?\n\nSerão excluídos ${itens.length} lançamento(s) vinculados a esta obra somente na aba Medições.\n\nEsta ação não altera a Base de Projetos nem as demais abas.`;
+  if(!confirm(msg)) return;
+  const idsSeq=itens.map(m=>m.id_seq).filter(Boolean);
+  MEDICOES=MEDICOES.filter(m=>!(String(m.id||'')===sid && String(m.cliente||'')===scli));
+  renderMedicoes();
+  refreshResumoAutomatico();
+  saveToStorage();
+  showSaveStatus('✓ Obra e lançamentos excluídos da aba Medições');
+  if(_sb){
+    idsSeq.forEach(seq=>sbDelete('medicoes','id_seq',seq,`Medição excluída em lote: ${sid} - ${scli}`));
+  }
+}
+
 function renderMedicoes(){
   const q=(document.getElementById('sm-q').value||'').toLowerCase();
   const all=getMedCons();
@@ -7939,6 +7962,7 @@ function renderMedicoes(){
   document.getElementById('tbody-med-cons').innerHTML=cons.map(m=>{
     const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—';
     return`<tr data-key="${m.id}|${m.cliente}">
+      <td class="acoes-left"><button class="btn btn-xs btn-r" onclick="excluirObraMedicoes(${JSON.stringify(m.id)},${JSON.stringify(m.cliente)})" title="Excluir esta obra e todos os lançamentos vinculados na aba Medições">Excluir</button></td>
       <td><code style="font-size:11px">${m.id}</code></td><td><strong>${m.cliente}</strong></td>
       <td style="text-align:right">${fmtR(m.contrato)}</td>
       <td style="text-align:right">${fmtR(m.med)}</td>
@@ -7953,7 +7977,7 @@ function renderMedicoes(){
   // Total geral
   const tCons=cons.reduce((s,m)=>({contrato:s.contrato+m.contrato,med:s.med+m.med,fat:s.fat+m.fat,rec:s.rec+m.rec,nfv:s.nfv+m.nfv,ar:s.ar+m.ar,pf:s.pf+m.pf}),{contrato:0,med:0,fat:0,rec:0,nfv:0,ar:0,pf:0});
   document.getElementById('tfoot-med').innerHTML=`
-    <td colspan="2" style="font-weight:700;padding:8px 12px">TOTAL GERAL</td>
+    <td colspan="3" style="font-weight:700;padding:8px 12px">TOTAL GERAL</td>
     <td style="text-align:right;font-weight:700;padding:8px 12px">${fmtR(tCons.contrato)}</td>
     <td style="text-align:right;font-weight:700;padding:8px 12px">${fmtR(tCons.med)}</td>
     <td style="text-align:right;font-weight:700;padding:8px 12px">${fmtR(tCons.fat)}</td>
