@@ -265,6 +265,12 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 .obs-blk > div:first-child{justify-content:flex-start!important;text-align:left!important;}
 .obs-blk > div:first-child > div{flex:1!important;text-align:left!important;min-width:0!important;}
 
+
+
+/* v54: indicação visual do local exato de encaixe das caixinhas ao arrastar */
+.obs-drop-before{box-shadow:0 -3px 0 var(--or)!important;}
+.obs-drop-after{box-shadow:0 3px 0 var(--or)!important;}
+
 </style>
 <!-- Correção: dados do primeiro arquivo + exportação por módulos selecionados v8 -->
 <!-- Versão v12: inclui opção de tonalidade clara/escura para PDF/PowerPoint, mantendo configurações anteriores -->
@@ -17614,6 +17620,64 @@ document.addEventListener('paste',function(ev){
     return _salvarObs_v53.apply(this,arguments);
   };
 })();
+
+
+
+/* Correção v54: encaixe preciso das caixinhas de comentários por arraste.
+   Ajusta somente a reordenação manual dos blocos em Cronograma, Medições/Financeiro e Observações Livres. */
+function __siog_clear_obs_drop_marks(){
+  document.querySelectorAll('.obs-drop-before,.obs-drop-after').forEach(el=>{
+    el.classList.remove('obs-drop-before','obs-drop-after');
+  });
+}
+function obsDragStart(ev,idx){
+  _obsDragIdx=idx;
+  try{ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain',String(idx));}catch(_e){}
+  ev.currentTarget.classList.add('dragging');
+}
+function obsDragOver(ev){
+  ev.preventDefault();
+  try{ev.dataTransfer.dropEffect='move';}catch(_e){}
+  const el=ev.currentTarget;
+  const rect=el.getBoundingClientRect();
+  const after=ev.clientY > (rect.top + rect.height/2);
+  __siog_clear_obs_drop_marks();
+  el.classList.add(after?'obs-drop-after':'obs-drop-before');
+}
+function obsDragEnd(ev){
+  if(ev && ev.currentTarget) ev.currentTarget.classList.remove('dragging');
+  __siog_clear_obs_drop_marks();
+  _obsDragIdx=null;
+}
+function obsDrop(ev,targetIdx){
+  ev.preventDefault();
+  const el=ev.currentTarget;
+  const rect=el.getBoundingClientRect();
+  const dropAfter=ev.clientY > (rect.top + rect.height/2);
+  let fromIdx=_obsDragIdx;
+  try{
+    const dt=ev.dataTransfer.getData('text/plain');
+    if(dt!=='' && !isNaN(parseInt(dt,10))) fromIdx=parseInt(dt,10);
+  }catch(_e){}
+  if(fromIdx===null || fromIdx===undefined || fromIdx<0 || fromIdx>=OBSERVACOES.length){__siog_clear_obs_drop_marks();return;}
+  if(targetIdx===null || targetIdx===undefined || targetIdx<0 || targetIdx>=OBSERVACOES.length){__siog_clear_obs_drop_marks();return;}
+  if(fromIdx===targetIdx){__siog_clear_obs_drop_marks();_obsDragIdx=null;return;}
+
+  const item=OBSERVACOES.splice(fromIdx,1)[0];
+  let insertAt=targetIdx;
+  if(fromIdx < targetIdx) insertAt = targetIdx - 1;
+  if(dropAfter) insertAt += 1;
+  insertAt=Math.max(0,Math.min(insertAt,OBSERVACOES.length));
+  OBSERVACOES.splice(insertAt,0,item);
+
+  __siog_clear_obs_drop_marks();
+  _obsDragIdx=null;
+  saveToStorage();
+  try{ renderObservacoes(); }catch(_e){}
+  try{ renderSideComments('crono-comments','Cronograma'); }catch(_e){}
+  try{ renderSideComments('med-comments','Financeiro'); }catch(_e){}
+  showSaveStatus('✓ Ordem dos comentários atualizada');
+}
 
 // ── INIT ─────────────────────────────────────────────────
 window.addEventListener('load', () => {
