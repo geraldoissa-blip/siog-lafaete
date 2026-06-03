@@ -17381,6 +17381,130 @@ function scheduleEnhanceObraSelects(){
   },0);
 }
 
+
+
+/* Correção v52: ordem padrão por ID preservada após abertura/importação e tópicos automáticos em comentários.
+   Mantém as demais regras visuais e de dados. */
+function __siog_id_parts(id){
+  const s=String(id||'').trim().toUpperCase();
+  if(!s) return {cat:9, nums:[999999], raw:s};
+  const nums=(s.match(/\d+/g)||[]).map(n=>parseInt(n,10));
+  // IDs do tipo 1.25.01530 continuam antes de IDs Pxxx, e P003...P010 ficam em ordem numérica.
+  const cat=/^P\s*\d+/.test(s)?2:(/^\d+(?:\.\d+)+/.test(s)?1:3);
+  return {cat, nums:nums.length?nums:[999999], raw:s};
+}
+function compareIdNumerico(a,b){
+  const ka=__siog_id_parts(a), kb=__siog_id_parts(b);
+  if(ka.cat!==kb.cat) return ka.cat-kb.cat;
+  const n=Math.max(ka.nums.length,kb.nums.length);
+  for(let i=0;i<n;i++){
+    const va=ka.nums[i] ?? -1, vb=kb.nums[i] ?? -1;
+    if(va!==vb) return va-vb;
+  }
+  return String(a||'').localeCompare(String(b||''),'pt-BR',{numeric:true,sensitivity:'base'});
+}
+function ordenarPorIdPadrao(arr,getId,getNome){
+  return [...(arr||[])].sort((a,b)=>{
+    const c=compareIdNumerico(getId(a),getId(b));
+    if(c) return c;
+    return String(getNome(a)||'').localeCompare(String(getNome(b)||''),'pt-BR',{numeric:true,sensitivity:'base'});
+  });
+}
+function __siog_sort_arrays_by_id(){
+  try{ PROJETOS=ordenarPorIdPadrao(PROJETOS,p=>p.id,p=>p.obra); }catch(_e){}
+  try{ RDO=ordenarPorIdPadrao(RDO,r=>r.id,r=>r.obra); }catch(_e){}
+  try{ DOCUMENTACAO=ordenarPorIdPadrao(DOCUMENTACAO,d=>d.id,d=>d.obra); }catch(_e){}
+  try{ MEDICOES=ordenarPorIdPadrao(MEDICOES,m=>m.id,m=>m.cliente); }catch(_e){}
+  try{ PESQUISAS=ordenarPorIdPadrao(PESQUISAS,p=>p.id,p=>p.cliente); }catch(_e){}
+  try{ OBSERVACOES=ordenarPorIdPadrao(OBSERVACOES,o=>o.id || (PROJETOS.find(p=>p.obra===o.obra)?.id||''),o=>o.obra); }catch(_e){}
+}
+function aplicarObsAutomaticaRdo(r){
+  if(!r) return r;
+  const st=getRdoStatus(r);
+  if(st==='Atualizado') r.obs='-';
+  else if(st==='Pendente') r.obs='ATUALIZAÇÃO SEMANAL PENDENTE';
+  return r;
+}
+(function(){
+  const _oldApplyStorageData = applyStorageData;
+  applyStorageData = function(data){
+    const ret=_oldApplyStorageData.apply(this,arguments);
+    __siog_sort_arrays_by_id();
+    try{ RDO.forEach(aplicarObsAutomaticaRdo); }catch(_e){}
+    return ret;
+  };
+  const _oldApplyExcelSheets = applyExcelSheets;
+  applyExcelSheets = function(sheets){
+    const changed=_oldApplyExcelSheets.apply(this,arguments);
+    __siog_sort_arrays_by_id();
+    try{ RDO.forEach(aplicarObsAutomaticaRdo); }catch(_e){}
+    return changed;
+  };
+  const _oldBuildStoragePayload = buildStoragePayload;
+  buildStoragePayload = function(){
+    __siog_sort_arrays_by_id();
+    try{ RDO.forEach(aplicarObsAutomaticaRdo); }catch(_e){}
+    return _oldBuildStoragePayload.apply(this,arguments);
+  };
+  const _oldRenderDashboard = renderDashboard;
+  renderDashboard = function(){
+    __siog_sort_arrays_by_id();
+    return _oldRenderDashboard.apply(this,arguments);
+  };
+  const _oldRenderRDO = renderRDO;
+  renderRDO = function(){
+    __siog_sort_arrays_by_id();
+    if(typeof _rdoSort==='object' && _rdoSort && !_rdoSort.__userClicked){ _rdoSort.col=null; _rdoSort.asc=true; }
+    return _oldRenderRDO.apply(this,arguments);
+  };
+  const _oldSortRDO = sortRDO;
+  sortRDO = function(col){ if(typeof _rdoSort==='object' && _rdoSort) _rdoSort.__userClicked=true; return _oldSortRDO.apply(this,arguments); };
+})();
+function __siog_bulletize_text(txt){
+  const s=String(txt||'').replace(/\r\n/g,'\n');
+  if(!s.trim()) return '• ';
+  return s.split('\n').map(l=>{
+    const t=l.trimStart();
+    if(!t) return '• ';
+    return /^[•\-*]\s/.test(t) ? t.replace(/^[-*]\s/,'• ') : '• '+t;
+  }).join('\n');
+}
+function __siog_install_bullet_textarea(){
+  const el=document.getElementById('fo-texto');
+  if(!el || el.__siogBulletsInstalled) return;
+  el.__siogBulletsInstalled=true;
+  el.addEventListener('keydown',function(ev){
+    if(ev.key!=='Enter') return;
+    ev.preventDefault();
+    const start=this.selectionStart, end=this.selectionEnd;
+    const before=this.value.slice(0,start), after=this.value.slice(end);
+    this.value=before+'\n• '+after;
+    this.selectionStart=this.selectionEnd=start+3;
+  });
+  el.addEventListener('paste',function(ev){
+    const clip=(ev.clipboardData||window.clipboardData)?.getData('text');
+    if(!clip) return;
+    ev.preventDefault();
+    const start=this.selectionStart, end=this.selectionEnd;
+    const text=__siog_bulletize_text(clip);
+    this.value=this.value.slice(0,start)+text+this.value.slice(end);
+    this.selectionStart=this.selectionEnd=start+text.length;
+  });
+}
+(function(){
+  const _oldOpenObsModal = openObsModal;
+  openObsModal = function(idx, origem){
+    const ret=_oldOpenObsModal.apply(this,arguments);
+    __siog_install_bullet_textarea();
+    const el=document.getElementById('fo-texto');
+    if(el && !String(el.value||'').trim()){
+      el.value='• ';
+      setTimeout(()=>{try{el.focus();el.selectionStart=el.selectionEnd=el.value.length;}catch(_e){}},30);
+    }
+    return ret;
+  };
+})();
+
 // ── INIT ─────────────────────────────────────────────────
 window.addEventListener('load', () => {
   // Step 1: Try localStorage; if absent/corrupt, keep embedded Excel seed data
