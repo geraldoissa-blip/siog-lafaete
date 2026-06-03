@@ -17505,6 +17505,59 @@ function __siog_install_bullet_textarea(){
   };
 })();
 
+
+
+/* Correção v53: reforço dos tópicos automáticos no modal de comentários.
+   Ajusta somente o campo Texto do bloco (Cronograma, Medições/Financeiro e Observações Livres). */
+function __siog_prepare_bullet_textarea(forceInitial){
+  const el=document.getElementById('fo-texto');
+  if(!el) return;
+  if(forceInitial && !String(el.value||'').trim()){
+    el.value='• ';
+    setTimeout(()=>{try{el.focus();el.selectionStart=el.selectionEnd=el.value.length;}catch(_e){}},30);
+  }
+}
+document.addEventListener('keydown',function(ev){
+  const el=ev.target;
+  if(!el || el.id!=='fo-texto' || ev.key!=='Enter') return;
+  ev.preventDefault();
+  const start=el.selectionStart, end=el.selectionEnd;
+  const before=el.value.slice(0,start), after=el.value.slice(end);
+  el.value=before+'\n• '+after;
+  el.selectionStart=el.selectionEnd=start+3;
+},true);
+document.addEventListener('paste',function(ev){
+  const el=ev.target;
+  if(!el || el.id!=='fo-texto') return;
+  const clip=(ev.clipboardData||window.clipboardData)?.getData('text');
+  if(!clip) return;
+  ev.preventDefault();
+  const start=el.selectionStart, end=el.selectionEnd;
+  const text=__siog_bulletize_text(clip);
+  el.value=el.value.slice(0,start)+text+el.value.slice(end);
+  el.selectionStart=el.selectionEnd=start+text.length;
+},true);
+(function(){
+  const _openObsModal_v53=openObsModal;
+  openObsModal=function(idx, origem){
+    const ret=_openObsModal_v53.apply(this,arguments);
+    __siog_prepare_bullet_textarea(idx===null || idx===undefined);
+    return ret;
+  };
+  const _salvarObs_v53=salvarObs;
+  salvarObs=function(keepOpen=false){
+    const el=document.getElementById('fo-texto');
+    if(el && String(el.value||'').trim()){
+      el.value=String(el.value).split('\n').map(l=>{
+        const t=l.trimStart();
+        if(!t) return '• ';
+        return /^[•\-*]\s/.test(t) ? t.replace(/^[\-*]\s/,'• ') : '• '+t;
+      }).join('\n');
+    }
+    return _salvarObs_v53.apply(this,arguments);
+  };
+})();
+
 // ── INIT ─────────────────────────────────────────────────
 window.addEventListener('load', () => {
   // Step 1: Try localStorage; if absent/corrupt, keep embedded Excel seed data
