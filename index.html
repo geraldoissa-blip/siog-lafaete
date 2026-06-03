@@ -307,6 +307,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <!-- Correção v50: traço (-) gravado no campo prevalece sobre regra automática de Pendente na aba ARTs & Documentos -->
 <!-- Correção v51: faróis do RDO congelados pela segunda-feira da semana do relatório -->
 <!-- Correção v52: observação automática do RDO por status e ordenação padrão por ID nas abas -->
+<!-- Correção v55: exportação do RDO usa a mesma segunda-feira de referência da tela para preservar as cores dos faróis -->
 </head>
 <body>
 
@@ -8628,7 +8629,7 @@ function gerarRelatorio(){
         if(!v||v==='NÃO INICIADA')return{txt:'<span style="color:#aaa">NÃO INICIADA</span>',dot:'<span class="export-dot export-dot-y">●</span>'};
         if(v==='PENDENTE')return{txt:'<span style="color:'+relWarn+';font-weight:600">PENDENTE</span>',dot:'<span class="export-dot export-dot-y">●</span>'};
         if(isNaN(v))return{txt:v,dot:'<span class="export-dot export-dot-y">●</span>'};
-        const d=TODAY_XL-v;return{txt:xl2str(v),dot:d<=7?'<span class="export-dot export-dot-g">●</span>':'<span class="export-dot export-dot-r">●</span>'};
+        const d=RDO_REFERENCE_XL-v;return{txt:xl2str(v),dot:d<=7?'<span class="export-dot export-dot-g">●</span>':'<span class="export-dot export-dot-r">●</span>'};
       };
       const fdAssinado=r=>{
         if(r.assinado&&!isNaN(r.assinado)&&r.enviado&&!isNaN(r.enviado)&&r.assinado===r.enviado)
