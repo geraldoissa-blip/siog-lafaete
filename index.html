@@ -2592,7 +2592,7 @@ let MEDICOES = [
   },
   {
     "id_seq": "med_0012",
-    "id": "P004",
+    "id": "P007",
     "cliente": "1000 CASAS - MUÇUM",
     "valor_contrato": 2155999.86,
     "tipo": "Medição",
@@ -2608,7 +2608,7 @@ let MEDICOES = [
   },
   {
     "id_seq": "med_0013",
-    "id": "P005",
+    "id": "P004",
     "cliente": "1000 CASAS - VERA CRUZ",
     "valor_contrato": 3079999.8,
     "tipo": "Medição",
@@ -17410,7 +17410,31 @@ function ordenarPorIdPadrao(arr,getId,getNome){
     return String(getNome(a)||'').localeCompare(String(getNome(b)||''),'pt-BR',{numeric:true,sensitivity:'base'});
   });
 }
+function __siog_norm_obra_key(v){
+  return String(v||'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toUpperCase()
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function sincronizarIdsMedicoesComBaseProjetos(){
+  // Ajusta somente o ID da aba Medições para seguir o ID da Base de Projetos pelo nome da obra/cliente.
+  // Não altera valores, datas, tipo, observações ou lançamentos já existentes.
+  try{
+    if(!Array.isArray(PROJETOS) || !Array.isArray(MEDICOES)) return;
+    const mapa = new Map();
+    PROJETOS.forEach(p=>{
+      const k=__siog_norm_obra_key(p && p.obra);
+      if(k && p && p.id!=null && !mapa.has(k)) mapa.set(k,String(p.id));
+    });
+    MEDICOES.forEach(m=>{
+      const k=__siog_norm_obra_key(m && m.cliente);
+      if(k && mapa.has(k)) m.id = mapa.get(k);
+    });
+  }catch(_e){}
+}
 function __siog_sort_arrays_by_id(){
+  try{ sincronizarIdsMedicoesComBaseProjetos(); }catch(_e){}
   try{ PROJETOS=ordenarPorIdPadrao(PROJETOS,p=>p.id,p=>p.obra); }catch(_e){}
   try{ RDO=ordenarPorIdPadrao(RDO,r=>r.id,r=>r.obra); }catch(_e){}
   try{ DOCUMENTACAO=ordenarPorIdPadrao(DOCUMENTACAO,d=>d.id,d=>d.obra); }catch(_e){}
@@ -17451,6 +17475,14 @@ function aplicarObsAutomaticaRdo(r){
     __siog_sort_arrays_by_id();
     return _oldRenderDashboard.apply(this,arguments);
   };
+  if(typeof renderMedicoes==='function'){
+    const _oldRenderMedicoes = renderMedicoes;
+    renderMedicoes = function(){
+      try{ sincronizarIdsMedicoesComBaseProjetos(); }catch(_e){}
+      __siog_sort_arrays_by_id();
+      return _oldRenderMedicoes.apply(this,arguments);
+    };
+  }
   const _oldRenderRDO = renderRDO;
   renderRDO = function(){
     __siog_sort_arrays_by_id();
@@ -17578,6 +17610,8 @@ window.addEventListener('load', () => {
   ['re-atualiz','re-enviado','re-assinado'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.__rdoInputFix){el.addEventListener('input',()=>clearSpecialField(id));el.__rdoInputFix=true;}});
   renderAccessLists();
   applyAccessState();
+
+  try { sincronizarIdsMedicoesComBaseProjetos(); __siog_sort_arrays_by_id(); } catch(e) { console.warn('Ordem/IDs Medições:', e); }
 
   // Step 2: Render data from current in-memory arrays
   try { renderProjetos(); } catch(e) { console.warn('Render projetos:', e); }
