@@ -8079,20 +8079,46 @@ let OBSERVACOES = [
 // ─── UTILS// ─── UTILS ───────────────────────────────────────────────────────────────────
 const TODAY_XL = Math.round(Date.now()/86400000 + 25569);
 const TODAY = new Date(); TODAY.setHours(0,0,0,0);
-// Correção v51: RDO com faróis congelados na segunda-feira da semana atual.
-// Evita que as cores mudem entre segunda e sexta apenas pela passagem dos dias.
+// Correção v51/v55: RDO com faróis congelados na segunda-feira da própria semana dos dados do RDO.
+// A referência é calculada pela maior data lançada no RDO (Atualização/Enviado), evitando que
+// as cores mudem com a passagem dos dias ou após reabrir o link/importar backup.
 function dateToExcelLocal(d){
   // Converte uma data local para serial Excel sem interferência de fuso/horário de verão.
   return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())/86400000 + 25569);
 }
+function excelSerialToUTCDate(n){
+  const d=new Date(Date.UTC(1899,11,30));
+  d.setUTCDate(d.getUTCDate()+Number(n));
+  return d;
+}
+function mondayFromExcelSerial(n){
+  const d=excelSerialToUTCDate(n);
+  const daysSinceMonday=(d.getUTCDay()+6)%7; // segunda=0 ... domingo=6
+  d.setUTCDate(d.getUTCDate()-daysSinceMonday);
+  return Math.floor(d.getTime()/86400000 + 25569);
+}
 function getRdoReferenceMondayXL(){
+  try{
+    const nums=[];
+    (Array.isArray(RDO)?RDO:[]).forEach(r=>{
+      ['atualizacao','enviado'].forEach(k=>{
+        const v=r&&r[k];
+        if(v!==null&&v!==undefined&&v!==''&&!isNaN(v)) nums.push(Number(v));
+      });
+    });
+    if(nums.length) return mondayFromExcelSerial(Math.max(...nums));
+  }catch(e){}
   const d=new Date();
   d.setHours(12,0,0,0);
-  const daysSinceMonday=(d.getDay()+6)%7; // segunda=0 ... domingo=6
+  const daysSinceMonday=(d.getDay()+6)%7;
   d.setDate(d.getDate()-daysSinceMonday);
   return dateToExcelLocal(d);
 }
-const RDO_REFERENCE_XL = getRdoReferenceMondayXL();
+let RDO_REFERENCE_XL = getRdoReferenceMondayXL();
+function refreshRdoReference(){
+  RDO_REFERENCE_XL = getRdoReferenceMondayXL();
+  return RDO_REFERENCE_XL;
+}
 
 const _ID_COLLATOR = new Intl.Collator('pt-BR',{numeric:true,sensitivity:'base'});
 function compareIdNumerico(a,b){
@@ -9219,6 +9245,7 @@ function sortRDO(col){
   renderRDO();
 }
 function renderRDO(){
+  refreshRdoReference();
   RDO.forEach(aplicarObsAutomaticaRdo);
   const q=(document.getElementById('sr-q').value||'').toLowerCase();
   const fs=document.getElementById('sr-status').value;
@@ -10613,6 +10640,7 @@ function initRelatorio(){
   updateReportCutoffField();
 }
 function gerarRelatorio(){
+  refreshRdoReference();
   updateReportCutoffField();
   const semana=document.getElementById('rel-semana').value;
   const corte=getReportCutoffLabel();
