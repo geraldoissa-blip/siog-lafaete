@@ -4,7 +4,89 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SIOG — Grupo Lafaete</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
+
+/* Correção v60: Sumário Executivo ligado SOMENTE aos comentários efetivamente atualizados nesta semana.
+   Ponto do Geraldo: não puxar histórico antigo apenas porque ainda existe no backup/base ou tem o mesmo número de semana.
+   Regra final:
+   - Painéis de comentários continuam mostrando todos os comentários cadastrados do módulo, para nada parecer apagado.
+   - Sumário Executivo e exportação usam apenas comentários de Cronograma/Financeiro com updated_at_local dentro da semana corrente.
+   - Comentários antigos sem updated_at_local não entram no Sumário até serem editados/salvos novamente.
+   - Criar, editar ou excluir atualiza a tela e o Sumário imediatamente. */
+function __siog_inicio_semana_corrente_ms_v60(){
+  const d=new Date();
+  d.setHours(0,0,0,0);
+  const dia=d.getDay();
+  d.setDate(d.getDate()-(dia===0?6:dia-1)); // segunda-feira
+  return d.getTime();
+}
+function __siog_is_comentario_sumario_atual_v60(o,i){
+  if(!o) return false;
+  if(!(o.tipo==='Cronograma'||o.tipo==='Financeiro')) return false;
+  if(!(__siog_is_cor_critica(o)||__siog_is_cor_atencao(o))) return false;
+  try{ if(__siog_get_deleted_obs_keys().has(__siog_obs_key(o,i))) return false; }catch(_e){}
+  const ts=Number(o.updated_at_local||0);
+  return Number.isFinite(ts) && ts>=__siog_inicio_semana_corrente_ms_v60();
+}
+function __siog_comentarios_sumario_atual_v60(){
+  return (OBSERVACOES||[]).filter((o,i)=>__siog_is_comentario_sumario_atual_v60(o,i));
+}
+const __siog_buildSumarioData_base_v60=buildSumarioData;
+buildSumarioData=function(){
+  const data=__siog_buildSumarioData_base_v60();
+  const comentarios=__siog_comentarios_sumario_atual_v60();
+  const criticos=comentarios.filter(__siog_is_cor_critica);
+  const emAtencao=comentarios.filter(__siog_is_cor_atencao);
+  const pontos=[];
+  criticos.forEach(o=>pontos.push({
+    cor:'🔴',
+    titulo:o.obra||'Geral',
+    detalhe:String(o.titulo||o.texto||'').substring(0,110),
+    categoria:o.tipo||'Comentário da semana'
+  }));
+  emAtencao.forEach(o=>pontos.push({
+    cor:'🟡',
+    titulo:o.obra||'Geral',
+    detalhe:String(o.titulo||o.texto||'').substring(0,110),
+    categoria:o.tipo||'Comentário da semana'
+  }));
+  data.criticos=criticos;
+  data.pontosPrioritarios=pontos;
+  return data;
+};
+const __siog_salvarObs_base_v60=salvarObs;
+salvarObs=function(keepOpen=false){
+  __siog_salvarObs_base_v60.apply(this,arguments);
+  try{
+    // Garante que o comentário salvo entre como atualização da semana, mesmo que a função base não tenha persistido o campo por algum motivo.
+    const tipo=(document.getElementById('fo-tipo')||{}).value;
+    if(tipo==='Cronograma'||tipo==='Financeiro'){
+      const seq=(document.getElementById('fo-id-seq')||{}).value;
+      let idx=-1;
+      if(typeof _editObsIdx==='number' && _editObsIdx>=0) idx=_editObsIdx;
+      if(seq) idx=(OBSERVACOES||[]).findIndex(o=>String(o.id_seq||'')===String(seq));
+      if(idx<0) idx=(OBSERVACOES||[]).length-1;
+      if(OBSERVACOES[idx]){OBSERVACOES[idx].updated_at_local=Date.now();saveToStorage();}
+    }
+  }catch(_e){}
+  requestAnimationFrame(()=>{
+    try{renderSideComments('crono-comments','Cronograma');}catch(_e){}
+    try{renderSideComments('med-comments','Financeiro');}catch(_e){}
+    try{renderSumario();}catch(_e){}
+  });
+};
+const __siog_excluirObsPorSeq_base_v60=excluirObsPorSeq;
+excluirObsPorSeq=function(key){
+  __siog_excluirObsPorSeq_base_v60.apply(this,arguments);
+  requestAnimationFrame(()=>{
+    try{renderSideComments('crono-comments','Cronograma');}catch(_e){}
+    try{renderSideComments('med-comments','Financeiro');}catch(_e){}
+    try{renderSumario();}catch(_e){}
+  });
+};
+try{document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{try{renderSumario();}catch(_e){}},1000));}catch(_e){}
+
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -308,6 +390,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <!-- Correção v51: faróis do RDO congelados pela segunda-feira da semana do relatório -->
 <!-- Correção v52: observação automática do RDO por status e ordenação padrão por ID nas abas -->
 <!-- Correção v53: exportação do RDO usa a mesma referência semanal da tela para os faróis das datas -->
+<!-- Correção v54: lista mestra de obras preservada, comentários instantâneos, satisfação semanal e sumário sem coluna de categoria -->
 </head>
 <body>
 
@@ -539,6 +622,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
     <input type="text" class="si" placeholder="Buscar obra, ID, responsável..." id="sp-q" oninput="renderProjetos()" list="dl-projetos" autocomplete="off"><datalist id="dl-projetos"></datalist>
     <select id="sp-status" onchange="renderProjetos()"><option value="">Todos status</option><option>Ativo</option><option>Encerrado</option><option>Concluído</option><option>Inativo</option></select>
     <button class="btn btn-or btn-sm" onclick="openProjModal(null)">＋ Novo Projeto</button>
+    <button class="btn btn-r btn-sm" onclick="excluirObraDaListaMestrePrompt()" title="Remove definitivamente uma obra apenas da lista de busca/vinculação, sem apagar registros já lançados">🧹 Excluir da lista de obras</button>
   </div>
   <div class="card card-table"><div class="tw"><table>
     <thead><tr><th class="acoes-left">Ações</th><th>ID</th><th>Obra / Cliente</th><th>Status</th><th>Resp.</th><th>Início</th><th>Prazo Contr.</th><th>Prazo Cliente</th><th>Tendência</th><th>Farol</th><th>Contrato</th><th>Obs</th></tr></thead>
@@ -8669,6 +8753,8 @@ let EXCLUIDOS_ABA = {
   "cronograma": []
 };
 let SAT_RELATORIO_OBS = "Esta semana tivemos apenas a atualização da pesquisa de satisfação com o cliente Anglo American - Cozinha.";
+// Lista mestra de obras/clientes para manter opções de vínculo mesmo quando a obra é removida de alguma aba.
+let MASTER_OBRAS = [];
 function projetoKey(id, obra){return String(id||'')+'|'+String(obra||'');}
 // Oculta apenas nas listas de seleção as opções importadas com ID curto numérico (ex.: "2 — Obra", "23 — Obra").
 // Mantém os dados nas bases, relatórios e tabelas; apenas evita duplicidade/confusão nos selects.
@@ -8803,6 +8889,7 @@ function salvarProjeto(keepOpen=false){
     RDO.push({id,obra,atualizacao:'NÃO INICIADA',enviado:'NÃO INICIADA',assinado:'NÃO INICIADA',resp:'',modelo:'',histograma:'',obs:'Novo projeto'});
     DOCUMENTACAO.push({id,obra,status:np.status,vig_cto:'',sre_st:'N/A',sre_vig:'',src_st:'N/A',src_vig:'',cf_st:'N/A',cf_vig:'',ga_st:'N/A',ga_vig:'',gp_st:'N/A',gp_vig:'',geo_st:'N/A',geo_vig:'',art_st:'Pendente',art_tipos:[],art_outros:'',crono_st:'-',hbe:'-',hbc:'-',mtr:'-',chi:'-',che:'-',te:'-',atc:'-'});
   }
+  lembrarObraNaListaMestre(np.id,np.obra);
   renderProjetos();renderDashboard();updateBadges();populateAllSelects();
   dbAfterSaveProjeto(np, _editProjIdx===null);
   if(keepOpen){_editProjIdx=PROJETOS.findIndex(x=>x.id===np.id&&x.obra===np.obra);showSaveStatus('✓ Projeto salvo');return;}
@@ -8847,6 +8934,7 @@ function excluirProjeto(idx){
 
 As demais bases (RDO, Documentação, Medições, Satisfação e Observações) serão mantidas.`))return;
   const id=p.id;const obra=p.obra;
+  lembrarObraNaListaMestre(id,obra);
   PROJETOS.splice(idx,1);
   renderProjetos();renderDashboard();updateBadges();populateAllSelects();
   dbAfterDeleteProjetoOnly(id,obra);
@@ -8865,6 +8953,7 @@ function checkAdminOrBlock() {
 function excluirRDO(id, obra) {
   if(typeof checkAdminOrBlock === 'function' && !checkAdminOrBlock()) return;
   if(!confirm(`Excluir o RDO de "${obra}" da lista? O projeto continuará na Base de Projetos.`)) return;
+  lembrarObraNaListaMestre(id,obra);
   const rIdx = RDO.findIndex(r => r.id === id && r.obra === obra);
   if(rIdx >= 0) {
     const rdoItem = RDO[rIdx];
@@ -8944,6 +9033,7 @@ function excluirProjetoDaAba(tab,id,obra){
   const aba=nomeDaAbaExclusao(tab);
   if(!confirm('Excluir "'+obra+'" apenas da aba '+aba+'?\n\nAs demais abas serão preservadas e continuarão com os próprios dados/comentários desta obra.')) return;
   const before={rdo:RDO.length,doc:DOCUMENTACAO.length,med:MEDICOES.length,pes:PESQUISAS.length,obs:OBSERVACOES.length};
+  lembrarObraNaListaMestre(id,obra);
   if(tab==='cronograma'){
     marcarProjetoExcluidoDaAba('cronograma',id,obra);
     delete AVANCOS[projetoKey(id,obra)];
@@ -9090,7 +9180,7 @@ function renderSideComments(containerId,tipo){
         <span class="drag-handle" title="Arraste para reordenar">↕</span><div style="font-size:11px;font-weight:700;color:var(--or);flex:1;min-width:0;text-align:left">${o.obra||'Geral'}${o.titulo?' — <span style="color:var(--tx2);font-weight:400">'+o.titulo+'</span>':''}</div>
         <div style="display:flex;gap:2px;flex-shrink:0">
           <button class="btn btn-xs" style="padding:1px 5px;font-size:10px" onclick="openObsModal(${oi},'${tipo}')">✏</button>
-          <button class="btn btn-xs btn-r" style="padding:1px 5px;font-size:10px" onclick="if(confirm('Excluir?')){excluirObs(${oi});renderSideComments('${containerId}','${tipo}')}">✕</button>
+          <button class="btn btn-xs btn-r" style="padding:1px 5px;font-size:10px" onclick="if(confirm('Excluir?')){const _obs=OBSERVACOES[${oi}];OBSERVACOES.splice(${oi},1);renderObservacoes();renderSideComments('crono-comments','Cronograma');renderSideComments('med-comments','Financeiro');requestAnimationFrame(()=>{try{renderObservacoes();}catch(e){}try{renderSideComments('crono-comments','Cronograma');}catch(e){}try{renderSideComments('med-comments','Financeiro');}catch(e){}});dbAfterDeleteObs(_obs)}">✕</button>
         </div>
       </div>
       <div style="font-size:11px;color:var(--tx2);line-height:1.5;white-space:pre-wrap;word-break:break-word">${o.texto.slice(0,220)}${o.texto.length>220?'…':''}</div>
@@ -9593,6 +9683,7 @@ function refreshResumoAutomatico(){
   try{renderDashboard();}catch(e){}
   try{updateBadges();}catch(e){}
   try{if(document.getElementById('page-medicoes')?.classList.contains('active'))renderMedicoes();}catch(e){}
+  try{if(document.getElementById('page-sumario')?.classList.contains('active') || (document.getElementById('sumario-content')?.innerHTML||'').trim())renderSumario();}catch(e){}
   try{if(document.getElementById('page-relatorios')?.classList.contains('active') || (document.getElementById('rel-preview')?.innerHTML||'').trim())gerarRelatorio();}catch(e){}
 }
 
@@ -9867,6 +9958,7 @@ function salvarSat(keepOpen=false){
   novo.id_seq=satIsNew?nextSeq('sat'):(PESQUISAS[parseInt(editIdx)]?.id_seq||nextSeq('sat'));
   if(!satIsNew){PESQUISAS[parseInt(editIdx)]=novo;delete document.getElementById('mo-sat').dataset.editIdx;}
   else PESQUISAS.push(novo);
+  lembrarObraNaListaMestre(id,cliente);
   renderSatisfacao();refreshResumoAutomatico();
   dbAfterSaveSat(novo,satIsNew);
   if(keepOpen){document.getElementById('mo-sat').dataset.editIdx=PESQUISAS.findIndex(x=>x.id_seq===novo.id_seq);showSaveStatus('✓ Avaliação salva');return;}
@@ -9966,7 +10058,7 @@ function renderSatisfacao(){
   if(satObsEl && satObsEl.value !== (SAT_RELATORIO_OBS || '')) satObsEl.value = SAT_RELATORIO_OBS || '';
   // Populate project filter
   const selP=document.getElementById('ss-proj');
-  if(selP.options.length<=1){PROJETOS.forEach(p=>{const o=document.createElement('option');o.value=p.id+'|'+p.obra;o.textContent=p.id+' — '+p.obra;selP.appendChild(o);});}
+  if(selP.options.length<=1){fillObraSelectFromReferencias(selP,{firstHtml:'<option value="">Todos projetos</option>',mode:'idobra'});}
   const kpis=PESQUISAS;
   document.getElementById('kpi-sat').innerHTML=`
     <div class="kpi or"><div class="kpi-lbl">Total Registros</div><div class="kpi-val">${kpis.length}</div></div>
@@ -10030,6 +10122,7 @@ function editSat(idx){
 function deleteSat(idx){
   const ps=PESQUISAS[idx];
   if(confirm('Excluir esta avaliação de satisfação?')){
+    lembrarObraNaListaMestre(ps.id,ps.cliente);
     PESQUISAS.splice(idx,1);
     renderSatisfacao();
     refreshResumoAutomatico();
@@ -10040,6 +10133,70 @@ function deleteSat(idx){
 
 
 // ─── LISTA MESTRA DE OBRAS ──────────────────────────────────────────────────
+function obraMestreKey(id,obra){
+  const nome=String(obra||'').trim();
+  const cod=String(id||'').trim();
+  return (cod?cod:'SEM_ID')+'|'+normalizeObraKey(nome);
+}
+function lembrarObraNaListaMestre(id,obra){
+  const nome=String(obra||'').trim();
+  if(!nome) return;
+  if(!Array.isArray(MASTER_OBRAS)) MASTER_OBRAS=[];
+  const cod=String(id||'').trim();
+  const key=obraMestreKey(cod,nome);
+  const existe=MASTER_OBRAS.some(x=>obraMestreKey(x.id,x.obra)===key);
+  if(!existe) MASTER_OBRAS.push({id:cod,obra:nome});
+}
+function sincronizarListaMestreObras(){
+  if(!Array.isArray(MASTER_OBRAS)) MASTER_OBRAS=[];
+  PROJETOS.forEach(p=>lembrarObraNaListaMestre(p.id,p.obra));
+  RDO.forEach(r=>lembrarObraNaListaMestre(r.id,r.obra));
+  DOCUMENTACAO.forEach(d=>lembrarObraNaListaMestre(d.id,d.obra));
+  MEDICOES.forEach(m=>lembrarObraNaListaMestre(m.id,m.cliente));
+  PESQUISAS.forEach(p=>lembrarObraNaListaMestre(p.id,p.cliente));
+  OBSERVACOES.forEach(o=>lembrarObraNaListaMestre(o.id||'',o.obra));
+  const seen=new Set();
+  MASTER_OBRAS=ordenarPorIdPadrao(MASTER_OBRAS.filter(x=>{
+    const nome=String(x.obra||'').trim();
+    if(!nome || isOpcaoObraIdCurtoNumerico(x.id,nome)) return false;
+    const k=obraMestreKey(x.id,nome);
+    if(seen.has(k)) return false;
+    seen.add(k);
+    x.id=String(x.id||'').trim();
+    x.obra=nome;
+    return true;
+  }),x=>x.id,x=>x.obra);
+}
+function obraPossuiRegistrosAtivos(id,obra){
+  const key=obraMestreKey(id,obra);
+  const same=(rid,robra)=>obraMestreKey(rid,robra)===key;
+  return PROJETOS.some(p=>same(p.id,p.obra)) || RDO.some(r=>same(r.id,r.obra)) ||
+    DOCUMENTACAO.some(d=>same(d.id,d.obra)) || MEDICOES.some(m=>same(m.id,m.cliente)) ||
+    PESQUISAS.some(p=>same(p.id,p.cliente)) || OBSERVACOES.some(o=>same(o.id||'',o.obra));
+}
+function excluirObraDaListaMestrePrompt(){
+  if(typeof checkAdminOrBlock==='function' && !checkAdminOrBlock()) return;
+  sincronizarListaMestreObras();
+  if(!MASTER_OBRAS.length){alert('A lista de obras está vazia.');return;}
+  const termo=prompt('Excluir definitivamente uma obra apenas da lista de busca/vinculação.\n\nDigite parte do ID ou nome da obra:');
+  if(termo===null) return;
+  const q=termo.trim().toLowerCase();
+  if(!q){alert('Informe um ID ou nome de obra.');return;}
+  const encontrados=MASTER_OBRAS.filter(p=>String(p.id||'').toLowerCase().includes(q)||String(p.obra||'').toLowerCase().includes(q));
+  if(encontrados.length===0){alert('Nenhuma obra encontrada na lista.');return;}
+  if(encontrados.length>1){
+    alert('Encontrei mais de uma obra. Digite um trecho mais específico:\n\n'+encontrados.slice(0,12).map(p=>'• '+(p.id?p.id+' — ':'')+p.obra).join('\n'));
+    return;
+  }
+  const item=encontrados[0];
+  const aviso=obraPossuiRegistrosAtivos(item.id,item.obra)?'\n\nAtenção: esta obra ainda possui registros em alguma aba. Ela pode continuar aparecendo enquanto esses registros existirem.':' ';
+  if(!confirm('Remover "'+item.obra+'" da lista mestra de busca/vinculação?'+aviso+'\n\nNenhum lançamento das abas será apagado.')) return;
+  const k=obraMestreKey(item.id,item.obra);
+  MASTER_OBRAS=MASTER_OBRAS.filter(x=>obraMestreKey(x.id,x.obra)!==k);
+  saveToStorage();
+  populateAllSelects();
+  showSaveStatus('✓ Obra removida da lista mestra');
+}
 function getProjetosReferenciados(includeBase=true){
   const map=new Map();
   const add=(id,obra)=>{
@@ -10055,6 +10212,7 @@ function getProjetosReferenciados(includeBase=true){
   MEDICOES.forEach(m=>add(m.id,m.cliente));
   PESQUISAS.forEach(p=>add(p.id,p.cliente));
   OBSERVACOES.forEach(o=>add(o.id||'',o.obra));
+  if(Array.isArray(MASTER_OBRAS)) MASTER_OBRAS.forEach(p=>add(p.id,p.obra));
   return ordenarPorIdPadrao(Array.from(map.values())
     .filter(p=>!isOpcaoObraIdCurtoNumerico(p.id,p.obra)),p=>p.id,p=>p.obra);
 }
@@ -10143,15 +10301,22 @@ function salvarObs(keepOpen=false){
     semana:parseInt(document.getElementById('fo-semana').value)||getSemanaAtual(),
     cor:document.getElementById('fo-cor').value,
     titulo:document.getElementById('fo-titulo').value,
-    texto:document.getElementById('fo-texto').value
+    texto:document.getElementById('fo-texto').value,
+    updated_at_local: Date.now()
   };
   if(!obsIsNew) OBSERVACOES[_editObsIdx]=novo; else OBSERVACOES.push(novo);
+  lembrarObraNaListaMestre('',novo.obra);
   renderObservacoes();
   renderSideComments('crono-comments','Cronograma');
   renderSideComments('med-comments','Financeiro');
+  if(!keepOpen) closeMo('mo-obs');
+  requestAnimationFrame(()=>{
+    try{renderObservacoes();}catch(e){}
+    try{renderSideComments('crono-comments','Cronograma');}catch(e){}
+    try{renderSideComments('med-comments','Financeiro');}catch(e){}
+  });
   dbAfterSaveObs(novo,obsIsNew);
   if(keepOpen){_editObsIdx=OBSERVACOES.findIndex(x=>x.id_seq===novo.id_seq);showSaveStatus('✓ Bloco salvo');return;}
-  closeMo('mo-obs');
 }
 function renderObservacoes(){
   const fs=document.getElementById('obs-semana').value;
@@ -10186,7 +10351,7 @@ function renderObservacoes(){
     </div>`;
   }).join(''):'<div style="color:var(--tx3);padding:32px;text-align:center;border:2px dashed var(--bd);border-radius:var(--rad)">Nenhuma observação. Clique em "＋ Novo Bloco" para adicionar.</div>';
 }
-function excluirObs(idx){if(confirm('Excluir este bloco?')){const _obs=OBSERVACOES[idx];OBSERVACOES.splice(idx,1);renderObservacoes();dbAfterDeleteObs(_obs);}}
+function excluirObs(idx){if(confirm('Excluir este bloco?')){const _obs=OBSERVACOES[idx];OBSERVACOES.splice(idx,1);renderObservacoes();renderSideComments('crono-comments','Cronograma');renderSideComments('med-comments','Financeiro');requestAnimationFrame(()=>{try{renderObservacoes();}catch(e){}try{renderSideComments('crono-comments','Cronograma');}catch(e){}try{renderSideComments('med-comments','Financeiro');}catch(e){}});dbAfterDeleteObs(_obs);}}
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 let _charts={};
 function renderDashboard(){
@@ -10428,10 +10593,10 @@ function buildSumarioSlideHtml(isLight,semana,corteDate,emissor,LOGO_URI){
     ${K('#E87722','Criticidade',critLabel,'')}
   </div>`;
   /* Pontos de atenção */
-  const pontosRows=s.pontosPrioritarios.slice(0,8).map(p=>`<tr style="border-bottom:1px solid ${theme.border}"><td style="padding:4px 6px;width:16px">${dotHtml(p.cor)}</td><td style="padding:4px 6px;font-size:9.5px;color:${isLight?'#111':'#f0f0f0'};font-weight:600;white-space:normal;overflow-wrap:break-word">${p.titulo}</td><td style="padding:4px 6px;font-size:9px;color:${theme.muted};white-space:normal;overflow-wrap:break-word;max-width:200px">${p.detalhe}</td><td style="padding:4px 8px;font-size:9px;color:${theme.muted};white-space:nowrap">${p.categoria}</td></tr>`).join('');
+  const pontosRows=s.pontosPrioritarios.slice(0,8).map(p=>`<tr style="border-bottom:1px solid ${theme.border}"><td style="padding:4px 6px;width:16px">${dotHtml(p.cor)}</td><td style="padding:4px 6px;font-size:9.5px;color:${isLight?'#111':'#f0f0f0'};font-weight:600;white-space:normal;overflow-wrap:break-word">${p.titulo}</td><td style="padding:4px 6px;font-size:9px;color:${theme.muted};white-space:normal;overflow-wrap:break-word;max-width:260px">${p.detalhe}</td></tr>`).join('');
   const pontosBloco=`<div style="flex:1;min-width:0">
     ${T('Pontos de Atenção Prioritários')}
-    <table style="width:100%;border-collapse:collapse;font-size:9.5px"><tbody>${pontosRows||`<tr><td colspan="4" style="padding:8px;color:${theme.muted};font-size:9px">Nenhum ponto crítico identificado esta semana.</td></tr>`}</tbody></table>
+    <table style="width:100%;border-collapse:collapse;font-size:9.5px"><tbody>${pontosRows||`<tr><td colspan="3" style="padding:8px;color:${theme.muted};font-size:9px">Nenhum ponto crítico identificado esta semana.</td></tr>`}</tbody></table>
   </div>`;
   /* Ranking de prazo */
   const rankRows=s.rankingPrazo.slice(0,6).map((r,i)=>`<tr style="border-bottom:1px solid ${theme.border}"><td style="padding:3px 6px;font-size:9px;color:${theme.muted}">${i+1}°</td><td style="padding:3px 6px;font-size:9px;color:${isLight?'#111':'#f0f0f0'};overflow-wrap:break-word;white-space:normal;max-width:120px">${r.obra}</td><td style="padding:3px 6px;font-size:9px;color:${r.desvio>0?'#ff3131':r.desvio<0?'#28a745':theme.muted};font-weight:700;white-space:nowrap">${r.desvio>0?'+':r.desvio<0?'':' '}${r.desvio} d</td><td style="padding:3px 6px;font-size:8.5px;color:${theme.muted};white-space:nowrap">${r.tend||'—'}</td></tr>`).join('');
@@ -10573,8 +10738,8 @@ function renderSumario(){
     ${K('or','Criticidade Geral',critLabel,'')}
   </div>`;
   /* Pontos prioritários */
-  const pontosHtml=s.pontosPrioritarios.length?s.pontosPrioritarios.slice(0,10).map(p=>`<tr><td style="padding:5px 4px 5px 8px;width:16px">${dotHtml(p.cor)}</td><td style="padding:5px 8px 5px 4px;font-weight:600">${p.titulo}</td><td style="padding:5px 8px;color:var(--tx2)">${p.detalhe}</td><td class="nowrap" style="padding:5px 8px;color:var(--tx3)">${p.categoria}</td></tr>`).join('')
-    :`<tr><td colspan="4" style="padding:10px 8px;color:var(--tx3);font-style:italic">Nenhum ponto crítico identificado esta semana.</td></tr>`;
+  const pontosHtml=s.pontosPrioritarios.length?s.pontosPrioritarios.slice(0,10).map(p=>`<tr><td style="padding:5px 4px 5px 8px;width:16px">${dotHtml(p.cor)}</td><td style="padding:5px 8px 5px 4px;font-weight:600">${p.titulo}</td><td style="padding:5px 8px;color:var(--tx2)">${p.detalhe}</td></tr>`).join('')
+    :`<tr><td colspan="3" style="padding:10px 8px;color:var(--tx3);font-style:italic">Nenhum ponto crítico identificado esta semana.</td></tr>`;
   /* Ranking prazo */
   const rankHtml=s.rankingPrazo.length?s.rankingPrazo.slice(0,8).map((r,i)=>`<tr><td style="padding:4px 8px;color:var(--tx3)">${i+1}°</td><td style="padding:4px 8px">${r.obra}</td><td style="padding:4px 8px;color:${r.desvio>0?'var(--r2)':r.desvio<0?'var(--g2)':'var(--tx2)'};font-weight:700">${r.desvio>0?'+':r.desvio<0?'':''}${r.desvio} d</td><td class="nowrap" style="padding:4px 8px;color:var(--tx2)">${r.tend||'—'}</td></tr>`).join('')
     :`<tr><td colspan="4" style="padding:10px 8px;color:var(--tx3);font-style:italic">Sem desvios de prazo identificados.</td></tr>`;
@@ -10615,7 +10780,7 @@ function renderSumario(){
   <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-bottom:14px">
     <div class="card card-table">
       ${T('Pontos de Atenção Prioritários')}
-      <div class="tw"><table><thead><tr><th></th><th>Ponto</th><th>Detalhe</th><th>Categoria</th></tr></thead><tbody>${pontosHtml}</tbody></table></div>
+      <div class="tw"><table><thead><tr><th></th><th>Ponto</th><th>Detalhe</th></tr></thead><tbody>${pontosHtml}</tbody></table></div>
     </div>
     <div class="card card-table">
       ${T('Ranking de Prazo')}
@@ -10753,14 +10918,14 @@ function gerarRelatorio(){
         ${projsCronoRel.filter(p=>p.status==='Ativo'||p.status==='Encerrado').map(p=>{
           const k=p.id+'|'+p.obra;const av=AVANCOS[k]||{};const f=cronoFarol(p);const fc='#111';
           const row=`<tr style="border-bottom:1px solid #222">${TD(p.obra,'font-weight:700;color:#f3f3f3;white-space:normal;overflow-wrap:break-word;word-break:normal;line-height:1.15')}${TD(xl2str(p.inicio),'color:#111;font-weight:700;white-space:nowrap')}${TD(xl2str(p.prazo_cont),'color:#111;font-weight:600;white-space:nowrap')}${TD(xl2str(p.prazo_cli),'color:#111;font-weight:600;white-space:nowrap')}<td style="padding:5px 0 5px 6px;color:#111;font-weight:700;white-space:nowrap">${xl2str(p.tendencia)}</td><td style="padding:5px 0 5px 0;text-align:left;position:relative;left:-28px"><span class="export-dot ${f==='g'?'export-dot-g':f==='y'?'export-dot-y':'export-dot-r'}">●</span></td>${TD(av.prev!=null?av.prev.toFixed(1)+'%':'—','text-align:center;white-space:nowrap;color:#111')}${TD(av.real!=null?av.real.toFixed(1)+'%':'—','text-align:center;color:#111;white-space:nowrap')}${TD(av.prev&&av.real?(av.real/av.prev*100).toFixed(0)+'%':'—','text-align:center;white-space:nowrap;color:#111')}</tr>`;
-          const sub=(p.parciais||[]).map(par=>{return`<tr style="border-bottom:1px solid #222;background:rgba(232,119,34,.05)"><td style="padding:5px 8px 5px 16px;color:#ffd2b0;font-size:10.2px;font-weight:700;white-space:normal;overflow-wrap:break-word;word-break:normal;line-height:1.15">↳ ${par.nome}</td>${TD(xl2str(par.inicio),'color:#111;font-weight:700;white-space:nowrap')}${TD(xl2str(par.prazo_cont),'color:#111;font-weight:600;white-space:nowrap')}<td style="padding:5px 8px;color:#111;font-weight:600;white-space:nowrap">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="padding:5px 4px 5px 6px;color:#111;font-weight:700;white-space:nowrap">${xl2str(par.tendencia)}</td><td colspan="4"></td></tr>`}).join('');
+          const sub=(p.parciais||[]).map((par,parIdx)=>{const pav=AVANCOS[cronoAvancoKey(p,parIdx)]||{};const pf=par.tendencia&&par.prazo_cli?(par.tendencia<=par.prazo_cli?'g':'r'):'y';const pader=(pav.prev!=null&&pav.real!=null&&Number(pav.prev)>0)?(Number(pav.real)/Number(pav.prev)*100).toFixed(0)+'%':'—';return`<tr style="border-bottom:1px solid #222;background:rgba(232,119,34,.05)"><td style="padding:5px 8px 5px 16px;color:#ffd2b0;font-size:10.2px;font-weight:700;white-space:normal;overflow-wrap:break-word;word-break:normal;line-height:1.15">↳ ${par.nome}</td>${TD(xl2str(par.inicio),'color:#111;font-weight:700;white-space:nowrap')}${TD(xl2str(par.prazo_cont),'color:#111;font-weight:600;white-space:nowrap')}<td style="padding:5px 8px;color:#111;font-weight:600;white-space:nowrap">${par.prazo_cli?xl2str(par.prazo_cli):'À definir'}</td><td style="padding:5px 4px 5px 6px;color:#111;font-weight:700;white-space:nowrap">${xl2str(par.tendencia)}</td><td style="padding:5px 0 5px 0;text-align:left;position:relative;left:-28px"><span class="export-dot ${pf==='g'?'export-dot-g':pf==='y'?'export-dot-y':'export-dot-r'}">●</span></td>${TD(pav.prev!=null?Number(pav.prev).toFixed(1)+'%':'—','text-align:center;white-space:nowrap;color:#111')}${TD(pav.real!=null?Number(pav.real).toFixed(1)+'%':'—','text-align:center;color:#111;white-space:nowrap')}${TD(pader,'text-align:center;white-space:nowrap;color:#111')}</tr>`}).join('');
           return row+sub;
         }).join('')}
         </tbody></table>
       </div>
       <div>
         <div style="font-size:12px;font-weight:700;color:#E87722;margin:4px 0 10px 0">💬 Comentários</div>
-        ${OBSERVACOES.filter(o=>o.tipo==='Cronograma'&&o.semana===16).map(o=>`
+        ${OBSERVACOES.filter((o,i)=>__siog_obs_visivel_no_relatorio(o,i,'Cronograma')).map(o=>`
           <div style="border-left:3px solid #E87722;padding:8px 12px;margin-bottom:10px;background:#1a1a1a;border-radius:0 6px 6px 0;overflow:hidden;max-width:100%;break-inside:avoid;page-break-inside:avoid">
             <div style="font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px">${o.obra?o.obra+' — ':''}${o.titulo||''}</div>
             <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%">${o.texto}</div>
@@ -10790,7 +10955,7 @@ function gerarRelatorio(){
       </div>
       <div>
         <div style="font-size:12px;font-weight:700;color:#E87722;margin-bottom:10px">💬 Comentários</div>
-        ${OBSERVACOES.filter(o=>o.tipo==='Financeiro'&&o.semana===16).map(o=>`
+        ${OBSERVACOES.filter((o,i)=>__siog_obs_visivel_no_relatorio(o,i,'Financeiro')).map(o=>`
           <div style="border-left:3px solid #E87722;padding:8px 12px;margin-bottom:10px;background:#1a1a1a;border-radius:0 6px 6px 0;overflow:hidden;max-width:100%">
             <div style="font-size:11px;font-weight:700;color:#E87722;margin-bottom:4px">${o.obra?o.obra+' — ':''}${o.titulo||''}</div>
             <div style="font-size:11px;color:#b0b0b0;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;max-width:100%">${o.texto}</div>
@@ -10802,22 +10967,22 @@ function gerarRelatorio(){
   if(document.getElementById('ri-sat').checked){
     // Para o PPT: mostrar apenas a pesquisa mais recente de cada cliente em formato de quadrinhos
     // Agrupa por cliente e pega apenas a mais recente (maior data)
-    const satIncluded=PESQUISAS.filter(p=>p.incl_rel);
+    const satIncluded=PESQUISAS.filter(p=>p.incl_rel!==false);
     const latestByClient={};
     satIncluded.forEach(p=>{
-      const key=p.id||p.cliente;
-      if(!latestByClient[key]||p.data>latestByClient[key].data) latestByClient[key]=p;
+      const key=satClienteKey(p);
+      if(!latestByClient[key]||satDateMs(p)>satDateMs(latestByClient[key])) latestByClient[key]=p;
     });
-    // Identifica se há pesquisa desta semana em qualquer cliente (para saber qual destacar)
-    const hasCurrentWeek=satIncluded.some(p=>getSatisfacaoGroupedRows([p]).some(r=>r.isCurrent));
-    const satCards=Object.values(latestByClient);
+    const currentWeekKey=satWeekKeyFromMs(Date.now());
+    const hasCurrentWeek=satIncluded.some(p=>satWeekKeyFromMs(satDateMs(p))===currentWeekKey);
+    const satCards=Object.values(latestByClient).sort((a,b)=>compareIdNumerico(a?.id,b?.id) || String(a?.cliente||'').localeCompare(String(b?.cliente||''),'pt-BR',{numeric:true,sensitivity:'base'}));
     const satObs=(SAT_RELATORIO_OBS||'').trim();
     // Gera os quadrinhos
     const cardHtml=satCards.map(p=>{
       const f=satFace(p.nivel);
       const c=p.nivel==='Satisfeito'?'#48c774':p.nivel==='Insatisfeito'?'#ff6b6b':relWarn;
       const comment=satComentarioHtml(p,true);
-      const isCurrent=getSatisfacaoGroupedRows([p]).some(r=>r.isCurrent);
+      const isCurrent=hasCurrentWeek && satWeekKeyFromMs(satDateMs(p))===currentWeekKey;
       const cardBg=isCurrent?(isLightTheme?'#ffffff':'#1a1a1a'):(isLightTheme?'#f8f9fc':'#141414');
       const cardBd=isCurrent?'#E87722':(isLightTheme?'#d8e0ec':'#2a2a2a');
       const clientColor=isCurrent?(isLightTheme?'#111827':'#f3f3f3'):(isLightTheme?'#8d98a8':'#7a8290');
@@ -10971,6 +11136,7 @@ function buildStoragePayload() {
     AVANCOS,
     EXCLUIDOS_ABA,
     SAT_RELATORIO_OBS,
+    MASTER_OBRAS,
   };
 }
 
@@ -18391,6 +18557,8 @@ function applyStorageData(data) {
   if(data.AVANCOS)                                  AVANCOS       = data.AVANCOS;
   if(data.EXCLUIDOS_ABA)                            EXCLUIDOS_ABA = data.EXCLUIDOS_ABA;
   if(typeof data.SAT_RELATORIO_OBS === 'string')    SAT_RELATORIO_OBS = data.SAT_RELATORIO_OBS;
+  if(Array.isArray(data.MASTER_OBRAS))              MASTER_OBRAS = data.MASTER_OBRAS;
+  try{sincronizarListaMestreObras();}catch(_e){}
   applyDocumentacaoDateCorrections();
 }
 
@@ -19186,6 +19354,7 @@ async function syncFromSupabase() {
       av.data.forEach(x=>{ AVANCOS[x.projeto_key]={prev:x.prev,real:x.real,semana:x.semana}; });
     }
     applyDocumentacaoDateCorrections();
+    try{sincronizarListaMestreObras();}catch(_e){}
     saveToStorage();
     console.log('Sync: P='+PROJETOS.length+' R='+RDO.length+' D='+DOCUMENTACAO.length);
   } catch(e) { console.warn('Sync error:', e.message); }
@@ -19745,6 +19914,254 @@ function obsDrop(ev,targetIdx){
   showSaveStatus('✓ Ordem dos comentários atualizada');
 }
 
+
+
+/* Correção v55: Sumário sem Observações Gerais e comentários com atualização instantânea.
+   - Pontos de Atenção Prioritários deixam de usar os blocos de Observações Gerais da Semana.
+   - O Sumário passa a considerar somente comentários laterais dos módulos Cronograma e Financeiro.
+   - Inclusão/exclusão de comentários atualiza a tela imediatamente, sem precisar trocar de aba. */
+function __siog_is_comentario_modulo(o){
+  const t=String((o&&o.tipo)||'').toLowerCase().trim();
+  return t==='cronograma' || t==='financeiro';
+}
+function __siog_is_cor_critica(o){
+  const c=String((o&&o.cor)||'').toLowerCase().trim();
+  return c==='r' || c==='🔴' || c==='vermelho' || c==='critico' || c==='crítico';
+}
+function __siog_is_cor_atencao(o){
+  const c=String((o&&o.cor)||'').toLowerCase().trim();
+  return c==='y' || c==='🟡' || c==='amarelo' || c==='atenção' || c==='atencao';
+}
+function __siog_escape_attr(v){
+  return String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function __siog_obs_key(o,idx){
+  return String((o&&(o.id_seq||o.id))||idx||'');
+}
+function __siog_refresh_comments_now(){
+  try{ renderObservacoes(); }catch(_e){}
+  try{ renderSideComments('crono-comments','Cronograma'); }catch(_e){}
+  try{ renderSideComments('med-comments','Financeiro'); }catch(_e){}
+  try{ renderSumario(); }catch(_e){}
+}
+function renderSideComments(containerId,tipo){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  const obs=(OBSERVACOES||[]).filter(o=>o.tipo===tipo);
+  if(!obs.length){el.innerHTML='<div style="color:var(--tx3);font-size:12px;padding:12px 0">Nenhum comentário. Use ＋ para adicionar.</div>';return;}
+  el.innerHTML=obs.map(o=>{
+    const oi=OBSERVACOES.indexOf(o);
+    const key=__siog_obs_key(o,oi);
+    const corBd=o.cor==='g'?'#28c76f':o.cor==='y'?'#ffc107':o.cor==='r'?'#ea5455':'var(--bd)';
+    return`<div data-obs-key="${__siog_escape_attr(key)}" draggable="true" ondragstart="obsDragStart(event,${oi})" ondragover="obsDragOver(event)" ondrop="obsDrop(event,${oi})" ondragend="obsDragEnd(event)" style="border-left:3px solid ${corBd};padding:8px 10px;margin-bottom:8px;background:var(--bg3);border-radius:0 var(--rad) var(--rad) 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px">
+        <span class="drag-handle" title="Arraste para reordenar">↕</span><div style="font-size:11px;font-weight:700;color:var(--or);flex:1;min-width:0;text-align:left">${o.obra||'Geral'}${o.titulo?' — <span style="color:var(--tx2);font-weight:400">'+o.titulo+'</span>':''}</div>
+        <div style="display:flex;gap:2px;flex-shrink:0">
+          <button class="btn btn-xs" style="padding:1px 5px;font-size:10px" onclick="openObsModal(${oi},'${tipo}')">✏</button>
+          <button class="btn btn-xs btn-r" style="padding:1px 5px;font-size:10px" onclick="excluirObsPorSeq('${__siog_escape_attr(key)}');return false;">✕</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--tx2);line-height:1.5;white-space:pre-wrap;word-break:break-word">${String(o.texto||'').slice(0,220)}${String(o.texto||'').length>220?'…':''}</div>
+    </div>`;
+  }).join('');
+}
+function excluirObsPorSeq(key){
+  if(!confirm('Excluir?')) return;
+  const idx=(OBSERVACOES||[]).findIndex((o,i)=>__siog_obs_key(o,i)===String(key));
+  if(idx<0){__siog_refresh_comments_now();return;}
+  const obs=OBSERVACOES[idx];
+  // Remove imediatamente do array e também do DOM visível, antes da sincronização externa.
+  OBSERVACOES.splice(idx,1);
+  document.querySelectorAll(`[data-obs-key="${CSS.escape(String(key))}"]`).forEach(el=>el.remove());
+  saveToStorage();
+  __siog_refresh_comments_now();
+  showSaveStatus('✓ Comentário excluído');
+  try{ dbAfterDeleteObs(obs); }catch(_e){}
+}
+function excluirObs(idx){
+  const o=(OBSERVACOES||[])[idx];
+  if(!o) return;
+  excluirObsPorSeq(__siog_obs_key(o,idx));
+}
+const __siog_salvarObs_base_v55 = salvarObs;
+salvarObs=function(keepOpen=false){
+  const obsIsNew = (_editObsIdx===null || _editObsIdx===undefined);
+  __siog_salvarObs_base_v55.apply(this,arguments);
+  // Re-renderiza no mesmo ciclo da gravação. Para novo comentário lateral, ele precisa aparecer sem trocar de aba.
+  __siog_refresh_comments_now();
+  if(obsIsNew){
+    try{
+      const tipo=(document.getElementById('fo-tipo')||{}).value;
+      const target = tipo==='Cronograma' ? document.getElementById('crono-comments') : (tipo==='Financeiro' ? document.getElementById('med-comments') : null);
+      if(target) target.scrollTop = target.scrollHeight;
+    }catch(_e){}
+  }
+};
+function buildSumarioData(){
+  const cons=getMedCons();
+  const tC=cons.reduce((s,m)=>s+(m.contrato||0),0);
+  const tR=cons.reduce((s,m)=>s+m.rec,0);
+  const pct=tC>0?Math.round((tR/tC)*100):0;
+  const ativos=PROJETOS.filter(p=>p.status==='Ativo');
+  const atrasados=ativos.filter(p=>p.alerta==='⚠ Atraso');
+  let pendDocs=0;
+  try{ pendDocs=DOCUMENTACAO.filter(d=>d.art_st==='Pendente').length; }catch(e){}
+  try{ pendDocs+=GARANTIAS?GARANTIAS.filter(g=>(g.vencimento&&typeof g.vencimento==='number')&&(g.vencimento-RDO_REFERENCE_XL)<30).length:0; }catch(e){}
+  const radarFinanceiro=cons.map(m=>{
+    const pFaturar=m.pf||0;
+    const notasVenc=m.nfv||0;
+    const exposicao=pFaturar+notasVenc;
+    return{obra:m.cliente||m.id,faturar:fmtR(pFaturar),notas:fmtR(notasVenc),exposicao:fmtR(exposicao),_exp:exposicao};
+  }).filter(r=>r._exp>0).sort((a,b)=>b._exp-a._exp);
+  const rankingPrazo=ativos.map(p=>{
+    const praz=p.prazo_cli;
+    const tend=p.tendencia;
+    let desvio=0;
+    if(praz&&tend&&!isNaN(praz)&&!isNaN(tend)){desvio=Math.round(tend-praz);}
+    return{obra:p.obra,desvio,tend:xl2str(tend),_abs:Math.abs(desvio)};
+  }).filter(r=>r.desvio!==0).sort((a,b)=>b.desvio-a.desvio);
+  // IMPORTANTE: o Sumário não usa mais Observações Gerais da Semana.
+  // Só entram comentários lançados nos painéis laterais de Cronograma ou Financeiro.
+  const comentariosModulo=(OBSERVACOES||[]).filter(__siog_is_comentario_modulo);
+  const criticos=comentariosModulo.filter(__siog_is_cor_critica);
+  const emAtencao=comentariosModulo.filter(__siog_is_cor_atencao);
+  const rdoPend=RDO.filter(r=>{const st=getRdoStatus(r);return st==='Pendente';});
+  const satAtencao=(PESQUISAS||[]).filter(p=>p.nivel!=null&&p.nivel<=3);
+  const satLabel=s=>{const n=s.nivel;return n<=1?'Insatisfeito':n===2?'Parcialmente Satisfeito':'Satisfação Parcial';};
+  const pontos=[];
+  criticos.forEach(o=>pontos.push({cor:'🔴',titulo:o.obra||'Geral',detalhe:(o.titulo||o.texto||'').substring(0,90),categoria:o.tipo||'Comentário'}));
+  atrasados.forEach(p=>pontos.push({cor:'🔴',titulo:p.obra,detalhe:`Atraso de prazo — ${p.alerta||''}`,categoria:'Cronograma'}));
+  radarFinanceiro.slice(0,3).forEach(r=>pontos.push({cor:'🟡',titulo:r.obra,detalhe:`Exposição financeira: ${r.exposicao}`,categoria:'Financeiro'}));
+  pendDocs>0&&pontos.push({cor:'🟡',titulo:`${pendDocs} pendência${pendDocs>1?'s':''} documental${pendDocs>1?'is':''}`,detalhe:'ARTs ou garantias pendentes/vencendo',categoria:'Documentação'});
+  satAtencao.forEach(s=>pontos.push({cor:'🟡',titulo:s.cliente||s.id||'—',detalhe:'Satisfação: '+satLabel(s),categoria:'Satisfação'}));
+  rdoPend.slice(0,3).forEach(r=>pontos.push({cor:'🟡',titulo:r.obra,detalhe:'RDO com status Pendente',categoria:'RDO'}));
+  emAtencao.forEach(o=>pontos.push({cor:'🟡',titulo:o.obra||'Geral',detalhe:(o.titulo||o.texto||'').substring(0,90),categoria:o.tipo||'Comentário'}));
+  const pendenciasRelevantes=[];
+  rdoPend.forEach(r=>pendenciasRelevantes.push({obra:r.obra,tipo:'RDO Pendente',descr:'Atualiz./Envio em atraso'}));
+  satAtencao.forEach(s=>pendenciasRelevantes.push({obra:s.cliente||s.id||'—',tipo:'Satisfação',descr:satLabel(s)}));
+  try{DOCUMENTACAO.filter(d=>d.art_st==='Pendente').forEach(d=>pendenciasRelevantes.push({obra:d.obra,tipo:'ART Pendente',descr:'ART não emitida'}));}catch(e){}
+  return{
+    fmtCarteira:fmtR(tC),fmtRecebido:fmtR(tR),pctRecebido:pct,
+    ativosCnt:ativos.length,atrasados,pendDocs,
+    criticos,radarFinanceiro,rankingPrazo,
+    pontosPrioritarios:pontos,pendenciasRelevantes
+  };
+}
+
+/* Correção v56: Sumário Executivo vinculado somente aos comentários da atualização atual.
+   - Comentários antigos gravados no arquivo/base não entram mais no Sumário só por estarem salvos.
+   - Um comentário passa a entrar no Sumário quando for criado/editado na atualização atual ou tiver sido criado recentemente.
+   - Excluir comentário remove imediatamente da tela, do Sumário e da exportação, sem precisar trocar de aba.
+   - Observações Gerais da Semana continuam fora do Sumário. */
+const __siog_DELETED_OBS_KEY='siog_deleted_obs_keys_v56';
+function __siog_get_deleted_obs_keys(){
+  try{return new Set(JSON.parse(localStorage.getItem(__siog_DELETED_OBS_KEY)||'[]'));}catch(_e){return new Set();}
+}
+function __siog_set_deleted_obs_key(key){
+  try{const s=__siog_get_deleted_obs_keys();s.add(String(key));localStorage.setItem(__siog_DELETED_OBS_KEY,JSON.stringify([...s]));}catch(_e){}
+}
+function __siog_obs_timestamp(o){
+  const up=Number(o&&o.updated_at_local); if(up>0) return up;
+  const raw=String((o&&(o.id_seq||o.id))||'');
+  const m=raw.match(/obs_(\d{12,})/);
+  if(m){const n=Number(m[1]); if(n>0) return n;}
+  return 0;
+}
+function __siog_obs_eh_atualizacao_atual(o){
+  // Mantém o Sumário ligado ao que está sendo atualizado agora, e evita trazer histórico antigo do arquivo.
+  const ts=__siog_obs_timestamp(o);
+  if(!ts) return !!(o&&o.updated_at_local);
+  const dias=21*24*60*60*1000;
+  return ts >= (Date.now()-dias);
+}
+function __siog_obs_visivel_no_sumario(o,i){
+  if(!__siog_is_comentario_modulo(o)) return false;
+  const key=__siog_obs_key(o,i);
+  if(__siog_get_deleted_obs_keys().has(String(key))) return false;
+  return __siog_obs_eh_atualizacao_atual(o);
+}
+function __siog_refresh_tudo_comentarios(){
+  try{renderSideComments('crono-comments','Cronograma');}catch(_e){}
+  try{renderSideComments('med-comments','Financeiro');}catch(_e){}
+  try{renderObservacoes();}catch(_e){}
+  try{renderSumario();}catch(_e){}
+  try{updateBadges();}catch(_e){}
+}
+renderSideComments=function(containerId,tipo){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  const deleted=__siog_get_deleted_obs_keys();
+  const obs=(OBSERVACOES||[]).filter((o,i)=>o.tipo===tipo && !deleted.has(__siog_obs_key(o,i)) && __siog_obs_eh_atualizacao_atual(o));
+  if(!obs.length){el.innerHTML='<div style="color:var(--tx3);font-size:12px;padding:12px 0">Nenhum comentário desta atualização. Use ＋ para adicionar.</div>';return;}
+  el.innerHTML=obs.map(o=>{
+    const oi=OBSERVACOES.indexOf(o);
+    const key=__siog_obs_key(o,oi);
+    const corBd=o.cor==='g'?'#28c76f':o.cor==='y'?'#ffc107':o.cor==='r'?'#ea5455':'var(--bd)';
+    return`<div data-obs-key="${__siog_escape_attr(key)}" draggable="true" ondragstart="obsDragStart(event,${oi})" ondragover="obsDragOver(event)" ondrop="obsDrop(event,${oi})" ondragend="obsDragEnd(event)" style="border-left:3px solid ${corBd};padding:8px 10px;margin-bottom:8px;background:var(--bg3);border-radius:0 var(--rad) var(--rad) 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px">
+        <span class="drag-handle" title="Arraste para reordenar">↕</span><div style="font-size:11px;font-weight:700;color:var(--or);flex:1;min-width:0;text-align:left">${o.obra||'Geral'}${o.titulo?' — <span style="color:var(--tx2);font-weight:400">'+o.titulo+'</span>':''}</div>
+        <div style="display:flex;gap:2px;flex-shrink:0">
+          <button type="button" class="btn btn-xs" style="padding:1px 5px;font-size:10px" onclick="openObsModal(${oi},'${tipo}')">✏</button>
+          <button type="button" class="btn btn-xs btn-r" style="padding:1px 5px;font-size:10px" onclick="excluirObsPorSeq('${__siog_escape_attr(key)}');return false;">✕</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--tx2);line-height:1.5;white-space:pre-wrap;word-break:break-word">${String(o.texto||'').slice(0,220)}${String(o.texto||'').length>220?'…':''}</div>
+    </div>`;
+  }).join('');
+};
+excluirObsPorSeq=function(key){
+  if(!confirm('Excluir?')) return;
+  key=String(key);
+  __siog_set_deleted_obs_key(key);
+  const idx=(OBSERVACOES||[]).findIndex((o,i)=>__siog_obs_key(o,i)===key);
+  const obs=idx>=0?OBSERVACOES[idx]:null;
+  // Some da tela imediatamente, antes de salvar/sincronizar.
+  try{document.querySelectorAll(`[data-obs-key="${CSS.escape(key)}"]`).forEach(el=>el.remove());}catch(_e){}
+  if(idx>=0) OBSERVACOES.splice(idx,1);
+  saveToStorage();
+  __siog_refresh_tudo_comentarios();
+  showSaveStatus('✓ Comentário excluído');
+  try{ if(obs) dbAfterDeleteObs(obs); }catch(_e){}
+};
+excluirObs=function(idx){
+  const o=(OBSERVACOES||[])[idx];
+  if(!o) return;
+  excluirObsPorSeq(__siog_obs_key(o,idx));
+};
+const __siog_salvarObs_base_v56=salvarObs;
+salvarObs=function(keepOpen=false){
+  __siog_salvarObs_base_v56.apply(this,arguments);
+  try{
+    const now=Date.now();
+    let idx=-1;
+    if(_editObsIdx!==null && _editObsIdx!==undefined) idx=_editObsIdx;
+    if(idx<0) idx=(OBSERVACOES||[]).length-1;
+    if(OBSERVACOES[idx]){
+      OBSERVACOES[idx].updated_at_local=now;
+      saveToStorage();
+    }
+  }catch(_e){}
+  requestAnimationFrame(()=>__siog_refresh_tudo_comentarios());
+};
+const __siog_buildSumarioData_base_v56=buildSumarioData;
+buildSumarioData=function(){
+  const data=__siog_buildSumarioData_base_v56();
+  const comentariosModulo=(OBSERVACOES||[]).filter((o,i)=>__siog_obs_visivel_no_sumario(o,i));
+  const criticos=comentariosModulo.filter(__siog_is_cor_critica);
+  const emAtencao=comentariosModulo.filter(__siog_is_cor_atencao);
+  const pontos=[];
+  criticos.forEach(o=>pontos.push({cor:'🔴',titulo:o.obra||'Geral',detalhe:(o.titulo||o.texto||'').substring(0,90),categoria:o.tipo||'Comentário'}));
+  // Mantém também alertas automáticos do sistema, porém sem puxar histórico antigo de comentários.
+  (data.atrasados||[]).forEach(p=>pontos.push({cor:'🔴',titulo:p.obra,detalhe:`Atraso de prazo — ${p.alerta||''}`,categoria:'Cronograma'}));
+  (data.radarFinanceiro||[]).slice(0,3).forEach(r=>pontos.push({cor:'🟡',titulo:r.obra,detalhe:`Exposição financeira: ${r.exposicao}`,categoria:'Financeiro'}));
+  if(data.pendDocs>0)pontos.push({cor:'🟡',titulo:`${data.pendDocs} pendência${data.pendDocs>1?'s':''} documental${data.pendDocs>1?'is':''}`,detalhe:'ARTs ou garantias pendentes/vencendo',categoria:'Documentação'});
+  emAtencao.forEach(o=>pontos.push({cor:'🟡',titulo:o.obra||'Geral',detalhe:(o.titulo||o.texto||'').substring(0,90),categoria:o.tipo||'Comentário'}));
+  data.criticos=criticos;
+  data.pontosPrioritarios=pontos;
+  return data;
+};
+
+
 // ── INIT ─────────────────────────────────────────────────
 window.addEventListener('load', () => {
   // Step 1: Try localStorage; if absent/corrupt, keep embedded Excel seed data
@@ -19759,6 +20176,8 @@ window.addEventListener('load', () => {
       saveToStorage();
     } catch(e) { console.warn('Initial seed save error:', e); }
   }
+
+  try{sincronizarListaMestreObras();saveToStorage();}catch(e){console.warn('Lista mestra:', e);}
 
   installAccessGuards();
   installAutoSaveRobusto();
@@ -19781,6 +20200,539 @@ window.addEventListener('load', () => {
     try { initSupabase(); } catch(e) { console.warn('Supabase:', e); }
   }, 500);
 });
+
+
+/* Correção v57: Sumário por comentários da semana + avanços em entregas parciais.
+   - Pontos de Atenção Prioritários passam a usar somente comentários críticos/atenção da semana selecionada, sem preencher automaticamente com atraso genérico.
+   - Cronograma permite salvar % Previsto e % Realizado por entrega parcial/praça/frente.
+   - As entregas parciais passam a exibir % Prev., % Real e Aderência na tela e no relatório/PPT/PDF. */
+function __siog_semana_numero_atual(){
+  const raw=String((document.getElementById('rel-semana')||{}).value||'').trim();
+  const m=raw.match(/(\d+)/);
+  if(m) return Number(m[1]);
+  try{
+    const nums=(OBSERVACOES||[]).map(o=>Number(o&&o.semana)).filter(n=>Number.isFinite(n));
+    return nums.length?Math.max(...nums):null;
+  }catch(_e){return null;}
+}
+function __siog_obs_eh_da_semana(o){
+  const sem=__siog_semana_numero_atual();
+  if(sem==null) return true;
+  return Number(o&&o.semana)===Number(sem);
+}
+function __siog_obs_visivel_no_relatorio(o,i,tipo){
+  if(!o || o.tipo!==tipo) return false;
+  if(!__siog_obs_eh_da_semana(o)) return false;
+  try{ if(__siog_get_deleted_obs_keys().has(__siog_obs_key(o,i))) return false; }catch(_e){}
+  return true;
+}
+function cronoAvancoKey(p,parcialIdx){
+  const base=(p&&p.id?p.id:'')+'|'+(p&&p.obra?p.obra:'');
+  if(parcialIdx===null || parcialIdx===undefined || parcialIdx==='') return base;
+  return base+'|PARCIAL|'+String(parcialIdx);
+}
+function __siog_pct_txt(v){
+  if(v===null||v===undefined||v==='') return '—';
+  const n=Number(v); return Number.isFinite(n)?n.toFixed(1)+'%':'—';
+}
+function __siog_ader_txt(prev,real){
+  const p=Number(prev), r=Number(real);
+  if(!Number.isFinite(p)||!Number.isFinite(r)||p<=0) return '—';
+  return (r/p*100).toFixed(0)+'%';
+}
+function __siog_instalar_select_entrega(){
+  const ent=document.getElementById('ce-ent');
+  if(ent && !ent.__siog_v57){
+    ent.__siog_v57=true;
+    ent.addEventListener('change',()=>__siog_carregar_avanco_crono_selecionado(false));
+  }
+}
+function __siog_carregar_avanco_crono_selecionado(rebuild=true){
+  __siog_instalar_select_entrega();
+  const projSel=document.getElementById('ce-proj');
+  const entSel=document.getElementById('ce-ent');
+  if(!projSel||!entSel) return;
+  const idx=parseInt(projSel.value);
+  const p=PROJETOS[idx]; if(!p) return;
+  const oldEnt=entSel.value||'';
+  if(rebuild || entSel.dataset.projIdx!==String(idx)){
+    entSel.innerHTML='<option value="">Consolidado geral</option>';
+    (p.parciais||[]).forEach((par,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=par.nome||('Entrega parcial '+(i+1));entSel.appendChild(o);});
+    entSel.dataset.projIdx=String(idx);
+    if(oldEnt!=='' && [...entSel.options].some(o=>o.value===oldEnt)) entSel.value=oldEnt;
+  }
+  const k=cronoAvancoKey(p,entSel.value);
+  const av=AVANCOS[k]||{};
+  const prev=document.getElementById('ce-prev');
+  const real=document.getElementById('ce-real');
+  if(prev) prev.value=av.prev??'';
+  if(real) real.value=av.real??'';
+}
+const __siog_openCronoEdit_base_v57=typeof openCronoEdit==='function'?openCronoEdit:null;
+openCronoEdit=function(idx){
+  if(__siog_openCronoEdit_base_v57){__siog_openCronoEdit_base_v57(idx);}else{openMo('mo-crono');}
+  setTimeout(()=>__siog_carregar_avanco_crono_selecionado(true),0);
+};
+populateCronoEdit=function(){__siog_carregar_avanco_crono_selecionado(true);};
+salvarCrono=function(keepOpen=false){
+  const idx=parseInt(document.getElementById('ce-proj').value);
+  const p=PROJETOS[idx]; if(!p)return;
+  const ent=(document.getElementById('ce-ent')||{}).value||'';
+  const k=cronoAvancoKey(p,ent);
+  const prev=parseFloat(document.getElementById('ce-prev').value);
+  const real=parseFloat(document.getElementById('ce-real').value);
+  if(!AVANCOS[k])AVANCOS[k]={};
+  if(!isNaN(prev))AVANCOS[k].prev=prev; else delete AVANCOS[k].prev;
+  if(!isNaN(real))AVANCOS[k].real=real; else delete AVANCOS[k].real;
+  AVANCOS[k].semana='Semana atual';
+  AVANCOS[k].tipo=ent===''?'Consolidado':'Parcial';
+  AVANCOS[k].parcial_idx=ent===''?null:Number(ent);
+  saveToStorage();
+  renderCronograma();renderDashboard();
+  try{dbAfterSaveCrono(k,AVANCOS[k]);}catch(_e){}
+  if(keepOpen){showSaveStatus('✓ Avanço salvo');__siog_carregar_avanco_crono_selecionado(false);return;}
+  closeMo('mo-crono');
+};
+renderCronograma=function(){
+  const q=(document.getElementById('sc-q').value||'').toLowerCase();
+  const ff=document.getElementById('sc-farol').value;
+  const ativos=PROJETOS.filter(p=>p.status==='Ativo' && !isProjetoExcluidoDaAba('cronograma',p.id,p.obra));
+  const noPrazo=ativos.filter(p=>cronoFarol(p)==='g').length;
+  const atrasados=ativos.filter(p=>cronoFarol(p)==='r').length;
+  document.getElementById('kpi-crono').innerHTML=`
+    <div class="kpi or"><div class="kpi-lbl">Obras Ativas</div><div class="kpi-val">${ativos.length}</div></div>
+    <div class="kpi or"><div class="kpi-lbl">🟢 No Prazo</div><div class="kpi-val">${noPrazo}</div></div>
+    <div class="kpi or"><div class="kpi-lbl">🔴 Atrasadas</div><div class="kpi-val">${atrasados}</div></div>
+    <div class="kpi or"><div class="kpi-lbl">🟡 Atenção</div><div class="kpi-val">${ativos.length-noPrazo-atrasados}</div></div>`;
+  let rows='';
+  ordenarPorIdPadrao(PROJETOS.filter(p=>{
+    if(isProjetoExcluidoDaAba('cronograma',p.id,p.obra)) return false;
+    const m=!q||p.obra.toLowerCase().includes(q)||p.id.toLowerCase().includes(q);
+    const cf=cronoFarol(p);
+    const fok=!ff||(ff==='g'&&cf==='g')||(ff==='y'&&cf==='y')||(ff==='r'&&cf==='r');
+    return m&&fok;
+  }),p=>p.id,p=>p.obra).forEach(p=>{
+    const av=AVANCOS[cronoAvancoKey(p,'')]||{};
+    const ader=__siog_ader_txt(av.prev,av.real);
+    const f=cronoFarol(p);
+    const tip=f==='g'?`No prazo — Tend.:${xl2str(p.tendencia)} ≤ Cli.:${xl2str(p.prazo_cli)}`:f==='y'?`Atenção — Tend.:${xl2str(p.tendencia)}`:`Atrasado — Tend.:${xl2str(p.tendencia)} > Cli.:${xl2str(p.prazo_cli)}`;
+    const grp=`${p.id}|${p.obra}`;
+    rows+=`<tr data-group="${grp}" data-group-parent="1" data-key="${p.id}|${p.obra}">
+      <td class="acoes-left"><button class="btn btn-xs btn-or" onclick="openCronoEdit(${PROJETOS.indexOf(p)})" title="Atualizar avanços">Atualizar</button>
+        <button class="btn btn-xs btn-r" onclick="excluirProjetoDaAba('cronograma','${String(p.id).replace(/'/g,"\\'")}','${String(p.obra).replace(/'/g,"\\'")}')" title="Excluir apenas da aba Cronograma">🗑 Aba</button></td>
+      <td><code style="font-size:11px;color:var(--tx2)">${p.id}</code></td><td><strong>${p.obra}</strong></td>
+      <td>${xl2str(p.inicio)}</td><td style="color:var(--tx2)">${xl2str(p.prazo_cont)}</td><td style="color:var(--r2)">${xl2str(p.prazo_cli)}</td>
+      <td style="color:var(--or);font-weight:700">${xl2str(p.tendencia)}</td><td style="text-align:center">${dotFarol(f,tip)}</td>
+      <td>${__siog_pct_txt(av.prev)}</td><td style="font-weight:600">${__siog_pct_txt(av.real)}</td><td>${ader}</td></tr>`;
+    (p.parciais||[]).forEach((par,parIdx)=>{
+      const pav=AVANCOS[cronoAvancoKey(p,parIdx)]||{};
+      const pader=__siog_ader_txt(pav.prev,pav.real);
+      const pf=par.tendencia&&par.prazo_cli?(par.tendencia<=par.prazo_cli?'g':'r'):'y';
+      const ptip=pf==='g'?`Parcial no prazo — Tend.:${xl2str(par.tendencia)} ≤ Cli.:${xl2str(par.prazo_cli)}`:pf==='r'?`Parcial atrasada — Tend.:${xl2str(par.tendencia)} > Cli.:${xl2str(par.prazo_cli)}`:'Parcial em atenção';
+      rows+=`<tr data-group="${grp}" style="background:rgba(232,119,34,.04)">
+        <td class="acoes-left"><button class="btn btn-xs" onclick="openCronoEdit(${PROJETOS.indexOf(p)});setTimeout(()=>{const e=document.getElementById('ce-ent');if(e){e.value='${parIdx}';__siog_carregar_avanco_crono_selecionado(false);}},30)" title="Atualizar avanço da entrega parcial">Atualizar</button></td><td></td>
+        <td style="padding-left:24px;color:var(--or);font-size:12px">↳ ${par.nome}</td><td>${xl2str(par.inicio)}</td><td style="color:var(--tx2)">${xl2str(par.prazo_cont)}</td>
+        <td style="color:var(--r2)">${par.prazo_cli?xl2str(par.prazo_cli):'<span style="color:var(--tx3)">À definir</span>'}</td><td style="color:var(--or)">${xl2str(par.tendencia)}</td>
+        <td style="text-align:center">${dotFarol(pf,ptip)}</td><td>${__siog_pct_txt(pav.prev)}</td><td style="font-weight:600">${__siog_pct_txt(pav.real)}</td><td>${pader}</td></tr>`;
+    });
+  });
+  document.getElementById('tbody-crono').innerHTML=rows||'<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--tx3)">Nenhum registro.</td></tr>';
+  renderSideComments('crono-comments','Cronograma');
+};
+renderSideComments=function(containerId,tipo){
+  const el=document.getElementById(containerId); if(!el)return;
+  const deleted=__siog_get_deleted_obs_keys();
+  const obs=(OBSERVACOES||[]).filter((o,i)=>o.tipo===tipo && __siog_obs_eh_da_semana(o) && !deleted.has(__siog_obs_key(o,i)));
+  if(!obs.length){el.innerHTML='<div style="color:var(--tx3);font-size:12px;padding:12px 0">Nenhum comentário desta semana. Use ＋ para adicionar.</div>';return;}
+  el.innerHTML=obs.map(o=>{
+    const oi=OBSERVACOES.indexOf(o); const key=__siog_obs_key(o,oi);
+    const corBd=o.cor==='g'?'#28c76f':o.cor==='y'?'#ffc107':o.cor==='r'?'#ea5455':'var(--bd)';
+    return`<div data-obs-key="${__siog_escape_attr(key)}" draggable="true" ondragstart="obsDragStart(event,${oi})" ondragover="obsDragOver(event)" ondrop="obsDrop(event,${oi})" ondragend="obsDragEnd(event)" style="border-left:3px solid ${corBd};padding:8px 10px;margin-bottom:8px;background:var(--bg3);border-radius:0 var(--rad) var(--rad) 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px">
+        <span class="drag-handle" title="Arraste para reordenar">↕</span><div style="font-size:11px;font-weight:700;color:var(--or);flex:1;min-width:0;text-align:left">${o.obra||'Geral'}${o.titulo?' — <span style="color:var(--tx2);font-weight:400">'+o.titulo+'</span>':''}</div>
+        <div style="display:flex;gap:2px;flex-shrink:0"><button type="button" class="btn btn-xs" style="padding:1px 5px;font-size:10px" onclick="openObsModal(${oi},'${tipo}')">✏</button><button type="button" class="btn btn-xs btn-r" style="padding:1px 5px;font-size:10px" onclick="excluirObsPorSeq('${__siog_escape_attr(key)}');return false;">✕</button></div>
+      </div><div style="font-size:11px;color:var(--tx2);line-height:1.5;white-space:pre-wrap;word-break:break-word">${String(o.texto||'').slice(0,220)}${String(o.texto||'').length>220?'…':''}</div></div>`;
+  }).join('');
+};
+const __siog_buildSumarioData_base_v57=buildSumarioData;
+buildSumarioData=function(){
+  const data=__siog_buildSumarioData_base_v57();
+  const comentariosModulo=(OBSERVACOES||[]).filter((o,i)=>__siog_obs_visivel_no_relatorio(o,i,o&&o.tipo) && (__siog_is_cor_critica(o)||__siog_is_cor_atencao(o)));
+  const criticos=comentariosModulo.filter(__siog_is_cor_critica);
+  const emAtencao=comentariosModulo.filter(__siog_is_cor_atencao);
+  const pontos=[];
+  criticos.forEach(o=>pontos.push({cor:'🔴',titulo:o.obra||'Geral',detalhe:(o.titulo||o.texto||'').substring(0,110),categoria:o.tipo||'Comentário'}));
+  emAtencao.forEach(o=>pontos.push({cor:'🟡',titulo:o.obra||'Geral',detalhe:(o.titulo||o.texto||'').substring(0,110),categoria:o.tipo||'Comentário'}));
+  data.criticos=criticos;
+  data.pontosPrioritarios=pontos;
+  return data;
+};
+try{document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{__siog_instalar_select_entrega();try{renderCronograma();}catch(_e){}},600));}catch(_e){}
+
+/* Correção v58: Sumário Executivo somente com comentários efetivamente atualizados na semana corrente.
+   - Não considera mais comentários antigos apenas porque possuem o mesmo número de semana.
+   - Só entram no Sumário os comentários dos painéis Cronograma ou Financeiro criados/editados desde segunda-feira da semana atual.
+   - Comentários sem updated_at_local, herdados de backup/arquivo antigo, ficam fora do Sumário até serem editados/salvos novamente.
+   - Removidos alertas genéricos automáticos de atraso/financeiro/documentação dos Pontos de Atenção Prioritários. */
+function __siog_inicio_semana_atual_ms(){
+  const d=new Date();
+  d.setHours(0,0,0,0);
+  const dia=d.getDay();
+  const diff=(dia===0?6:dia-1); // segunda-feira como início da semana
+  d.setDate(d.getDate()-diff);
+  return d.getTime();
+}
+function __siog_obs_atualizada_na_semana_corrente(o){
+  const ts=Number(o&&o.updated_at_local);
+  if(!Number.isFinite(ts)||ts<=0) return false;
+  return ts>=__siog_inicio_semana_atual_ms();
+}
+function __siog_obs_visivel_sumario_semana_corrente(o,i){
+  if(!__siog_is_comentario_modulo(o)) return false;
+  if(!(__siog_is_cor_critica(o)||__siog_is_cor_atencao(o))) return false;
+  try{ if(__siog_get_deleted_obs_keys().has(__siog_obs_key(o,i))) return false; }catch(_e){}
+  return __siog_obs_atualizada_na_semana_corrente(o);
+}
+function __siog_comentarios_modulo_atualizados_semana(){
+  return (OBSERVACOES||[]).filter((o,i)=>__siog_obs_visivel_sumario_semana_corrente(o,i));
+}
+function __siog_refresh_sumario_exec(){
+  try{renderSumario();}catch(_e){}
+}
+const __siog_buildSumarioData_base_v58=buildSumarioData;
+buildSumarioData=function(){
+  const data=__siog_buildSumarioData_base_v58();
+  const comentarios=__siog_comentarios_modulo_atualizados_semana();
+  const criticos=comentarios.filter(__siog_is_cor_critica);
+  const emAtencao=comentarios.filter(__siog_is_cor_atencao);
+  const pontos=[];
+  criticos.forEach(o=>pontos.push({
+    cor:'🔴',
+    titulo:o.obra||'Geral',
+    detalhe:String(o.titulo||o.texto||'').substring(0,110),
+    categoria:o.tipo||'Comentário'
+  }));
+  emAtencao.forEach(o=>pontos.push({
+    cor:'🟡',
+    titulo:o.obra||'Geral',
+    detalhe:String(o.titulo||o.texto||'').substring(0,110),
+    categoria:o.tipo||'Comentário'
+  }));
+  data.criticos=criticos;
+  data.pontosPrioritarios=pontos;
+  return data;
+};
+const __siog_salvarObs_base_v58=salvarObs;
+salvarObs=function(keepOpen=false){
+  __siog_salvarObs_base_v58.apply(this,arguments);
+  try{
+    const now=Date.now();
+    const tipo=(document.getElementById('fo-tipo')||{}).value;
+    let idx=-1;
+    if(_editObsIdx!==null && _editObsIdx!==undefined) idx=_editObsIdx;
+    if(idx<0) idx=(OBSERVACOES||[]).length-1;
+    if(OBSERVACOES[idx]){
+      OBSERVACOES[idx].updated_at_local=now;
+      if(!OBSERVACOES[idx].semana) OBSERVACOES[idx].semana=getSemanaAtual();
+      saveToStorage();
+    }
+    if(tipo==='Cronograma'||tipo==='Financeiro') setTimeout(()=>{try{renderSumario();}catch(_e){}},0);
+  }catch(_e){}
+  requestAnimationFrame(()=>{try{renderSumario();}catch(_e){}});
+};
+const __siog_excluirObsPorSeq_base_v58=excluirObsPorSeq;
+excluirObsPorSeq=function(key){
+  __siog_excluirObsPorSeq_base_v58.apply(this,arguments);
+  requestAnimationFrame(()=>{try{renderSumario();}catch(_e){}});
+};
+/* Filtro específico dos painéis laterais: mantém visíveis apenas comentários da atualização semanal corrente.
+   Para reaproveitar um comentário antigo no Sumário, basta editar/salvar o bloco novamente. */
+renderSideComments=function(containerId,tipo){
+  const el=document.getElementById(containerId); if(!el)return;
+  const deleted=__siog_get_deleted_obs_keys();
+  const obs=(OBSERVACOES||[]).filter((o,i)=>o.tipo===tipo && !deleted.has(__siog_obs_key(o,i)) && __siog_obs_atualizada_na_semana_corrente(o));
+  if(!obs.length){el.innerHTML='<div style="color:var(--tx3);font-size:12px;padding:12px 0">Nenhum comentário atualizado nesta semana. Use ＋ para adicionar ou edite/salve um comentário antigo para trazê-lo para a atualização.</div>';return;}
+  el.innerHTML=obs.map(o=>{
+    const oi=OBSERVACOES.indexOf(o); const key=__siog_obs_key(o,oi);
+    const corBd=o.cor==='g'?'#28c76f':o.cor==='y'?'#ffc107':o.cor==='r'?'#ea5455':'var(--bd)';
+    return`<div data-obs-key="${__siog_escape_attr(key)}" draggable="true" ondragstart="obsDragStart(event,${oi})" ondragover="obsDragOver(event)" ondrop="obsDrop(event,${oi})" ondragend="obsDragEnd(event)" style="border-left:3px solid ${corBd};padding:8px 10px;margin-bottom:8px;background:var(--bg3);border-radius:0 var(--rad) var(--rad) 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px">
+        <span class="drag-handle" title="Arraste para reordenar">↕</span><div style="font-size:11px;font-weight:700;color:var(--or);flex:1;min-width:0;text-align:left">${o.obra||'Geral'}${o.titulo?' — <span style="color:var(--tx2);font-weight:400">'+o.titulo+'</span>':''}</div>
+        <div style="display:flex;gap:2px;flex-shrink:0"><button type="button" class="btn btn-xs" style="padding:1px 5px;font-size:10px" onclick="openObsModal(${oi},'${tipo}')">✏</button><button type="button" class="btn btn-xs btn-r" style="padding:1px 5px;font-size:10px" onclick="excluirObsPorSeq('${__siog_escape_attr(key)}');return false;">✕</button></div>
+      </div><div style="font-size:11px;color:var(--tx2);line-height:1.5;white-space:pre-wrap;word-break:break-word">${String(o.texto||'').slice(0,220)}${String(o.texto||'').length>220?'…':''}</div></div>`;
+  }).join('');
+};
+try{document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{try{renderSumario();}catch(_e){}},800));}catch(_e){}
+
+
+
+/* Correção v59: comentários preservados na tela e Sumário vinculado aos comentários da semana do relatório.
+   - Os painéis laterais voltam a exibir todos os comentários cadastrados do módulo (Cronograma/Financeiro), sem ocultar por updated_at_local.
+   - O Sumário Executivo usa somente comentários de Cronograma e Financeiro da semana de referência do relatório.
+   - Observações Gerais da Semana continuam fora do Sumário.
+   - Não gera pontos genéricos por atraso para todas as obras. */
+function __siog_semana_relatorio_num(){
+  try{
+    const el=document.getElementById('rel-semana');
+    const m=String(el&&el.value||'').match(/(\d+)/);
+    if(m) return parseInt(m[1],10);
+  }catch(_e){}
+  try{
+    const nums=(OBSERVACOES||[]).map(o=>parseInt(o&&o.semana,10)).filter(n=>Number.isFinite(n)&&n>0);
+    if(nums.length) return Math.max(...nums);
+  }catch(_e){}
+  try{return getSemanaAtual();}catch(_e){return 0;}
+}
+function __siog_comentario_modulo_da_semana_relatorio(o){
+  if(!o) return false;
+  if(!(o.tipo==='Cronograma'||o.tipo==='Financeiro')) return false;
+  if(!(__siog_is_cor_critica(o)||__siog_is_cor_atencao(o))) return false;
+  const sr=__siog_semana_relatorio_num();
+  const so=parseInt(o.semana,10);
+  return !sr || so===sr;
+}
+function __siog_html_comentario_lateral(o,oi,tipo){
+  const key=__siog_obs_key(o,oi);
+  const corBd=o.cor==='g'?'#28c76f':o.cor==='y'?'#ffc107':o.cor==='r'?'#ea5455':'var(--bd)';
+  return `<div data-obs-key="${__siog_escape_attr(key)}" draggable="true" ondragstart="obsDragStart(event,${oi})" ondragover="obsDragOver(event)" ondrop="obsDrop(event,${oi})" ondragend="obsDragEnd(event)" style="border-left:3px solid ${corBd};padding:8px 10px;margin-bottom:8px;background:var(--bg3);border-radius:0 var(--rad) var(--rad) 0">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px">
+      <span class="drag-handle" title="Arraste para reordenar">↕</span>
+      <div style="font-size:11px;font-weight:700;color:var(--or);flex:1;min-width:0;text-align:left">${o.obra||'Geral'}${o.titulo?' — <span style="color:var(--tx2);font-weight:400">'+o.titulo+'</span>':''}</div>
+      <div style="display:flex;gap:2px;flex-shrink:0">
+        <button type="button" class="btn btn-xs" style="padding:1px 5px;font-size:10px" onclick="openObsModal(${oi},'${tipo}')">✏</button>
+        <button type="button" class="btn btn-xs btn-r" style="padding:1px 5px;font-size:10px" onclick="excluirObsPorSeq('${__siog_escape_attr(key)}');return false;">✕</button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--tx2);line-height:1.5;white-space:pre-wrap;word-break:break-word">${String(o.texto||'').slice(0,220)}${String(o.texto||'').length>220?'…':''}</div>
+  </div>`;
+}
+renderSideComments=function(containerId,tipo){
+  const el=document.getElementById(containerId); if(!el) return;
+  const obs=(OBSERVACOES||[]).filter(o=>o.tipo===tipo);
+  if(!obs.length){el.innerHTML='<div style="color:var(--tx3);font-size:12px;padding:12px 0">Nenhum comentário cadastrado neste módulo. Use ＋ para adicionar.</div>';return;}
+  el.innerHTML=obs.map(o=>__siog_html_comentario_lateral(o,OBSERVACOES.indexOf(o),tipo)).join('');
+};
+const __siog_buildSumarioData_base_v59 = (typeof __siog_buildSumarioData_base_v58==='function') ? __siog_buildSumarioData_base_v58 : buildSumarioData;
+buildSumarioData=function(){
+  const data=__siog_buildSumarioData_base_v59();
+  const comentarios=(OBSERVACOES||[]).filter(__siog_comentario_modulo_da_semana_relatorio);
+  const criticos=comentarios.filter(__siog_is_cor_critica);
+  const emAtencao=comentarios.filter(__siog_is_cor_atencao);
+  const pontos=[];
+  criticos.forEach(o=>pontos.push({cor:'🔴',titulo:o.obra||'Geral',detalhe:String(o.titulo||o.texto||'').substring(0,110),categoria:o.tipo||'Comentário'}));
+  emAtencao.forEach(o=>pontos.push({cor:'🟡',titulo:o.obra||'Geral',detalhe:String(o.titulo||o.texto||'').substring(0,110),categoria:o.tipo||'Comentário'}));
+  data.criticos=criticos;
+  data.pontosPrioritarios=pontos;
+  return data;
+};
+const __siog_salvarObs_base_v59=salvarObs;
+salvarObs=function(keepOpen=false){
+  __siog_salvarObs_base_v59.apply(this,arguments);
+  try{renderSideComments('crono-comments','Cronograma');}catch(_e){}
+  try{renderSideComments('med-comments','Financeiro');}catch(_e){}
+  try{renderSumario();}catch(_e){}
+};
+const __siog_excluirObsPorSeq_base_v59=excluirObsPorSeq;
+excluirObsPorSeq=function(key){
+  __siog_excluirObsPorSeq_base_v59.apply(this,arguments);
+  try{renderSideComments('crono-comments','Cronograma');}catch(_e){}
+  try{renderSideComments('med-comments','Financeiro');}catch(_e){}
+  try{renderSumario();}catch(_e){}
+};
+try{document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{try{renderSideComments('crono-comments','Cronograma');renderSideComments('med-comments','Financeiro');renderSumario();}catch(_e){}},900));}catch(_e){}
+
+
+
+/* Correção v61: salvamento instantâneo dos comentários ao editar/criar.
+   - Ao clicar em Salvar, grava no array/localStorage imediatamente.
+   - Atualiza os painéis laterais e o Sumário no mesmo clique.
+   - Fecha a janela de edição imediatamente, sem precisar clicar no X ou trocar de aba.
+   - Mantém Salvar+ aberto para inclusão/continuidade. */
+function __siog_force_close_modal_v61(id){
+  try{ closeMo(id); }catch(_e){}
+  try{ const el=document.getElementById(id); if(el) el.classList.remove('open'); }catch(_e){}
+}
+function __siog_bulletize_obs_text_v61(txt){
+  txt=String(txt||'');
+  if(!txt.trim()) return '';
+  return txt.split('\n').map(l=>{
+    const t=String(l||'').trimStart();
+    if(!t) return '• ';
+    return /^[•\-*]\s/.test(t) ? t.replace(/^[\-*]\s/,'• ') : '• '+t;
+  }).join('\n');
+}
+function __siog_refresh_after_obs_save_v61(){
+  try{ renderObservacoes(); }catch(_e){}
+  try{ renderSideComments('crono-comments','Cronograma'); }catch(_e){}
+  try{ renderSideComments('med-comments','Financeiro'); }catch(_e){}
+  try{ renderSumario(); }catch(_e){}
+  try{ updateBadges(); }catch(_e){}
+}
+salvarObs=function(keepOpen=false){
+  const idxAtual = (_editObsIdx!==null && _editObsIdx!==undefined && _editObsIdx>=0) ? _editObsIdx : -1;
+  const obsIsNew = idxAtual<0 || !OBSERVACOES[idxAtual];
+  const anterior = obsIsNew ? null : (OBSERVACOES[idxAtual] || {});
+  const textoEl=document.getElementById('fo-texto');
+  if(textoEl) textoEl.value=__siog_bulletize_obs_text_v61(textoEl.value);
+  const novo={
+    id: obsIsNew ? (obsNextId++) : (anterior.id ?? obsNextId++),
+    id_seq: obsIsNew ? nextSeq('obs') : (anterior.id_seq || nextSeq('obs')),
+    obra:(document.getElementById('fo-obra')||{}).value||'',
+    tipo:(document.getElementById('fo-tipo')||{}).value||'Geral da Semana',
+    semana:parseInt(((document.getElementById('fo-semana')||{}).value)||'',10)||getSemanaAtual(),
+    cor:(document.getElementById('fo-cor')||{}).value||'n',
+    titulo:(document.getElementById('fo-titulo')||{}).value||'',
+    texto:(document.getElementById('fo-texto')||{}).value||'',
+    updated_at_local:Date.now()
+  };
+  if(obsIsNew){
+    OBSERVACOES.push(novo);
+    _editObsIdx=OBSERVACOES.length-1;
+  }else{
+    OBSERVACOES[idxAtual]=novo;
+    _editObsIdx=idxAtual;
+  }
+  try{ lembrarObraNaListaMestre('',novo.obra); }catch(_e){}
+  try{ saveToStorage(); }catch(_e){}
+  __siog_refresh_after_obs_save_v61();
+  try{ showSaveStatus('✓ Comentário salvo'); }catch(_e){}
+  if(!keepOpen){
+    __siog_force_close_modal_v61('mo-obs');
+    _editObsIdx=null;
+  }else{
+    _editObsIdx=(OBSERVACOES||[]).findIndex(x=>String(x.id_seq||'')===String(novo.id_seq||''));
+  }
+  try{
+    if(typeof _sb!=='undefined' && _sb){
+      if(obsIsNew) sbInsert('observacoes',novo); else sbUpdate('observacoes',novo,'id_seq',novo.id_seq);
+    }
+  }catch(_e){}
+  return false;
+};
+try{document.addEventListener('DOMContentLoaded',()=>{try{__siog_refresh_after_obs_save_v61();}catch(_e){}},false);}catch(_e){}
+
+
+/* Correção v62: Exportação PowerPoint/HTML alinhada ao sistema.
+   - Mantém todo o funcionamento atual da tela.
+   - Ao gerar relatório/PowerPoint, os comentários de Cronograma e Financeiro passam a usar a mesma lógica da atualização semanal:
+     somente comentários criados/editados nesta semana entram nas abas exportadas.
+   - O Sumário Executivo exportado também usa os mesmos comentários atualizados da semana.
+   - Observações Gerais continuam fora do Sumário. */
+function __siog_v62_inicio_semana_ms(){
+  const d=new Date();
+  d.setHours(0,0,0,0);
+  const dia=d.getDay();
+  d.setDate(d.getDate()-(dia===0?6:dia-1));
+  return d.getTime();
+}
+function __siog_v62_tipo_modulo(o,tipo){
+  const t=String((o&&o.tipo)||'').trim();
+  return t==='Cronograma'||t==='Financeiro'||(tipo&&t===tipo);
+}
+function __siog_v62_deleted(o,i){
+  try{return __siog_get_deleted_obs_keys().has(__siog_obs_key(o,i));}catch(_e){return false;}
+}
+function __siog_v62_atualizado_semana(o){
+  const ts=Number((o&&o.updated_at_local)||(o&&o.created_at_local)||0);
+  return Number.isFinite(ts) && ts>=__siog_v62_inicio_semana_ms();
+}
+function __siog_obs_export_semana_v62(o,i,tipo){
+  if(!o) return false;
+  if(!__siog_v62_tipo_modulo(o,tipo)) return false;
+  if(tipo && String(o.tipo||'').trim()!==String(tipo).trim()) return false;
+  if(__siog_v62_deleted(o,i)) return false;
+  return __siog_v62_atualizado_semana(o);
+}
+function __siog_obs_sumario_semana_v62(o,i){
+  if(!__siog_obs_export_semana_v62(o,i,o&&o.tipo)) return false;
+  return (__siog_is_cor_critica(o)||__siog_is_cor_atencao(o));
+}
+try{
+  __siog_obs_visivel_no_relatorio=function(o,i,tipo){
+    return __siog_obs_export_semana_v62(o,i,tipo);
+  };
+}catch(_e){}
+try{
+  __siog_obs_visivel_no_sumario=function(o,i){
+    return __siog_obs_sumario_semana_v62(o,i);
+  };
+}catch(_e){}
+const __siog_buildSumarioData_base_v62 = buildSumarioData;
+buildSumarioData=function(){
+  const data=__siog_buildSumarioData_base_v62();
+  const comentarios=(OBSERVACOES||[]).filter((o,i)=>__siog_obs_sumario_semana_v62(o,i));
+  const criticos=comentarios.filter(__siog_is_cor_critica);
+  const emAtencao=comentarios.filter(__siog_is_cor_atencao);
+  const pontos=[];
+  criticos.forEach(o=>pontos.push({
+    cor:'🔴',
+    titulo:o.obra||'Geral',
+    detalhe:String(o.titulo||o.texto||'').substring(0,110),
+    categoria:o.tipo||'Comentário da semana'
+  }));
+  emAtencao.forEach(o=>pontos.push({
+    cor:'🟡',
+    titulo:o.obra||'Geral',
+    detalhe:String(o.titulo||o.texto||'').substring(0,110),
+    categoria:o.tipo||'Comentário da semana'
+  }));
+  data.criticos=criticos;
+  data.pontosPrioritarios=pontos;
+  return data;
+};
+function __siog_v62_refresh_relatorio_if_open(){
+  try{
+    const page=document.getElementById('page-relatorios');
+    if(page && page.classList.contains('active')) gerarRelatorio();
+  }catch(_e){}
+}
+const __siog_v62_salvarObs_base=salvarObs;
+salvarObs=function(keepOpen=false){
+  const r=__siog_v62_salvarObs_base.apply(this,arguments);
+  try{__siog_v62_refresh_relatorio_if_open();}catch(_e){}
+  return r;
+};
+const __siog_v62_excluirObsPorSeq_base=excluirObsPorSeq;
+excluirObsPorSeq=function(key){
+  const r=__siog_v62_excluirObsPorSeq_base.apply(this,arguments);
+  try{__siog_v62_refresh_relatorio_if_open();}catch(_e){}
+  return r;
+};
+try{document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{try{renderSumario();}catch(_e){}},900));}catch(_e){}
+
+
+/* Correção v63: Exportação dos módulos deve reproduzir os comentários que aparecem no painel do sistema.
+   - Cronograma & Prazos e Medições & Financeiro exportam TODOS os comentários visíveis do respectivo módulo.
+   - Sumário Executivo permanece com a regra já aprovada: somente comentários críticos/atenção atualizados na semana.
+   - Não altera banco, backup, lançamentos ou lógica visual das telas. */
+function __siog_obs_modulo_visivel_export_v63(o,i,tipo){
+  if(!o) return false;
+  const ot=String((o.tipo||'')).trim();
+  const tt=String((tipo||'')).trim();
+  if(tt && ot!==tt) return false;
+  if(ot!=='Cronograma' && ot!=='Financeiro') return false;
+  try{ if(__siog_get_deleted_obs_keys().has(__siog_obs_key(o,i))) return false; }catch(_e){}
+  return true;
+}
+try{
+  __siog_obs_visivel_no_relatorio=function(o,i,tipo){
+    return __siog_obs_modulo_visivel_export_v63(o,i,tipo);
+  };
+}catch(_e){}
+try{
+  __siog_obs_visivel_no_sumario=function(o,i){
+    return __siog_obs_sumario_semana_v62(o,i);
+  };
+}catch(_e){}
+try{
+  const __siog_v63_gerarRelatorio_base=gerarRelatorio;
+  gerarRelatorio=function(){
+    const r=__siog_v63_gerarRelatorio_base.apply(this,arguments);
+    try{renderSumario();}catch(_e){}
+    return r;
+  };
+}catch(_e){}
+
 </script>
 </body>
 </html>
