@@ -37,18 +37,31 @@ buildSumarioData=function(){
   const comentarios=__siog_comentarios_sumario_atual_v60();
   const criticos=comentarios.filter(__siog_is_cor_critica);
   const emAtencao=comentarios.filter(__siog_is_cor_atencao);
-  const pontos=[];
-  criticos.forEach(o=>pontos.push({
-    cor:'🔴',
-    titulo:o.obra||'Geral',
-    detalhe:String(o.titulo||o.texto||'').substring(0,110),
-    categoria:o.tipo||'Comentário da semana'
-  }));
-  emAtencao.forEach(o=>pontos.push({
-    cor:'🟡',
-    titulo:o.obra||'Geral',
-    detalhe:String(o.titulo||o.texto||'').substring(0,110),
-    categoria:o.tipo||'Comentário da semana'
+  // v61: consolida pontos do Sumário por obra, evitando duplicidade quando a mesma obra tem
+  // comentários atualizados tanto em Cronograma quanto em Financeiro. Os assuntos ficam unidos por " / ".
+  const grupos=new Map();
+  function normObra(v){return String(v||'Geral').trim()||'Geral';}
+  function normKey(v){return normObra(v).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');}
+  function assunto(o){return String(o.titulo||o.texto||'').replace(/\s+/g,' ').trim();}
+  function addPonto(o,cor){
+    const titulo=normObra(o.obra);
+    const key=normKey(titulo);
+    if(!grupos.has(key)) grupos.set(key,{cor, titulo, assuntos:[], _set:new Set(), categoria:o.tipo||'Comentário da semana'});
+    const g=grupos.get(key);
+    if(cor==='🔴') g.cor='🔴'; // se houver algum crítico, a obra fica crítica
+    const a=assunto(o);
+    if(a){
+      const ak=a.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
+      if(!g._set.has(ak)){g._set.add(ak);g.assuntos.push(a);}
+    }
+  }
+  criticos.forEach(o=>addPonto(o,'🔴'));
+  emAtencao.forEach(o=>addPonto(o,'🟡'));
+  const pontos=Array.from(grupos.values()).map(g=>({
+    cor:g.cor,
+    titulo:g.titulo,
+    detalhe:(g.assuntos.length?g.assuntos.join(' / '):'Comentário da semana').substring(0,180),
+    categoria:g.categoria
   }));
   data.criticos=criticos;
   data.pontosPrioritarios=pontos;
@@ -19758,104 +19771,89 @@ function aplicarObsAutomaticaRdo(r){
   const _oldSortRDO = sortRDO;
   sortRDO = function(col){ if(typeof _rdoSort==='object' && _rdoSort) _rdoSort.__userClicked=true; return _oldSortRDO.apply(this,arguments); };
 })();
+
+/* Correção v64: campo de comentários com tópicos sem duplicação ao colar.
+   - Modal abre com apenas 1 bolinha inicial.
+   - Ao colar texto, cada linha vira 1 item com bolinha, sem repetir o conteúdo.
+   - Se o campo estiver apenas com "• ", o texto colado substitui essa bolinha inicial.
+   - Só cria nova bolinha quando o usuário pressiona Enter. */
 function __siog_bulletize_text(txt){
-  const s=String(txt||'').replace(/\r\n/g,'\n');
-  if(!s.trim()) return '• ';
-  return s.split('\n').map(l=>{
-    const t=l.trimStart();
-    if(!t) return '• ';
-    return /^[•\-*]\s/.test(t) ? t.replace(/^[-*]\s/,'• ') : '• '+t;
+  const s=String(txt||'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  const lines=s.split('\n').map(l=>String(l||'').trim()).filter(l=>l.length>0);
+  if(!lines.length) return '• ';
+  return lines.map(l=>{
+    let t=String(l||'').trim();
+    t=t.replace(/^[•\-*]\s*/,'').trim();
+    return t ? ('• '+t) : '• ';
   }).join('\n');
+}
+function __siog_current_line_bounds_v64(el){
+  const start=el.selectionStart||0;
+  const val=String(el.value||'');
+  const lineStart=val.lastIndexOf('\n',Math.max(0,start-1))+1;
+  let lineEnd=val.indexOf('\n',start);
+  if(lineEnd<0) lineEnd=val.length;
+  return {lineStart,lineEnd,line:val.slice(lineStart,lineEnd)};
+}
+function __siog_replace_selection_or_empty_bullet_v64(el,text){
+  const val=String(el.value||'');
+  let start=el.selectionStart||0, end=el.selectionEnd||start;
+  const b=__siog_current_line_bounds_v64(el);
+  const currentLine=String(b.line||'').trim();
+  // Se o usuário colar sobre a bolinha inicial/linha vazia, substitui a linha inteira para evitar "• • texto".
+  if(start===end && (/^[•\-*]?\s*$/.test(currentLine) || val.trim()==='•')){
+    start=b.lineStart; end=b.lineEnd;
+  }
+  el.value=val.slice(0,start)+text+val.slice(end);
+  el.selectionStart=el.selectionEnd=start+text.length;
+  try{el.dispatchEvent(new Event('input',{bubbles:true}));}catch(_e){}
 }
 function __siog_install_bullet_textarea(){
   const el=document.getElementById('fo-texto');
-  if(!el || el.__siogBulletsInstalled) return;
-  el.__siogBulletsInstalled=true;
+  if(!el || el.__siogBulletsInstalled_v64) return;
+  el.__siogBulletsInstalled_v64=true;
   el.addEventListener('keydown',function(ev){
     if(ev.key!=='Enter') return;
     ev.preventDefault();
-    const start=this.selectionStart, end=this.selectionEnd;
+    ev.stopImmediatePropagation();
+    const start=this.selectionStart||0, end=this.selectionEnd||start;
     const before=this.value.slice(0,start), after=this.value.slice(end);
     this.value=before+'\n• '+after;
     this.selectionStart=this.selectionEnd=start+3;
-  });
+    try{this.dispatchEvent(new Event('input',{bubbles:true}));}catch(_e){}
+  },true);
   el.addEventListener('paste',function(ev){
     const clip=(ev.clipboardData||window.clipboardData)?.getData('text');
     if(!clip) return;
     ev.preventDefault();
-    const start=this.selectionStart, end=this.selectionEnd;
+    ev.stopImmediatePropagation();
     const text=__siog_bulletize_text(clip);
-    this.value=this.value.slice(0,start)+text+this.value.slice(end);
-    this.selectionStart=this.selectionEnd=start+text.length;
-  });
+    __siog_replace_selection_or_empty_bullet_v64(this,text);
+  },true);
 }
-(function(){
-  const _oldOpenObsModal = openObsModal;
-  openObsModal = function(idx, origem){
-    const ret=_oldOpenObsModal.apply(this,arguments);
-    __siog_install_bullet_textarea();
-    const el=document.getElementById('fo-texto');
-    if(el && !String(el.value||'').trim()){
-      el.value='• ';
-      setTimeout(()=>{try{el.focus();el.selectionStart=el.selectionEnd=el.value.length;}catch(_e){}},30);
-    }
-    return ret;
-  };
-})();
-
-
-
-/* Correção v53: reforço dos tópicos automáticos no modal de comentários.
-   Ajusta somente o campo Texto do bloco (Cronograma, Medições/Financeiro e Observações Livres). */
 function __siog_prepare_bullet_textarea(forceInitial){
   const el=document.getElementById('fo-texto');
   if(!el) return;
+  __siog_install_bullet_textarea();
   if(forceInitial && !String(el.value||'').trim()){
     el.value='• ';
     setTimeout(()=>{try{el.focus();el.selectionStart=el.selectionEnd=el.value.length;}catch(_e){}},30);
   }
 }
-document.addEventListener('keydown',function(ev){
-  const el=ev.target;
-  if(!el || el.id!=='fo-texto' || ev.key!=='Enter') return;
-  ev.preventDefault();
-  const start=el.selectionStart, end=el.selectionEnd;
-  const before=el.value.slice(0,start), after=el.value.slice(end);
-  el.value=before+'\n• '+after;
-  el.selectionStart=el.selectionEnd=start+3;
-},true);
-document.addEventListener('paste',function(ev){
-  const el=ev.target;
-  if(!el || el.id!=='fo-texto') return;
-  const clip=(ev.clipboardData||window.clipboardData)?.getData('text');
-  if(!clip) return;
-  ev.preventDefault();
-  const start=el.selectionStart, end=el.selectionEnd;
-  const text=__siog_bulletize_text(clip);
-  el.value=el.value.slice(0,start)+text+el.value.slice(end);
-  el.selectionStart=el.selectionEnd=start+text.length;
-},true);
 (function(){
-  const _openObsModal_v53=openObsModal;
+  const _openObsModal_v64=openObsModal;
   openObsModal=function(idx, origem){
-    const ret=_openObsModal_v53.apply(this,arguments);
+    const ret=_openObsModal_v64.apply(this,arguments);
     __siog_prepare_bullet_textarea(idx===null || idx===undefined);
     return ret;
   };
-  const _salvarObs_v53=salvarObs;
+  const _salvarObs_v64=salvarObs;
   salvarObs=function(keepOpen=false){
     const el=document.getElementById('fo-texto');
-    if(el && String(el.value||'').trim()){
-      el.value=String(el.value).split('\n').map(l=>{
-        const t=l.trimStart();
-        if(!t) return '• ';
-        return /^[•\-*]\s/.test(t) ? t.replace(/^[\-*]\s/,'• ') : '• '+t;
-      }).join('\n');
-    }
-    return _salvarObs_v53.apply(this,arguments);
+    if(el && String(el.value||'').trim()) el.value=__siog_bulletize_text(el.value);
+    return _salvarObs_v64.apply(this,arguments);
   };
 })();
-
 
 
 /* Correção v54: encaixe preciso das caixinhas de comentários por arraste.
@@ -20663,18 +20661,31 @@ buildSumarioData=function(){
   const comentarios=(OBSERVACOES||[]).filter((o,i)=>__siog_obs_sumario_semana_v62(o,i));
   const criticos=comentarios.filter(__siog_is_cor_critica);
   const emAtencao=comentarios.filter(__siog_is_cor_atencao);
-  const pontos=[];
-  criticos.forEach(o=>pontos.push({
-    cor:'🔴',
-    titulo:o.obra||'Geral',
-    detalhe:String(o.titulo||o.texto||'').substring(0,110),
-    categoria:o.tipo||'Comentário da semana'
-  }));
-  emAtencao.forEach(o=>pontos.push({
-    cor:'🟡',
-    titulo:o.obra||'Geral',
-    detalhe:String(o.titulo||o.texto||'').substring(0,110),
-    categoria:o.tipo||'Comentário da semana'
+  // v61: consolida pontos do Sumário por obra, evitando duplicidade quando a mesma obra tem
+  // comentários atualizados tanto em Cronograma quanto em Financeiro. Os assuntos ficam unidos por " / ".
+  const grupos=new Map();
+  function normObra(v){return String(v||'Geral').trim()||'Geral';}
+  function normKey(v){return normObra(v).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');}
+  function assunto(o){return String(o.titulo||o.texto||'').replace(/\s+/g,' ').trim();}
+  function addPonto(o,cor){
+    const titulo=normObra(o.obra);
+    const key=normKey(titulo);
+    if(!grupos.has(key)) grupos.set(key,{cor, titulo, assuntos:[], _set:new Set(), categoria:o.tipo||'Comentário da semana'});
+    const g=grupos.get(key);
+    if(cor==='🔴') g.cor='🔴'; // se houver algum crítico, a obra fica crítica
+    const a=assunto(o);
+    if(a){
+      const ak=a.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
+      if(!g._set.has(ak)){g._set.add(ak);g.assuntos.push(a);}
+    }
+  }
+  criticos.forEach(o=>addPonto(o,'🔴'));
+  emAtencao.forEach(o=>addPonto(o,'🟡'));
+  const pontos=Array.from(grupos.values()).map(g=>({
+    cor:g.cor,
+    titulo:g.titulo,
+    detalhe:(g.assuntos.length?g.assuntos.join(' / '):'Comentário da semana').substring(0,180),
+    categoria:g.categoria
   }));
   data.criticos=criticos;
   data.pontosPrioritarios=pontos;
