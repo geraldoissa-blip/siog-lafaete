@@ -10617,23 +10617,42 @@ function buildSumarioSlideHtml(isLight,semana,corteDate,emissor,LOGO_URI){
     ${T('Ranking de Prazo')}
     <table style="width:100%;border-collapse:collapse"><thead><tr style="background:${theme.bg3}"><th style="padding:3px 6px;font-size:8px;color:${theme.muted};text-align:left">#</th><th style="padding:3px 6px;font-size:8px;color:${theme.muted};text-align:left">Obra</th><th style="padding:3px 6px;font-size:8px;color:${theme.muted};text-align:left">Desvio</th><th style="padding:3px 6px;font-size:8px;color:${theme.muted};text-align:left">Tendência</th></tr></thead><tbody>${rankRows||`<tr><td colspan="4" style="padding:8px;color:${theme.muted};font-size:9px">Sem dados de prazo.</td></tr>`}</tbody></table>
   </div>`;
-  /* Radar financeiro */
-  const finRows=s.radarFinanceiro.slice(0,6).map(r=>`<tr style="border-bottom:1px solid ${theme.border}"><td style="padding:3px 6px;font-size:9px;color:${isLight?'#111':'#f0f0f0'};overflow-wrap:break-word;white-space:normal;max-width:110px">${r.obra}</td><td style="padding:3px 6px;font-size:9px;color:${isLight?'#444':'#ddd'};white-space:nowrap">${r.faturar}</td><td style="padding:3px 6px;font-size:9px;color:${isLight?'#444':'#ddd'};white-space:nowrap">${r.notas}</td><td style="padding:3px 6px;font-size:9px;color:#E87722;font-weight:700;white-space:nowrap">${r.exposicao}</td></tr>`).join('');
+  /* Radar financeiro — exportação */
+  const _sFatTotal=s.radarFinanceiro.reduce((a,r)=>a+(r._fat||0),0);
+  const _sNfvTotal=s.radarFinanceiro.reduce((a,r)=>a+(r._nfv||0),0);
+  const _sExpTotal=_sFatTotal+_sNfvTotal;
+  const _sFmtR=v=>v>0?('R$\u00a0'+Math.round(v).toLocaleString('pt-BR')):'—';
+  const finRows=s.radarFinanceiro.slice(0,10).map(r=>{
+    const tF=r._fat>0,tN=r._nfv>0;
+    return`<tr style="border-bottom:1px solid ${theme.border}">
+      <td style="padding:3px 6px;font-size:9px;color:${isLight?'#111':'#f0f0f0'};overflow-wrap:break-word;white-space:normal;max-width:110px">${r.obra}</td>
+      <td style="padding:3px 6px;font-size:9px;color:${tF?(isLight?'#1a7a3a':'#4ade80'):(isLight?'#aaa':'#555')};font-weight:${tF?'700':'400'};white-space:nowrap">${tF?r.faturar:'—'}</td>
+      <td style="padding:3px 6px;font-size:9px;color:${tN?(isLight?'#c0392b':'#ff6b6b'):(isLight?'#aaa':'#555')};font-weight:${tN?'700':'400'};white-space:nowrap">${tN?r.notas:'—'}</td>
+      <td style="padding:3px 6px;font-size:9px;color:${r._nfv>0&&r._fat===0?(isLight?'#c0392b':'#ff6b6b'):r._fat>0&&r._nfv===0?(isLight?'#1a7a3a':'#4ade80'):'#E87722'};font-weight:700;white-space:nowrap">${r.exposicao}</td>
+    </tr>`;
+  }).join('')+`<tr style="border-top:2px solid ${theme.border};background:${theme.bg3}">
+    <td style="padding:4px 6px;font-size:9px;font-weight:700;color:${isLight?'#111':'#f0f0f0'}">TOTAL</td>
+    <td style="padding:4px 6px;font-size:9px;font-weight:700;color:${_sFatTotal>0?(isLight?'#1a7a3a':'#4ade80'):(isLight?'#aaa':'#555')};white-space:nowrap">${_sFmtR(_sFatTotal)}</td>
+    <td style="padding:4px 6px;font-size:9px;font-weight:700;color:${_sNfvTotal>0?(isLight?'#c0392b':'#ff6b6b'):(isLight?'#aaa':'#555')};white-space:nowrap">${_sFmtR(_sNfvTotal)}</td>
+    <td style="padding:4px 6px;font-size:9px;font-weight:700;color:#E87722;white-space:nowrap">${_sFmtR(_sExpTotal)}</td>
+  </tr>`;
   const finBloco=`<div style="flex:1;min-width:0">
-    ${T('Radar Financeiro')}
-    <table style="width:100%;border-collapse:collapse"><thead><tr style="background:${theme.bg3}"><th style="padding:3px 6px;font-size:8px;color:${theme.muted};text-align:left">Obra</th><th style="padding:3px 6px;font-size:8px;color:${theme.muted};text-align:left">A Faturar</th><th style="padding:3px 6px;font-size:8px;color:${theme.muted};text-align:left">Notas Venc.</th><th style="padding:3px 6px;font-size:8px;color:${theme.muted};text-align:left">Exposição</th></tr></thead><tbody>${finRows||`<tr><td colspan="4" style="padding:8px;color:${theme.muted};font-size:9px">Sem dados financeiros.</td></tr>`}</tbody></table>
+    ${T('Radar Financeiro')}<div style="display:flex;gap:10px;margin:-4px 0 6px"><span style="font-size:8px;color:${isLight?'#1a7a3a':'#4ade80'};display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${isLight?'#1a7a3a':'#4ade80'};-webkit-print-color-adjust:exact;print-color-adjust:exact"></span>A Faturar = oportunidade</span><span style="font-size:8px;color:${isLight?'#c0392b':'#ff6b6b'};display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${isLight?'#c0392b':'#ff6b6b'};-webkit-print-color-adjust:exact;print-color-adjust:exact"></span>Notas Venc. = risco</span></div>
+    <table style="width:100%;border-collapse:collapse"><thead><tr style="background:${theme.bg3}"><th style="padding:3px 6px;font-size:8px;color:${theme.muted};text-align:left">Obra</th><th style="padding:3px 6px;font-size:8px;color:${isLight?'#1a7a3a':'#4ade80'};text-align:left">A Faturar</th><th style="padding:3px 6px;font-size:8px;color:${isLight?'#c0392b':'#ff6b6b'};text-align:left">Notas Venc.</th><th style="padding:3px 6px;font-size:8px;color:${theme.muted};text-align:left">Exposição</th></tr></thead><tbody>${finRows||`<tr><td colspan="4" style="padding:8px;color:${theme.muted};font-size:9px">Sem dados financeiros.</td></tr>`}</tbody></table>
   </div>`;
   /* Gráfico de barras — todas as obras ativas */
   const avAtivos=PROJETOS.filter(p=>p.status==='Ativo').map(p=>{
     const key=(p.id||'')+'|'+(p.obra||'');
     const av=AVANCOS&&AVANCOS[key]?AVANCOS[key]:{prev:0,real:0};
-    return{obra:p.obra,prev:Math.min(100,Math.max(0,parseFloat(av.prev)||0)),real:Math.min(100,Math.max(0,parseFloat(av.real)||0))};
-  }).sort((a,b)=>b.prev-a.prev);
+    const prev=Math.min(100,Math.max(0,parseFloat(av.prev)||0));
+    const real=Math.min(100,Math.max(0,parseFloat(av.real)||0));
+    return{obra:p.obra,prev,real,gap:real-prev,atrasada:p.alerta==='⚠ Atraso'};
+  }).sort((a,b)=>a.gap-b.gap);
   const barRows=avAtivos.length?avAtivos.map(r=>{
     const nome=r.obra.length>38?r.obra.substring(0,36)+'…':r.obra;
-    const gap=r.real-r.prev;
-    const pctColor=gap<-2?'#ff3131':gap>2?'#28a745':(isLight?'#555':'#aaa');
-    return`<div style="display:grid;grid-template-columns:160px 1fr 72px;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid ${theme.border}">
+    const gapColor=r.gap<-5?(isLight?'#c0392b':'#ff6b6b'):r.gap>5?(isLight?'#1a7a3a':'#4ade80'):(isLight?'#888':'#888');
+    const gapStr=r.gap===0?'—':(r.gap>0?'+':'')+r.gap.toFixed(1)+'pp';
+    return`<div style="display:grid;grid-template-columns:148px 1fr 60px 46px;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid ${theme.border}">
       <div style="font-size:8.5px;color:${isLight?'#111':'#eee'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.obra}">${nome}</div>
       <div style="position:relative;height:16px;background:${theme.bg3};border-radius:3px;overflow:hidden">
         <div style="position:absolute;left:0;top:2px;height:5px;width:${r.prev}%;background:#4a9eff;border-radius:2px;opacity:.8;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
@@ -10642,12 +10661,14 @@ function buildSumarioSlideHtml(isLight,semana,corteDate,emissor,LOGO_URI){
       <div style="font-size:8.5px;text-align:right;white-space:nowrap">
         <span style="color:#4a9eff;opacity:.85">${r.prev.toFixed(1)}%</span>
         <span style="color:${isLight?'#888':'#888'};margin:0 1px">/</span>
-        <span style="color:${pctColor};font-weight:700">${r.real.toFixed(1)}%</span>
+        <span style="color:#E87722;font-weight:700">${r.real.toFixed(1)}%</span>
       </div>
+      <div style="font-size:8.5px;text-align:right;white-space:nowrap;font-weight:700;color:${gapColor};-webkit-print-color-adjust:exact;print-color-adjust:exact">${gapStr}</div>
     </div>`;
-  }).join('')+`<div style="display:flex;gap:14px;margin-top:6px;justify-content:flex-end">
+  }).join('')+`<div style="display:flex;gap:12px;margin-top:6px;justify-content:flex-end;align-items:center;flex-wrap:wrap">
     <span style="font-size:8px;color:${theme.muted};display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:4px;background:#4a9eff;border-radius:1px;opacity:.8;-webkit-print-color-adjust:exact;print-color-adjust:exact"></span>Previsto</span>
     <span style="font-size:8px;color:${theme.muted};display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:4px;background:#E87722;border-radius:1px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></span>Realizado</span>
+    <span style="font-size:8px;color:${theme.muted}">· pp = diferença prev vs real</span>
   </div>`:`<div style="padding:8px;color:${theme.muted};font-size:9px">Nenhuma obra ativa.</div>`;
   const avancoBloco=`<div style="flex:1;min-width:0">
     ${T('Avanços Físicos — Obras Ativas')}
@@ -10683,13 +10704,13 @@ function buildSumarioData(){
   let pendDocs=0;
   try{ pendDocs=DOCUMENTACAO.filter(d=>d.art_st==='Pendente').length; }catch(e){}
   try{ pendDocs+=GARANTIAS?GARANTIAS.filter(g=>(g.vencimento&&typeof g.vencimento==='number')&&(g.vencimento-RDO_REFERENCE_XL)<30).length:0; }catch(e){}
-  /* Radar financeiro */
+  /* Radar financeiro — NFV primeiro (risco imediato), depois por exposição total */
   const radarFinanceiro=cons.map(m=>{
     const pFaturar=m.pf||0;
     const notasVenc=m.nfv||0;
     const exposicao=pFaturar+notasVenc;
-    return{obra:m.cliente||m.id,faturar:fmtR(pFaturar),notas:fmtR(notasVenc),exposicao:fmtR(exposicao),_exp:exposicao};
-  }).filter(r=>r._exp>0).sort((a,b)=>b._exp-a._exp);
+    return{obra:m.cliente||m.id,faturar:fmtR(pFaturar),notas:fmtR(notasVenc),exposicao:fmtR(exposicao),_exp:exposicao,_fat:pFaturar,_nfv:notasVenc};
+  }).filter(r=>r._exp>0).sort((a,b)=>b._nfv!==a._nfv?b._nfv-a._nfv:b._exp-a._exp);
   /* Ranking de prazo */
   const rankingPrazo=ativos.map(p=>{
     const praz=p.prazo_cli;
@@ -10738,7 +10759,6 @@ function renderSumario(){
   const T=(t)=>`<div class="card-title">${t}</div>`;
   const atAtras=s.atrasados.length;
   const temCrit=s.criticos.length;
-  
   const critLabel=temCrit>0?'Crítico':atAtras>0?'Atenção':'Saudável';
   /* KPIs */
   const kpisHtml=`<div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:20px">
@@ -10756,19 +10776,39 @@ function renderSumario(){
   /* Ranking prazo */
   const rankHtml=s.rankingPrazo.length?s.rankingPrazo.slice(0,8).map((r,i)=>`<tr><td style="padding:4px 8px;color:var(--tx3)">${i+1}°</td><td style="padding:4px 8px">${r.obra}</td><td style="padding:4px 8px;color:${r.desvio>0?'var(--r2)':r.desvio<0?'var(--g2)':'var(--tx2)'};font-weight:700">${r.desvio>0?'+':r.desvio<0?'':''}${r.desvio} d</td><td class="nowrap" style="padding:4px 8px;color:var(--tx2)">${r.tend||'—'}</td></tr>`).join('')
     :`<tr><td colspan="4" style="padding:10px 8px;color:var(--tx3);font-style:italic">Sem desvios de prazo identificados.</td></tr>`;
-  /* Radar financeiro */
-  const finHtml=s.radarFinanceiro.length?s.radarFinanceiro.slice(0,8).map(r=>`<tr><td style="padding:4px 8px">${r.obra}</td><td class="nowrap" style="padding:4px 8px;color:var(--tx2)">${r.faturar}</td><td class="nowrap" style="padding:4px 8px;color:var(--tx2)">${r.notas}</td><td class="nowrap" style="padding:4px 8px;color:var(--or);font-weight:700">${r.exposicao}</td></tr>`).join('')
-    :`<tr><td colspan="4" style="padding:10px 8px;color:var(--tx3);font-style:italic">Sem exposição financeira relevante.</td></tr>`;
+  /* Radar financeiro — cores diferenciadas: verde=oportunidade, vermelho=risco */
+  const _finList=s.radarFinanceiro;
+  const _finTotFat=_finList.reduce((s,r)=>s+(r._fat||0),0);
+  const _finTotNfv=_finList.reduce((s,r)=>s+(r._nfv||0),0);  const _finTotExp=_finTotFat+_finTotNfv;
+  const _finFmtR=v=>v>0?fmtR(v):'—';
+  const finHtml=_finList.length?_finList.map(r=>{
+    const temFat=r._fat>0,temNfv=r._nfv>0;
+    return`<tr>
+      <td style="padding:4px 8px">${r.obra}</td>
+      <td class="nowrap" style="padding:4px 8px;color:${temFat?'var(--g2)':'var(--tx3)'};font-weight:${temFat?'700':'400'}">${temFat?r.faturar:'—'}</td>
+      <td class="nowrap" style="padding:4px 8px;color:${temNfv?'var(--r2)':'var(--tx3)'};font-weight:${temNfv?'700':'400'}">${temNfv?r.notas:'—'}</td>
+      <td class="nowrap" style="padding:4px 8px;font-weight:700;color:${r._nfv>0&&r._fat===0?'var(--r2)':r._fat>0&&r._nfv===0?'var(--g2)':'var(--or)'}">${r.exposicao}</td>
+    </tr>`;
+  }).join('')+`<tr style="border-top:2px solid var(--bd)">
+    <td style="padding:5px 8px;font-weight:700;font-size:11px;color:var(--tx)">TOTAL</td>
+    <td class="nowrap" style="padding:5px 8px;font-weight:700;color:${_finTotFat>0?'var(--g2)':'var(--tx3)'}">${_finFmtR(_finTotFat)}</td>
+    <td class="nowrap" style="padding:5px 8px;font-weight:700;color:${_finTotNfv>0?'var(--r2)':'var(--tx3)'}">${_finFmtR(_finTotNfv)}</td>
+    <td class="nowrap" style="padding:5px 8px;font-weight:700;color:var(--or)">${fmtR(_finTotExp)}</td>
+  </tr>`
+  :`<tr><td colspan="4" style="padding:10px 8px;color:var(--tx3);font-style:italic">Sem exposição financeira relevante.</td></tr>`;
   /* Gráfico de avanços — obras ativas */
   const avAtivos=PROJETOS.filter(p=>p.status==='Ativo').map(p=>{
     const key=(p.id||'')+'|'+(p.obra||'');
     const av=AVANCOS&&AVANCOS[key]?AVANCOS[key]:{prev:0,real:0};
-    return{obra:p.obra,prev:Math.min(100,Math.max(0,parseFloat(av.prev)||0)),real:Math.min(100,Math.max(0,parseFloat(av.real)||0))};
-  }).sort((a,b)=>b.prev-a.prev);
+    const prev=Math.min(100,Math.max(0,parseFloat(av.prev)||0));
+    const real=Math.min(100,Math.max(0,parseFloat(av.real)||0));
+    return{obra:p.obra,prev,real,gap:real-prev,atrasada:p.alerta==='⚠ Atraso'};
+  }).sort((a,b)=>a.gap-b.gap);
   const barChartHtml=avAtivos.length?avAtivos.map(r=>{
     const nomeAbrev=r.obra.length>35?r.obra.substring(0,33)+'…':r.obra;
-    const gapColor=r.real<r.prev?'var(--r2)':r.real>r.prev?'var(--g2)':'var(--tx3)';
-    return`<div style="display:grid;grid-template-columns:180px 1fr 90px;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--bd)">
+    const gapColor=r.gap<-5?'var(--r2)':r.gap>5?'var(--g2)':'var(--tx3)';
+    const gapStr=r.gap===0?'—':(r.gap>0?'+':'')+r.gap.toFixed(1)+'pp';
+    return`<div style="display:grid;grid-template-columns:170px 1fr 60px 52px;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bd)">
       <div style="font-size:11px;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.obra}">${nomeAbrev}</div>
       <div style="position:relative;height:20px;background:var(--bg3);border-radius:3px;overflow:hidden">
         <div style="position:absolute;left:0;top:3px;height:7px;width:${r.prev}%;background:#4a9eff;border-radius:2px;opacity:.7"></div>
@@ -10776,13 +10816,15 @@ function renderSumario(){
       </div>
       <div style="font-size:10px;text-align:right;white-space:nowrap">
         <span style="color:#4a9eff;opacity:.85">${r.prev.toFixed(1)}%</span>
-        <span style="color:var(--tx3);margin:0 2px">/</span>
-        <span style="color:${gapColor};font-weight:700">${r.real.toFixed(1)}%</span>
+        <span style="color:var(--tx3);margin:0 1px">/</span>
+        <span style="color:var(--or);font-weight:700">${r.real.toFixed(1)}%</span>
       </div>
+      <div style="font-size:10px;text-align:right;white-space:nowrap;font-weight:700;color:${gapColor}">${gapStr}</div>
     </div>`;
-  }).join('')+`<div style="display:flex;gap:16px;margin-top:8px;justify-content:flex-end">
+  }).join('')+`<div style="display:flex;gap:14px;margin-top:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap">
     <span style="font-size:10px;color:var(--tx3);display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:5px;background:#4a9eff;border-radius:2px;opacity:.7"></span>Previsto</span>
     <span style="font-size:10px;color:var(--tx3);display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:5px;background:#E87722;border-radius:2px"></span>Realizado</span>
+    <span style="font-size:10px;color:var(--tx3)">· pp = diferença prev vs real</span>
   </div>`:`<div style="padding:10px 8px;color:var(--tx3);font-style:italic">Nenhuma obra ativa.</div>`;
 
   const html=`<div style="font-size:13px">
@@ -10802,7 +10844,7 @@ function renderSumario(){
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
     <div class="card card-table">
-      ${T('Radar Financeiro')}
+      ${T('Radar Financeiro')}<div style="display:flex;gap:12px;margin:-4px 0 6px;padding:0 2px"><span style="font-size:10px;color:var(--g2);display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--g2)"></span>A Faturar = oportunidade</span><span style="font-size:10px;color:var(--r2);display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--r2)"></span>Notas Venc. = risco</span></div>
       <div class="tw"><table><thead><tr><th>Obra</th><th>A Faturar</th><th>Notas Venc.</th><th>Exposição</th></tr></thead><tbody>${finHtml}</tbody></table></div>
     </div>
     <div class="card" style="padding:14px 16px">
@@ -20009,8 +20051,8 @@ function buildSumarioData(){
     const pFaturar=m.pf||0;
     const notasVenc=m.nfv||0;
     const exposicao=pFaturar+notasVenc;
-    return{obra:m.cliente||m.id,faturar:fmtR(pFaturar),notas:fmtR(notasVenc),exposicao:fmtR(exposicao),_exp:exposicao};
-  }).filter(r=>r._exp>0).sort((a,b)=>b._exp-a._exp);
+    return{obra:m.cliente||m.id,faturar:fmtR(pFaturar),notas:fmtR(notasVenc),exposicao:fmtR(exposicao),_exp:exposicao,_fat:pFaturar,_nfv:notasVenc};
+  }).filter(r=>r._exp>0).sort((a,b)=>b._nfv!==a._nfv?b._nfv-a._nfv:b._exp-a._exp);
   const rankingPrazo=ativos.map(p=>{
     const praz=p.prazo_cli;
     const tend=p.tendencia;
