@@ -891,6 +891,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
       <button type="button" class="btn btn-sm" onclick="addParcialRow()" style="margin-top:6px">+ Adicionar</button>
     </div>
     <div class="fg"><label>Observações Gerais</label><textarea id="pp-obs" rows="2"></textarea></div>
+    <div class="fg"><label>Superintendente responsável</label><input id="pp-superintendente" type="text" placeholder="Ex.: Nome do superintendente"></div>
     <div class="mo-ft"><button class="btn" onclick="closeMo('mo-proj')">Cancelar</button><button class="btn btn-bl" onclick="salvarProjeto(true)">Salvar +</button><button class="btn btn-or" onclick="salvarProjeto()">Salvar Projeto</button></div>
   </div>
 </div>
@@ -8823,7 +8824,7 @@ function openProjModal(idx){
   _editProjIdx=idx;
   document.getElementById('mo-proj-title').textContent=idx===null?'Novo Projeto':'Editar Projeto';
   if(idx===null){
-    ['pp-id','pp-obra','pp-resp','pp-valor','pp-obs'].forEach(id=>document.getElementById(id).value='');
+    ['pp-id','pp-obra','pp-resp','pp-valor','pp-obs','pp-superintendente'].forEach(id=>document.getElementById(id).value='');
     ['pp-inicio','pp-prazo-cont','pp-prazo-cli','pp-tend'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('pp-status').value='Ativo';
     document.getElementById('pp-parcial').value='nao';
@@ -8841,6 +8842,7 @@ function openProjModal(idx){
     document.getElementById('pp-tend').value=xl2iso(p.tendencia);
     document.getElementById('pp-valor').value=p.valor||'';
     document.getElementById('pp-obs').value=p.obs||'';
+    document.getElementById('pp-superintendente').value=p.superintendente||'';
     document.getElementById('pp-parcial').value=(p.parciais&&p.parciais.length)?'sim':'nao';
     // Repopulate parciais with THIS project's data (fix: was keeping previous project's parciais)
     document.getElementById('pp-parciais').innerHTML='';
@@ -8889,7 +8891,7 @@ function salvarProjeto(keepOpen=false){
   const np={id,obra,status:document.getElementById('pp-status').value,resp:document.getElementById('pp-resp').value,
     inicio:str2xl(document.getElementById('pp-inicio').value),prazo_cont:str2xl(document.getElementById('pp-prazo-cont').value),
     prazo_cli:pcli,tendencia:tend,valor:parseFloat(document.getElementById('pp-valor').value)||null,
-    obs:document.getElementById('pp-obs').value,parciais,ativo_rdo:true};
+    obs:document.getElementById('pp-obs').value,superintendente:document.getElementById('pp-superintendente').value.trim(),parciais,ativo_rdo:true};
   np.alerta=(tend&&pcli)?(tend<=pcli?'✅ OK':'⚠ Atraso'):'-';
   if(_editProjIdx!==null){
     const antigo=PROJETOS[_editProjIdx];
@@ -10646,14 +10648,14 @@ function buildSumarioSlideHtml(isLight,semana,corteDate,emissor,LOGO_URI){
     const av=AVANCOS&&AVANCOS[key]?AVANCOS[key]:{prev:0,real:0};
     const prev=Math.min(100,Math.max(0,parseFloat(av.prev)||0));
     const real=Math.min(100,Math.max(0,parseFloat(av.real)||0));
-    return{obra:p.obra,prev,real,gap:real-prev,atrasada:p.alerta==='⚠ Atraso'};
+    return{obra:p.obra,superintendente:String(p.superintendente||'').trim(),prev,real,gap:real-prev,atrasada:p.alerta==='⚠ Atraso'};
   }).sort((a,b)=>a.gap-b.gap);
   const barRows=avAtivos.length?avAtivos.map(r=>{
     const nome=r.obra.length>38?r.obra.substring(0,36)+'…':r.obra;
     const gapColor=r.gap<-5?(isLight?'#c0392b':'#ff6b6b'):r.gap>5?(isLight?'#1a7a3a':'#4ade80'):(isLight?'#888':'#888');
     const gapStr=r.gap===0?'—':(r.gap>0?'+':'')+r.gap.toFixed(1)+'pp';
     return`<div style="display:grid;grid-template-columns:148px 1fr 60px 46px;align-items:center;gap:5px;padding:3px 0;border-bottom:1px solid ${theme.border}">
-      <div style="font-size:8.5px;color:${isLight?'#111':'#eee'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.obra}">${nome}</div>
+      <div style="font-size:8.5px;color:${isLight?'#111':'#eee'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.obra}${r.superintendente?' — Superintendente: '+r.superintendente:''}">${nome}${r.superintendente?`<span style="display:block;font-size:7px;color:${theme.muted};margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Superintendente Responsável: ${r.superintendente}</span>`:''}</div>
       <div style="position:relative;height:16px;background:${theme.bg3};border-radius:3px;overflow:hidden">
         <div style="position:absolute;left:0;top:2px;height:5px;width:${r.prev}%;background:#4a9eff;border-radius:2px;opacity:.8;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
         <div style="position:absolute;left:0;bottom:2px;height:5px;width:${r.real}%;background:#E87722;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div>
@@ -18735,7 +18737,12 @@ function excelJoinList(v){ return Array.isArray(v) ? v.join(' | ') : (v || ''); 
 function buildExcelSheetsData(){
   const medCons = getMedCons().map(m => ({ ID:m.id, Cliente:m.cliente, Contrato:excelMoney(m.contrato), Medido:excelMoney(m.med), Faturado:excelMoney(m.fat), Recebido:excelMoney(m.rec), '% Recebido':m.contrato ? Number((m.rec/m.contrato*100).toFixed(2)) : '', 'NF Vencida':excelMoney(m.nfv), 'A Receber':excelMoney(m.ar), 'Pendência à Faturar':excelMoney(m.pf) }));
   return {
-    'Base Projetos': PROJETOS.map(p=>({'ID':p.id,'Obra':p.obra,'Status':p.status,'Responsável':p.resp,'Início':excelDate(p.inicio),'Prazo Contratual':excelDate(p.prazo_cont),'Prazo Cliente':excelDate(p.prazo_cli),'Tendência':excelDate(p.tendencia),'Alerta':p.alerta,'Valor':excelMoney(p.valor),'Observações':p.obs})),
+    'Base Projetos': PROJETOS.map(p=>({'ID':p.id,'Obra':p.obra,'Status':p.status,'Responsável':p.resp,'Superintendente Responsável':p.superintendente||'','Início':excelDate(p.inicio),'Prazo Contratual':excelDate(p.prazo_cont),'Prazo Cliente':excelDate(p.prazo_cli),'Tendência':excelDate(p.tendencia),'Alerta':p.alerta,'Valor':excelMoney(p.valor),'Observações':p.obs,'Ação': 'MANTER'})),
+    'Instruções Projetos': [{
+      'Como usar': 'Na aba Base Projetos, mantenha uma linha por projeto. Para excluir um cadastro duplicado, escreva EXCLUIR na coluna Ação da linha correspondente e importe o mesmo arquivo.',
+      'Alteração de ID': 'Você pode corrigir o ID diretamente. O sistema mantém os vínculos da mesma obra e atualiza o ID dos registros vinculados.',
+      'Atenção': 'Não apague as colunas. Antes de importar, gere um Backup JSON. Linhas com Ação EXCLUIR serão removidas da Base de Projetos e dos módulos vinculados.'
+    }],
     'RDO': RDO.map(r=>({'ID':r.id,'Obra':r.obra,'Atualização':excelDate(r.atualizacao),'Enviado':excelDate(r.enviado),'Assinado':excelDate(r.assinado),'Responsável':r.resp,'Modelo':r.modelo,'Histograma':r.histograma,'Observações':r.obs})),
     'Documentação': DOCUMENTACAO.map(d=>({
       'ID':d.id,'Obra':d.obra,'Status':d.status,'Vigência Contrato':excelDate(d.vig_cto),
@@ -18847,10 +18854,38 @@ function applyExcelSheets(sheets){
   let changed=[];
   const sp = getSheet(sheets, ['Base Projetos','Projetos']);
   if(sp && sp.length){
+    const projetosAntes = Array.isArray(PROJETOS) ? PROJETOS.slice() : [];
+    const removidos = [];
+    const atualizados = [];
     PROJETOS = sp.map(row=>{
-      const id=_txt(_rowVal(row,['ID','Id'])); const obra=_txt(_rowVal(row,['Obra','Cliente'])); const old=_findProjetoBase(id,obra) || {};
-      return Object.assign({}, old, {id, obra, status:_txt(_rowVal(row,['Status'])) || old.status || 'Ativo', resp:_txt(_rowVal(row,['Responsável','Responsavel'])) || old.resp || '', inicio:_dateVal(_rowVal(row,['Início','Inicio'])), prazo_cont:_dateVal(_rowVal(row,['Prazo Contratual'])), prazo_cli:_dateVal(_rowVal(row,['Prazo Cliente'])), tendencia:_dateVal(_rowVal(row,['Tendência','Tendencia'])), alerta:_txt(_rowVal(row,['Alerta'])) || old.alerta || '', valor:_num(_rowVal(row,['Valor'])) ?? old.valor ?? null, obs:_txt(_rowVal(row,['Observações','Observacoes'])) || '', parciais: old.parciais || [], ativo_rdo: old.ativo_rdo !== undefined ? old.ativo_rdo : true});
-    }).filter(p=>p.id||p.obra);
+      const id=_txt(_rowVal(row,['ID','Id']));
+      const obra=_txt(_rowVal(row,['Obra','Cliente']));
+      const acao=_txt(_rowVal(row,['Ação','Acao','AÇÃO','ACAO'])).toUpperCase();
+      const old=_findProjetoBase(id,obra) || projetosAntes.find(p=>String(p.obra||'').trim().toUpperCase()===obra.toUpperCase()) || {};
+      if(acao==='EXCLUIR' || acao==='EXCLUIR PROJETO' || acao==='DELETE'){
+        removidos.push({id:id||old.id||'',obra:obra||old.obra||''});
+        return null;
+      }
+      const novo=Object.assign({}, old, {id, obra, status:_txt(_rowVal(row,['Status'])) || old.status || 'Ativo', resp:_txt(_rowVal(row,['Responsável','Responsavel'])) || old.resp || '', superintendente:_txt(_rowVal(row,['Superintendente Responsável','Superintendente','Superintendente Responsavel'])) || '', inicio:_dateVal(_rowVal(row,['Início','Inicio'])), prazo_cont:_dateVal(_rowVal(row,['Prazo Contratual'])), prazo_cli:_dateVal(_rowVal(row,['Prazo Cliente'])), tendencia:_dateVal(_rowVal(row,['Tendência','Tendencia'])), alerta:_txt(_rowVal(row,['Alerta'])) || old.alerta || '', valor:_num(_rowVal(row,['Valor'])) ?? old.valor ?? null, obs:_txt(_rowVal(row,['Observações','Observacoes'])) || '', parciais: old.parciais || [], ativo_rdo: old.ativo_rdo !== undefined ? old.ativo_rdo : true});
+      if(old && old.id && old.id!==novo.id && String(old.obra||'').trim().toUpperCase()===String(novo.obra||'').trim().toUpperCase()) atualizados.push({oldId:old.id,obra:novo.obra,newId:novo.id});
+      return novo;
+    }).filter(p=>p && (p.id||p.obra));
+    // Exclusão controlada pela coluna Ação: remove também os registros vinculados, evitando sobras de projetos duplicados.
+    if(removidos.length){
+      const isRem=(x)=>removidos.some(r=>(r.id && String(x.id||'')===String(r.id)) || (r.obra && String((x.obra||x.cliente)||'').trim().toUpperCase()===String(r.obra).trim().toUpperCase()));
+      RDO=(RDO||[]).filter(x=>!isRem(x)); DOCUMENTACAO=(DOCUMENTACAO||[]).filter(x=>!isRem(x));
+      MEDICOES=(MEDICOES||[]).filter(x=>!isRem(x)); PESQUISAS=(PESQUISAS||[]).filter(x=>!isRem(x)); OBSERVACOES=(OBSERVACOES||[]).filter(x=>!isRem(x));
+      Object.keys(AVANCOS||{}).forEach(k=>{ if(removidos.some(r=>k===String(r.id||'')+'|'+String(r.obra||''))) delete AVANCOS[k]; });
+    }
+    // Se o ID foi corrigido no Excel, mantém os vínculos da mesma obra sincronizados.
+    atualizados.forEach(u=>{
+      (RDO||[]).forEach(x=>{if(String(x.id||'')===String(u.oldId)&&String(x.obra||'').trim().toUpperCase()===String(u.obra||'').trim().toUpperCase()) x.id=u.newId;});
+      (DOCUMENTACAO||[]).forEach(x=>{if(String(x.id||'')===String(u.oldId)&&String(x.obra||'').trim().toUpperCase()===String(u.obra||'').trim().toUpperCase()) x.id=u.newId;});
+      (MEDICOES||[]).forEach(x=>{if(String(x.id||'')===String(u.oldId)&&String(x.cliente||'').trim().toUpperCase()===String(u.obra||'').trim().toUpperCase()) x.id=u.newId;});
+      (PESQUISAS||[]).forEach(x=>{if(String(x.id||'')===String(u.oldId)&&String(x.cliente||'').trim().toUpperCase()===String(u.obra||'').trim().toUpperCase()) x.id=u.newId;});
+      (OBSERVACOES||[]).forEach(x=>{if(String(x.id||'')===String(u.oldId)&&String(x.obra||'').trim().toUpperCase()===String(u.obra||'').trim().toUpperCase()) x.id=u.newId;});
+      const oldKey=String(u.oldId)+'|'+String(u.obra), newKey=String(u.newId)+'|'+String(u.obra); if(AVANCOS&&AVANCOS[oldKey]&&!AVANCOS[newKey]){AVANCOS[newKey]=AVANCOS[oldKey]; delete AVANCOS[oldKey];}
+    });
     changed.push('Base Projetos');
   }
   const sr = getSheet(sheets, ['RDO']);
@@ -18898,7 +18933,7 @@ async function afterExcelImport(fileName, changed){
   alert('✅ Excel importado com sucesso. Abas atualizadas: '+changed.join(', ')+'.\n\nOs dados foram salvos no navegador e enviados ao Supabase quando disponível.');
 }
 function importExcel(){
-  const msg = 'Importar Excel para atualizar a base do SIOG?\n\nUse preferencialmente o arquivo exportado pelo botão 📊 Excel deste sistema.\nAs abas presentes no Excel serão substituídas/atualizadas no sistema. Abas ausentes serão preservadas.\n\nAntes de importar, recomenda-se gerar um Backup JSON.';
+  const msg = 'Importar Excel para atualizar a base do SIOG?\n\nUse preferencialmente o arquivo exportado pelo botão 📊 Excel deste sistema.\nAs abas presentes no Excel serão substituídas/atualizadas no sistema. Abas ausentes serão preservadas. Na aba Base Projetos, use a coluna Ação = EXCLUIR para remover projetos duplicados e os respectivos vínculos.\n\nAntes de importar, recomenda-se gerar um Backup JSON.';
   if(!confirm(msg)) return;
   const inp=document.createElement('input');
   inp.type='file'; inp.accept='.xlsx,.xls,.xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel';
