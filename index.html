@@ -20932,7 +20932,7 @@ try{
     });
     return Object.values(map).sort(function(a,b){return b.atraso-a.atraso||b.faturado-a.faturado;});
   }
-  function petroComments(){return (window.OBSERVACOES||[]).filter(function(o){return o&&o.tipo==='Petrobras';});}
+  function petroComments(){return (typeof OBSERVACOES!=='undefined'&&Array.isArray(OBSERVACOES)?OBSERVACOES:[]).filter(function(o){return o&&o.tipo==='Petrobras';});}
   function renderPetroComments(){
     const el=document.getElementById('petro-comments'); if(!el)return;
     const obs=petroComments();
@@ -21403,5 +21403,89 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
 })();
 
 </script>
+
+
+
+<script>
+/* Petrobras — comentários persistentes no SIOG, Backup e relatório PowerPoint. */
+(function(){
+  'use strict';
+  var seed=[
+    {obra:'PETROBRAS',tipo:'Petrobras',semana:16,cor:'y',titulo:'Contrato 4600683278 / Lote C',texto:`. Há 73 solicitações: 41 em andamento, 2 concluídas, 3 em orçamento e 24 canceladas.
+. A Petrobras RNEST disponibilizará munck, operador e sinaleiro até a regularização do aditivo da nova norma de movimentação de cargas.
+. Dois chamados foram priorizados para atendimento até 24/07/2026; um possui previsão de conclusão em 20/07/2026 e o outro aguarda aprovação de orçamento.
+. Para os demais chamados, foi definida prioridade e enviada à filial Recife, ainda sem retorno.
+. Chamado CSC0615226: estrutura em montagem em Aracaju; equipe Recife retoma em 30/06/2026, com conclusão estimada entre 20 e 25 dias após retomada. Permanecem pendentes a regularização do projeto elétrico e o envio do projeto com medidas das rampas.
+. Chamado CSC0754112: aguarda desmobilização da empresa atualmente instalada; mobilização da União já planejada aguardando liberação da área.`,__petro_final_v2:true},
+    {obra:'PETROBRAS',tipo:'Petrobras',semana:16,cor:'y',titulo:'Contrato 4600683292 / Lote B',texto:`. Há 55 solicitações: 33 em andamento, 1 concluída, 6 em orçamento e 15 canceladas.
+. A indisponibilidade de aparelhos de ar-condicionado em Duque de Caxias segue impactando atendimentos.
+. Em Cabiúnas, a mobilização do vestiário depende da instalação de cabo específico, ainda aguardando aquisição.`,__petro_final_v2:true},
+    {obra:'PETROBRAS',tipo:'Petrobras',semana:16,cor:'g',titulo:'Contrato 4600683725 / Oiapoque',texto:`. As manutenções solicitadas nos módulos Pelican foram concluídas em 18/06/2026.
+. A formalização da compra dos módulos da Pelican pela União, ainda está pendente. Entretanto, as medições estão ocorrendo independente dos trâmites documentais, porém sem os ativos locados dentro do sistema.`,__petro_final_v2:true}
+  ];
+
+  function hasObs(){ return typeof OBSERVACOES!=='undefined' && Array.isArray(OBSERVACOES); }
+  function persist(){ try{ if(typeof saveToStorage==='function') saveToStorage(); }catch(e){ console.warn(e); } }
+  function ensureComments(){
+    if(!hasObs()) return false;
+    var titles=seed.map(function(s){return s.titulo;});
+    var existing=OBSERVACOES.filter(function(o){return o && o.tipo==='Petrobras';});
+    // Só insere o bloco inicial quando ele não estiver presente. Não apaga comentários criados pelo usuário.
+    var now=Date.now();
+    seed.forEach(function(s,i){
+      var found=existing.some(function(o){ return o && o.titulo===s.titulo; });
+      if(!found){
+        var x=Object.assign({},s,{id_seq:'petro_seed_'+(i+1)+'_'+now,updated_at_local:now+i});
+        OBSERVACOES.push(x);
+      }
+    });
+    persist();
+    try{ if(typeof renderPetroComments==='function') renderPetroComments(); }catch(e){}
+    return true;
+  }
+
+  function patchCommentReader(){
+    // A versão anterior consultava window.OBSERVACOES, mas OBSERVACOES foi declarada com let.
+    // Este leitor usa a variável real da base e funciona no painel e na exportação.
+    try{
+      window.petroComments=function(){ return hasObs()?OBSERVACOES.filter(function(o){return o&&o.tipo==='Petrobras';}):[]; };
+      window.renderPetroComments=function(){
+        var el=document.getElementById('petro-comments'); if(!el) return;
+        var obs=window.petroComments();
+        if(!obs.length){ el.innerHTML='<div style="color:var(--tx3);font-size:12px;padding:12px 0">Nenhum comentário. Use ＋ para adicionar.</div>'; return; }
+        el.innerHTML=obs.map(function(o){
+          var i=OBSERVACOES.indexOf(o);
+          var c=o.cor==='r'?'#ea5455':o.cor==='y'?'#ffc107':o.cor==='g'?'#28c76f':'var(--bd)';
+          return '<div style="border-left:3px solid '+c+';padding:8px 10px;margin-bottom:8px;background:var(--bg3);border-radius:0 var(--rad) var(--rad) 0"><div style="display:flex;justify-content:space-between;gap:6px"><div style="font-size:11px;font-weight:700;color:var(--or);min-width:0">'+esc(o.obra||'Petrobras')+(o.titulo?' — <span style="color:var(--tx2);font-weight:400">'+esc(o.titulo)+'</span>':'')+'</div><div style="display:flex;gap:2px"><button class="btn btn-xs" style="padding:1px 5px;font-size:10px" onclick="openObsModal('+i+',\'Petrobras\')">✏</button><button class="btn btn-xs btn-r" style="padding:1px 5px;font-size:10px" onclick="petroDeleteComment('+i+')">✕</button></div></div><div style="font-size:11px;color:var(--tx2);line-height:1.5;white-space:pre-wrap;margin-top:5px">'+esc(o.texto||'')+'</div></div>';
+        }).join('');
+      };
+      window.petroDeleteComment=function(i){ if(!confirm('Excluir este comentário?')) return; var o=OBSERVACOES[i]; OBSERVACOES.splice(i,1); persist(); try{ if(typeof dbAfterDeleteObs==='function') dbAfterDeleteObs(o); }catch(e){} window.renderPetroComments(); };
+    }catch(e){ console.warn(e); }
+  }
+
+  function patchRenderAndReport(){
+    try{
+      if(typeof renderPetrobras==='function' && !window.__petroCommentsRenderV2){
+        window.__petroCommentsRenderV2=true;
+        var original=renderPetrobras;
+        renderPetrobras=function(){ var r=original.apply(this,arguments); setTimeout(function(){ensureComments();try{window.renderPetroComments();}catch(e){}},0); return r; };
+        window.renderPetrobras=renderPetrobras;
+        if(window.PAGE_RENDERS) window.PAGE_RENDERS.petrobras=renderPetrobras;
+      }
+      // reportHtml é usado pelo módulo Petrobras na exportação. Substitui apenas a fonte dos comentários.
+      if(typeof reportHtml==='function' && !window.__petroCommentsReportV2){
+        window.__petroCommentsReportV2=true;
+        var oldReport=reportHtml;
+        reportHtml=function(){ ensureComments(); return oldReport.apply(this,arguments); };
+      }
+    }catch(e){ console.warn(e); }
+  }
+
+  function init(){ patchCommentReader(); ensureComments(); patchRenderAndReport(); try{if(typeof renderPetrobras==='function') renderPetrobras();}catch(e){} }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ setTimeout(init,1800); setTimeout(init,4500); });
+  else { setTimeout(init,1800); setTimeout(init,4500); }
+})();
+</script>
+
 </body>
 </html>
