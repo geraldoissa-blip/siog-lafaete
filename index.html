@@ -10582,7 +10582,7 @@ function buildSumarioSlideHtml(isLight,semana,corteDate,emissor,LOGO_URI){
   const kpis=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px">
     ${K('#E87722','Carteira Total',s.fmtCarteira,'contrato total')}
     ${K('rgba(232,119,34,.75)','Valor de Venda',s.fmtVendaV91||'R$ 0M','')}
-    ${K('rgba(232,119,34,.75)','Locação',s.fmtLocV91||'R$ 0M','')}
+    ${K('rgba(232,119,34,.75)','Locação Petrobras',s.fmtLocV91||'R$ 0M','')}
     ${K('#E87722','Valor Recebido',s.fmtRecebido,s.pctRecebido+'% recebido')}
     ${K('#E87722','Projetos Ativos',s.ativosCnt,'obras em andamento')}
     ${K('#E87722','Obras em Atraso',atAtras,'desvio de prazo')}
@@ -10976,7 +10976,7 @@ function gerarRelatorio(){
     const c2=orderByCurrentTable(getMedCons(),'tbody-med-cons',m=>m.id,m=>m.cliente,0,1);
     const tots=c2.reduce((s,m)=>({c:s.c+(m.contrato||0),m:s.m+m.med,f:s.f+m.fat,r:s.r+m.rec,nv:s.nv+m.nfv,ar:s.ar+m.ar,pf:s.pf+(m.pf||0)}),{c:0,m:0,f:0,r:0,nv:0,ar:0,pf:0});
     const petroRowsCards=c2.filter(m=>/PETROBRAS/i.test(String(m.cliente||m.obra||'')));
-    const locacaoPpt=petroRowsCards.reduce((s,m)=>s+((m.med!=null?Number(m.med):0)||((Number(m.fat)||0)+(Number(m.pf)||0))),0);
+    const locacaoPpt=petroRowsCards.reduce((s,m)=>s+(Number(m.contrato)||0),0);
     const carteiraPpt=tots.c;
     const medCards={carteira:carteiraPpt,venda:Math.max(0,carteiraPpt-locacaoPpt),loc:locacaoPpt,med:tots.m,fat:tots.f,rec:tots.r,nfv:tots.nv,ar:tots.ar};
     html+=`<section class="rel-module med-relatorio" data-title="Medições"><div style="background:#111;padding:16px 28px;border-bottom:1px solid #333">
@@ -10987,7 +10987,7 @@ function gerarRelatorio(){
           ${[
             ['#E87722','Carteira',medCards.carteira],
             ['rgba(232,119,34,.55)','Valor de Venda',medCards.venda],
-            ['rgba(232,119,34,.55)','Locação',medCards.loc],
+            ['rgba(232,119,34,.55)','Locação Petrobras',medCards.loc],
             ['#E87722','Medido',medCards.med],
             ['#E87722','Faturado',medCards.fat],
             ['#E87722','Recebido',medCards.rec],
@@ -21308,8 +21308,10 @@ function calc(){
   const non=cons.filter(x=>!isPetroMed(x));
   const venda=non.reduce((s,x)=>s+n(x.contrato),0);
   const totals=petroTotals();
-  const loc=Object.values(totals).reduce((s,x)=>s+n(x.total),0);
-  const petroMed=loc;
+  // v100: Locação passa a ser o somatório do valor de contrato informado nas 3 linhas Petrobras.
+  // Assim, quando o usuário editar o contrato Petrobras no sistema, Carteira e Locação atualizam automaticamente.
+  const loc=petro.reduce((s,x)=>s+n(x.contrato),0);
+  const petroMed=Object.values(totals).reduce((s,x)=>s+n(x.total),0);
   const petroFat=Object.values(totals).reduce((s,x)=>s+n(x.nota),0);
   const petroPf=Object.values(totals).reduce((s,x)=>s+n(x.rm),0);
   const nonMed=non.reduce((s,x)=>s+n(x.med),0);
@@ -21332,8 +21334,8 @@ function patchCards(){
   const t=calc();
   grid.innerHTML=
     card('💼 Carteira',t.carteira,false)+
-    card('🏷 Valor de Venda',t.venda,true)+
-    card('🏗 Locação',t.loc,true)+
+    card('🏷 Valor de Venda',t.carteira-t.loc,true)+
+    card('🏗 Locação Petrobras',t.loc,true)+
     card('📐 Medido',t.med,false)+
     card('🧾 Faturado',t.fat,false)+
     card('✅ Recebido',t.rec,false)+
@@ -21353,7 +21355,23 @@ function setPetroContractDash(root){
     });
   });
 }
-function movePetroRowsEnd(){ const tb=document.getElementById('tbody-med-cons'); if(!tb)return; [...tb.querySelectorAll('tr')].forEach(r=>{ const txt=(r.textContent||''); if(/PETROBRAS/i.test(txt)){ r.style.background='rgba(232,119,34,.08)'; r.style.borderTop='1px solid rgba(232,119,34,.35)'; const first=r.children[0]; if(first)first.innerHTML='<span style="font-size:10px;color:var(--or);font-weight:800">Importado</span>'; tb.appendChild(r); }}); }
+function editarContratoPetrobras(id,cliente){
+  const regs=MEDICOES.filter(m=>String(m.id)===String(id)&&String(m.cliente)===String(cliente));
+  if(!regs.length){alert('Não encontrei lançamentos para este contrato Petrobras.');return;}
+  const atual=Number(regs[0].valor_contrato)||0;
+  const br=atual?atual.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
+  const resp=prompt('Informe o valor do contrato para '+cliente+':',br);
+  if(resp===null)return;
+  const val=n(resp);
+  regs.forEach(m=>{m.valor_contrato=val;});
+  saveToStorage();
+  try{showSaveStatus('✓ Valor do contrato Petrobras atualizado');}catch(e){}
+  renderMedicoes();
+  try{renderSumario();}catch(e){}
+  setTimeout(()=>{try{patchMedicoes();patchReport();}catch(e){}},50);
+}
+window.editarContratoPetrobras=editarContratoPetrobras;
+function movePetroRowsEnd(){ const tb=document.getElementById('tbody-med-cons'); if(!tb)return; [...tb.querySelectorAll('tr')].forEach(r=>{ const txt=(r.textContent||''); if(/PETROBRAS/i.test(txt)){ r.style.background='rgba(232,119,34,.08)'; r.style.borderTop='1px solid rgba(232,119,34,.35)'; const first=r.children[0]; if(first){ const key=(r.getAttribute('data-key')||'').split('|'); const id=key[0]||''; const cliente=key.slice(1).join('|')||''; const eid=encodeURIComponent(id); const ecli=encodeURIComponent(cliente); first.innerHTML='<button class="btn btn-xs" onclick="editarContratoPetrobras(decodeURIComponent(&quot;'+eid+'&quot;),decodeURIComponent(&quot;'+ecli+'&quot;))">Editar</button> <button class="btn btn-xs btn-r" onclick="excluirObraMedicoes(decodeURIComponent(&quot;'+eid+'&quot;),decodeURIComponent(&quot;'+ecli+'&quot;))">Excluir</button>'; } tb.appendChild(r); }}); }
 
 function injectButtons(){
   const q=document.getElementById('sm-q');
@@ -21367,9 +21385,9 @@ function injectButtons(){
 }
 function hideOldPetro(){ [...document.querySelectorAll('[onclick]')].forEach(el=>{ if(String(el.getAttribute('onclick')||'').includes("nav('petrobras')")) el.style.display='none'; }); const pg=document.getElementById('page-petrobras'); if(pg)pg.style.display='none'; const chk=document.getElementById('ri-petrobras'); if(chk){chk.checked=false; const lab=chk.closest('label')||chk.parentElement; if(lab)lab.style.display='none';} document.querySelectorAll('[data-title="Petrobras — Medições, RMs e Faturamento"],#petrobras-resumo-executivo,.petrobras-resumo-executivo').forEach(e=>e.remove()); }
 function patchMedicoes(){ patchCards(); movePetroRowsEnd(); injectButtons(); hideOldPetro(); }
-function patchSumario(){ const t=calc(); const host=document.getElementById('sumario-content'); if(!host)return; let s={}; try{s=(typeof window.buildSumarioData==='function'?window.buildSumarioData():{})||{};}catch(e){} const grid=host.querySelector('.kpi-grid'); if(grid){ const atAtras=Array.isArray(s.atrasados)?s.atrasados.length:0; const ativos=Number(s.ativosCnt)||0; const pendDocs=Number(s.pendDocs)||0; const pctRec=(t.carteira?Math.round(t.rec/t.carteira*100):0); const C=(lbl,val,sub,light)=>'<div class="kpi or" style="'+(light?'background:rgba(232,119,34,.10);border-top-color:rgba(232,119,34,.65);':'')+'"><div class="kpi-lbl">'+esc(lbl)+'</div><div class="kpi-val" style="font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+val+'</div>'+(sub?'<div class="kpi-sub">'+esc(sub)+'</div>':'')+'</div>'; grid.style.gridTemplateColumns='repeat(auto-fit,minmax(120px,1fr))'; grid.innerHTML= C('Carteira Total',fmtM0(t.carteira),'contrato total',false)+C('Valor de Venda',fmtM0(t.venda),'',true)+C('Locação',fmtM0(t.loc),'',true)+C('Valor Recebido',fmtM0(t.rec),pctRec+'% recebido',false)+C('Projetos Ativos',ativos,'obras em andamento',false)+C('Obras em Atraso',atAtras,'desvio de prazo',false)+C('Pend. Documentais',pendDocs,'ART/Seguro/Outros',false); }
+function patchSumario(){ const t=calc(); const host=document.getElementById('sumario-content'); if(!host)return; let s={}; try{s=(typeof window.buildSumarioData==='function'?window.buildSumarioData():{})||{};}catch(e){} const grid=host.querySelector('.kpi-grid'); if(grid){ const atAtras=Array.isArray(s.atrasados)?s.atrasados.length:0; const ativos=Number(s.ativosCnt)||0; const pendDocs=Number(s.pendDocs)||0; const pctRec=(t.carteira?Math.round(t.rec/t.carteira*100):0); const C=(lbl,val,sub,light)=>'<div class="kpi or" style="'+(light?'background:rgba(232,119,34,.10);border-top-color:rgba(232,119,34,.65);':'')+'"><div class="kpi-lbl">'+esc(lbl)+'</div><div class="kpi-val" style="font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+val+'</div>'+(sub?'<div class="kpi-sub">'+esc(sub)+'</div>':'')+'</div>'; grid.style.gridTemplateColumns='repeat(auto-fit,minmax(120px,1fr))'; grid.innerHTML= C('Carteira Total',fmtM0(t.carteira),'contrato total',false)+C('Valor de Venda',fmtM0(t.carteira-t.loc),'',true)+C('Locação Petrobras',fmtM0(t.loc),'',true)+C('Valor Recebido',fmtM0(t.rec),pctRec+'% recebido',false)+C('Projetos Ativos',ativos,'obras em andamento',false)+C('Obras em Atraso',atAtras,'desvio de prazo',false)+C('Pend. Documentais',pendDocs,'ART/Seguro/Outros',false); }
  let details={}; try{details=JSON.parse(localStorage.getItem(SUM_DET_KEY)||'{}')||{};}catch(e){} [...host.querySelectorAll('table tbody tr')].forEach(r=>{ const c=r.children; if(c.length<3)return; const obra=(c[1].textContent||'').trim(); const det=c[2]; if(!obra||det.dataset.editV75)return; det.dataset.editV75='1'; if(Object.prototype.hasOwnProperty.call(details,obra))det.textContent=details[obra]; det.contentEditable='true'; det.title='Edite somente este detalhe do Sumário Executivo'; det.style.cursor='text'; det.onblur=()=>{details[obra]=det.textContent.trim(); localStorage.setItem(SUM_DET_KEY,JSON.stringify(details)); try{showSaveStatus('✓ Detalhe do Sumário salvo');}catch(e){}}; }); }
-function patchReport(){ const root=document.getElementById('rel-preview')||document.getElementById('report-content'); if(!root)return; hideOldPetro(); const t=calc(); const med=[...root.querySelectorAll('.rel-module')].find(x=>x.getAttribute('data-title')==='Medições'); if(med){ const grids=[...med.querySelectorAll('div[style*="grid-template-columns"]')]; const grid=grids.find(g=>{ const st=String(g.getAttribute('style')||''); if(!/repeat\(4,\s*1fr\)/.test(st)) return false; const cards=[...g.children].filter(el=>el.tagName==='DIV'); if(!(cards.length===6||cards.length===8)) return false; return !!(g.parentElement && g.parentElement.querySelector('table.med-export-table')); }); if(grid){ const C=(l,v,light)=>'<div style="border:1px solid #e5e7eb;border-top:3px solid '+(light?'rgba(232,119,34,.55)':'#E87722')+';border-radius:7px;padding:9px 10px;background:'+(light?'#fff8f2':'#f7f8fa')+'"><div style="font-size:9px;color:#667085;text-transform:uppercase;font-weight:700">'+l+'</div><div style="font-size:16px;font-weight:800;color:#E87722;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fmtR(v)+'</div></div>'; grid.style.gridTemplateColumns='repeat(4,1fr)'; grid.style.gap='10px'; grid.style.marginBottom='14px'; grid.innerHTML=C('Carteira',t.carteira,false)+C('Valor de Venda',t.venda,true)+C('Locação',t.loc,true)+C('Medido',t.med,false)+C('Faturado',t.fat,false)+C('Recebido',t.rec,false)+C('NF Vencida',t.nfv,false)+C('A Receber',t.ar,false); }
+function patchReport(){ const root=document.getElementById('rel-preview')||document.getElementById('report-content'); if(!root)return; hideOldPetro(); const t=calc(); const med=[...root.querySelectorAll('.rel-module')].find(x=>x.getAttribute('data-title')==='Medições'); if(med){ const grids=[...med.querySelectorAll('div[style*="grid-template-columns"]')]; const grid=grids.find(g=>{ const st=String(g.getAttribute('style')||''); if(!/repeat\(4,\s*1fr\)/.test(st)) return false; const cards=[...g.children].filter(el=>el.tagName==='DIV'); if(!(cards.length===6||cards.length===8)) return false; return !!(g.parentElement && g.parentElement.querySelector('table.med-export-table')); }); if(grid){ const C=(l,v,light)=>'<div style="border:1px solid #e5e7eb;border-top:3px solid '+(light?'rgba(232,119,34,.55)':'#E87722')+';border-radius:7px;padding:9px 10px;background:'+(light?'#fff8f2':'#f7f8fa')+'"><div style="font-size:9px;color:#667085;text-transform:uppercase;font-weight:700">'+l+'</div><div style="font-size:16px;font-weight:800;color:#E87722;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fmtR(v)+'</div></div>'; grid.style.gridTemplateColumns='repeat(4,1fr)'; grid.style.gap='10px'; grid.style.marginBottom='14px'; grid.innerHTML=C('Carteira',t.carteira,false)+C('Valor de Venda',t.carteira-t.loc,true)+C('Locação Petrobras',t.loc,true)+C('Medido',t.med,false)+C('Faturado',t.fat,false)+C('Recebido',t.rec,false)+C('NF Vencida',t.nfv,false)+C('A Receber',t.ar,false); }
     [...root.querySelectorAll('.kpi')].forEach(card=>{const lbl=((card.querySelector('.kpi-lbl')||{}).textContent||'').trim().toLowerCase(); if(lbl==='valor de venda'||lbl==='locação'||lbl==='locacao'){ card.style.background='#fff8f2'; card.style.borderTopColor='rgba(232,119,34,.55)'; }});
   } setPetroContractDash(root); }
 
@@ -21406,7 +21424,7 @@ function importPetro(kind){
 function refreshAll(){ try{if(typeof renderMedicoes==='function')renderMedicoes();}catch(e){} try{if(typeof renderSumario==='function')renderSumario();}catch(e){} setTimeout(()=>{patchMedicoes();patchSumario();patchReport();},80); }
 function install(){ if(window.__siog_v76_petro_ok)return; window.__siog_v76_petro_ok=true; seedPetroMedicoes(); hideOldPetro(); const oldMed=window.renderMedicoes||renderMedicoes; if(typeof oldMed==='function'){ window.renderMedicoes=function(){ seedPetroMedicoes(); const r=oldMed.apply(this,arguments); setTimeout(patchMedicoes,30); return r;}; if(window.PAGE_RENDERS)window.PAGE_RENDERS.medicoes=window.renderMedicoes; }
  const oldSum=window.renderSumario||renderSumario; if(typeof oldSum==='function'){ window.renderSumario=function(){ seedPetroMedicoes(); const r=oldSum.apply(this,arguments); setTimeout(patchSumario,40); return r;}; if(window.PAGE_RENDERS)window.PAGE_RENDERS.sumario=window.renderSumario; }
- if(typeof window.buildSumarioData==='function'){ const oldBuild=window.buildSumarioData; window.buildSumarioData=function(){ const s=oldBuild.apply(this,arguments)||{}; if(!s.__petroV75){s.__petroV75=true; s.ativosCnt=(Number(s.ativosCnt)||0)+3;} try{const t=calc(); s.fmtCarteira=fmtM0(t.carteira); s.fmtRecebido=fmtM0(t.rec); s.pctRecebido=(t.carteira?Math.round(t.rec/t.carteira*100):0); s.vendaV91=t.venda; s.locV91=t.loc; s.fmtVendaV91=fmtM0(t.venda); s.fmtLocV91=fmtM0(t.loc);}catch(e){} let details={}; try{details=JSON.parse(localStorage.getItem(SUM_DET_KEY)||'{}')||{};}catch(e){} if(Array.isArray(s.pontosPrioritarios))s.pontosPrioritarios=s.pontosPrioritarios.map(p=>Object.assign({},p,{detalhe:Object.prototype.hasOwnProperty.call(details,p.titulo)?details[p.titulo]:p.detalhe})); return s;}; }
+ if(typeof window.buildSumarioData==='function'){ const oldBuild=window.buildSumarioData; window.buildSumarioData=function(){ const s=oldBuild.apply(this,arguments)||{}; if(!s.__petroV75){s.__petroV75=true; s.ativosCnt=(Number(s.ativosCnt)||0)+3;} try{const t=calc(); s.fmtCarteira=fmtM0(t.carteira); s.fmtRecebido=fmtM0(t.rec); s.pctRecebido=(t.carteira?Math.round(t.rec/t.carteira*100):0); s.vendaV91=(t.carteira-t.loc); s.locV91=t.loc; s.fmtVendaV91=fmtM0(t.carteira-t.loc); s.fmtLocV91=fmtM0(t.loc);}catch(e){} let details={}; try{details=JSON.parse(localStorage.getItem(SUM_DET_KEY)||'{}')||{};}catch(e){} if(Array.isArray(s.pontosPrioritarios))s.pontosPrioritarios=s.pontosPrioritarios.map(p=>Object.assign({},p,{detalhe:Object.prototype.hasOwnProperty.call(details,p.titulo)?details[p.titulo]:p.detalhe})); return s;}; }
  if(typeof window.gerarRelatorio==='function'){ const oldGer=window.gerarRelatorio; window.gerarRelatorio=function(){ seedPetroMedicoes(); hideOldPetro(); const r=oldGer.apply(this,arguments); setTimeout(()=>{patchReport();patchSumario();hideOldPetro();},120); return r;}; }
  if(typeof window.exportarPPTX==='function'){ const oldPpt=window.exportarPPTX; window.exportarPPTX=function(){ seedPetroMedicoes(); patchReport(); hideOldPetro(); return oldPpt.apply(this,arguments); }; }
  refreshAll(); setTimeout(refreshAll,1200); }
