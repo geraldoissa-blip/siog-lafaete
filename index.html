@@ -10580,7 +10580,7 @@ function buildSumarioSlideHtml(isLight,semana,corteDate,emissor,LOGO_URI){
   const critLabel=temCrit>0?'Atenção Crítica':atAtras>0?'Atenção':'Saudável';
   /* KPIs row */
   const kpis=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px">
-    ${K('#E87722','Carteira Total',s.fmtCarteira,'contrato total')}
+    ${K('#E87722','Carteira Total',(window.__siogCarteiraMedicoesFmt?window.__siogCarteiraMedicoesFmt():s.fmtCarteira),'contrato total')}
     ${K('rgba(232,119,34,.75)','Valor de Venda',s.fmtVendaV91||'R$ 0M','')}
     ${K('rgba(232,119,34,.75)','Locação Petrobras',s.fmtLocV91||'R$ 0M','')}
     ${K('#E87722','Valor Recebido',s.fmtRecebido,s.pctRecebido+'% recebido')}
@@ -10589,7 +10589,7 @@ function buildSumarioSlideHtml(isLight,semana,corteDate,emissor,LOGO_URI){
     ${K('#E87722','Pend. Documentais',s.pendDocs,'ART/Seguro/Outros')}
   </div>`;
   /* Pontos de atenção */
-  const pontosRows=s.pontosPrioritarios.slice(0,8).map(p=>`<tr style="border-bottom:1px solid ${theme.border}"><td style="padding:4px 6px;width:16px">${dotHtml(p.cor)}</td><td style="padding:4px 6px;font-size:9.5px;color:${isLight?'#111':'#f0f0f0'};font-weight:600;white-space:normal;overflow-wrap:break-word">${p.titulo}</td><td style="padding:4px 6px;font-size:9px;color:${theme.muted};white-space:normal;overflow-wrap:break-word;max-width:260px">${p.detalhe}</td></tr>`).join('');
+  const pontosRows=s.pontosPrioritarios.slice(0,10).map(p=>`<tr style="border-bottom:1px solid ${theme.border}"><td style="padding:4px 6px;width:16px">${dotHtml(p.cor)}</td><td style="padding:4px 6px;font-size:9.5px;color:${isLight?'#111':'#f0f0f0'};font-weight:600;white-space:normal;overflow-wrap:break-word">${p.titulo}</td><td style="padding:4px 6px;font-size:9px;color:${theme.muted};white-space:normal;overflow-wrap:break-word;max-width:260px">${window.__siogGetSumarioDetalhe?window.__siogGetSumarioDetalhe(p.titulo,p.detalhe):p.detalhe}</td></tr>`).join('');
   const pontosBloco=`<div style="flex:1;min-width:0">
     ${T('Pontos de Atenção Prioritários')}
     <table style="width:100%;border-collapse:collapse;font-size:9.5px"><tbody>${pontosRows||`<tr><td colspan="3" style="padding:8px;color:${theme.muted};font-size:9px">Nenhum ponto crítico identificado esta semana.</td></tr>`}</tbody></table>
@@ -10745,7 +10745,7 @@ function renderSumario(){
   const critLabel=temCrit>0?'Crítico':atAtras>0?'Atenção':'Saudável';
   /* KPIs */
   const kpisHtml=`<div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:20px">
-    ${K('or','Carteira Total',s.fmtCarteira,'')}
+    ${K('or','Carteira Total',(window.__siogCarteiraMedicoesFmt?window.__siogCarteiraMedicoesFmt():s.fmtCarteira),'')}
     ${K('or','Valor Recebido',s.fmtRecebido,s.pctRecebido+'% recebido')}
     ${K('or','Projetos Ativos',s.ativosCnt,'')}
     ${K('or','Obras em Atraso',atAtras,'')}
@@ -10754,7 +10754,7 @@ function renderSumario(){
     ${K('or','Criticidade Geral',critLabel,'')}
   </div>`;
   /* Pontos prioritários */
-  const pontosHtml=s.pontosPrioritarios.length?s.pontosPrioritarios.slice(0,10).map(p=>`<tr><td style="padding:5px 4px 5px 8px;width:16px">${dotHtml(p.cor)}</td><td style="padding:5px 8px 5px 4px;font-weight:600">${p.titulo}</td><td style="padding:5px 8px;color:var(--tx2)">${p.detalhe}</td></tr>`).join('')
+  const pontosHtml=s.pontosPrioritarios.length?s.pontosPrioritarios.slice(0,10).map(p=>`<tr><td style="padding:5px 4px 5px 8px;width:16px">${dotHtml(p.cor)}</td><td style="padding:5px 8px 5px 4px;font-weight:600">${p.titulo}</td><td style="padding:3px 8px;color:var(--tx2);overflow:visible">${window.__siogSumarioDetalheInput?window.__siogSumarioDetalheInput(p.titulo,p.detalhe):p.detalhe}</td></tr>`).join('')
     :`<tr><td colspan="3" style="padding:10px 8px;color:var(--tx3);font-style:italic">Nenhum ponto crítico identificado esta semana.</td></tr>`;
   /* Ranking prazo */
   const rankHtml=s.rankingPrazo.length?s.rankingPrazo.slice(0,8).map((r,i)=>`<tr><td style="padding:4px 8px;color:var(--tx3)">${i+1}°</td><td style="padding:4px 8px">${r.obra}</td><td style="padding:4px 8px;color:${r.desvio>0?'var(--r2)':r.desvio<0?'var(--g2)':'var(--tx2)'};font-weight:700">${r.desvio>0?'+':r.desvio<0?'':''}${r.desvio} d</td><td class="nowrap" style="padding:4px 8px;color:var(--tx2)">${r.tend||'—'}</td></tr>`).join('')
@@ -21570,5 +21570,1010 @@ if(typeof oldPpt==='function'){
 }
 })();
 </script>
+<script>
+/* v102 — Correção definitiva Geraldo: Detalhe editável no Sumário + importação preservando ajustes e atualizando comentários.
+   - Usa textarea real na coluna Detalhe dos Pontos de Atenção Prioritários.
+   - Salva os detalhes manuais no navegador e reaplica na tela, relatório e PowerPoint.
+   - Ao importar Excel/JSON, substitui comentários importados de Cronograma/Financeiro e marca como atuais da semana para entrarem no Sumário.
+   - Não altera estrutura, base existente nem regras de Petrobras/Resultado já instaladas. */
+(function(){
+'use strict';
+var KEY102='siog_sumario_pontos_detalhes_v102';
+var KEY101='siog_sumario_pontos_detalhes_v101';
+var KEY75='siog_sumario_pontos_detalhes_v75';
+function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function n(v){
+  if(v==null||v==='') return 0;
+  if(typeof v==='number') return isFinite(v)?v:0;
+  var s=String(v).replace(/R\$|\s/g,'');
+  if(s.indexOf(',')>=0 && s.indexOf('.')>=0) s=s.replace(/\./g,'').replace(',','.');
+  else s=s.replace(',','.');
+  var x=Number(s); return isFinite(x)?x:0;
+}
+function readKey(k){try{return JSON.parse(localStorage.getItem(k)||'{}')||{};}catch(e){return {};}}
+function writeKey(k,o){try{localStorage.setItem(k,JSON.stringify(o||{}));}catch(e){}}
+function loadDetails(){
+  var out={};
+  [KEY75,KEY101,KEY102].forEach(function(k){
+    var o=readKey(k);
+    Object.keys(o).forEach(function(key){
+      var v=o[key]; if(v==null) return;
+      out[key]=String(v); out[norm(key)]=String(v);
+    });
+  });
+  return out;
+}
+function saveDetail(title,value){
+  var v=String(value==null?'':value).trim();
+  [KEY75,KEY101,KEY102].forEach(function(k){
+    var o=readKey(k); o[title]=v; o[norm(title)]=v; writeKey(k,o);
+  });
+}
+function manualFor(title){
+  var d=loadDetails();
+  if(Object.prototype.hasOwnProperty.call(d,title)) return d[title];
+  var k=norm(title);
+  if(Object.prototype.hasOwnProperty.call(d,k)) return d[k];
+  return null;
+}
+function getCarteiraMedicoes(){
+  try{
+    if(typeof window.getMedCons==='function'){
+      var c=(window.getMedCons()||[]).reduce(function(s,m){return s+n(m&&m.contrato);},0);
+      if(c>0) return c;
+    }
+  }catch(e){}
+  try{
+    var seen={};
+    return (window.MEDICOES||[]).reduce(function(s,m){
+      var k=String((m&&m.id)||'')+'|'+String((m&&m.cliente)||'');
+      if(seen[k]) return s; seen[k]=1;
+      return s+n(m&&m.valor_contrato);
+    },0);
+  }catch(e){return 0;}
+}
+function fmtR(v){try{return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0,minimumFractionDigits:0}).format(Math.round(n(v)));}catch(e){return 'R$ '+Math.round(n(v)).toLocaleString('pt-BR');}}
+function fmtM(v){var x=Math.trunc(Math.abs(n(v))/1000000);return (n(v)<0?'-':'')+'R$ '+x.toLocaleString('pt-BR')+'M';}
+function applyManualToSumarioData(s){
+  s=s||{};
+  if(Array.isArray(s.pontosPrioritarios)){
+    s.pontosPrioritarios=s.pontosPrioritarios.map(function(p){
+      var cp=Object.assign({},p||{});
+      var m=manualFor(cp.titulo);
+      if(m!==null) cp.detalhe=m;
+      return cp;
+    });
+  }
+  var carteira=getCarteiraMedicoes();
+  if(carteira>0){
+    s.fmtCarteira=fmtR(carteira);
+    s.fmtCarteiraM=fmtM(carteira);
+    s.carteiraV102=carteira;
+  }
+  return s;
+}
+function wrapBuild(){
+  if(typeof window.buildSumarioData==='function' && !window.buildSumarioData.__v102){
+    var old=window.buildSumarioData;
+    var fn=function(){return applyManualToSumarioData(old.apply(this,arguments)||{});};
+    fn.__v102=true;
+    window.buildSumarioData=fn;
+  }
+}
+function findPontosTables(host){
+  host=host||document;
+  var res=[];
+  Array.prototype.slice.call(host.querySelectorAll('table')).forEach(function(tbl){
+    var box=tbl.closest('.card')||tbl.parentElement;
+    var txt=(box&&box.textContent)||tbl.textContent||'';
+    if(/pontos\s+de\s+aten[cç][aã]o\s+priorit[aá]rios/i.test(txt)) res.push(tbl);
+  });
+  return res;
+}
+function makeTextarea(td,title){
+  var current=manualFor(title);
+  if(current===null) current=(td.querySelector('textarea')?td.querySelector('textarea').value:td.textContent)||'';
+  td.innerHTML='';
+  var ta=document.createElement('textarea');
+  ta.value=String(current||'').trim();
+  ta.setAttribute('aria-label','Detalhe editável do ponto de atenção '+title);
+  ta.title='Edite este detalhe. O texto será salvo e usado também no PowerPoint.';
+  ta.style.width='100%';
+  ta.style.minHeight='42px';
+  ta.style.border='1px solid rgba(232,119,34,.55)';
+  ta.style.borderRadius='6px';
+  ta.style.padding='6px 8px';
+  ta.style.background='rgba(232,119,34,.06)';
+  ta.style.color='var(--tx)';
+  ta.style.font='inherit';
+  ta.style.fontSize='11px';
+  ta.style.lineHeight='1.25';
+  ta.style.resize='vertical';
+  ta.style.boxSizing='border-box';
+  ta.addEventListener('input',function(){saveDetail(title,ta.value);});
+  ta.addEventListener('blur',function(){saveDetail(title,ta.value); try{ if(typeof window.showSaveStatus==='function') window.showSaveStatus('✓ Detalhe do Sumário salvo'); }catch(e){} });
+  td.appendChild(ta);
+  td.dataset.v102Edit='1';
+}
+function enableDetails(){
+  var host=document.getElementById('sumario-content');
+  if(!host) return;
+  findPontosTables(host).forEach(function(tbl){
+    Array.prototype.slice.call(tbl.querySelectorAll('tbody tr')).forEach(function(row){
+      var c=row.children; if(!c||c.length<3) return;
+      var title=(c[1].textContent||'').trim(); if(!title) return;
+      var td=c[2];
+      var existing=td.querySelector('textarea');
+      if(existing){
+        var m=manualFor(title); if(m!==null && existing.value!==m) existing.value=m;
+        return;
+      }
+      makeTextarea(td,title);
+    });
+  });
+}
+function patchCarteiraOnScreen(){
+  var host=document.getElementById('sumario-content')||document;
+  var carteira=getCarteiraMedicoes(); if(!(carteira>0)) return;
+  Array.prototype.slice.call(host.querySelectorAll('.kpi')).forEach(function(kpi){
+    var lbl=kpi.querySelector('.kpi-lbl'); var val=kpi.querySelector('.kpi-val');
+    if(lbl&&val&&/^(carteira|carteira total)$/i.test(norm(lbl.textContent))){lbl.textContent='Carteira Total'; val.textContent=fmtM(carteira);}
+  });
+}
+function patchScreen(){wrapBuild(); patchCarteiraOnScreen(); enableDetails();}
+function stripTextareasForExport(root){
+  try{Array.prototype.slice.call((root||document).querySelectorAll('textarea')).forEach(function(ta){ta.replaceWith(document.createTextNode(ta.value||''));});}catch(e){}
+}
+function patchSlideHtml(html){
+  try{
+    html=String(html);
+    var s=(typeof window.buildSumarioData==='function'?window.buildSumarioData():{})||{};
+    var carteira=getCarteiraMedicoes();
+    if(carteira>0){
+      html=html.replace(/(<div[^>]*>Carteira Total<\/div>\s*<div[^>]*>)(.*?)(<\/div>)/i,'$1'+fmtM(carteira)+'$3');
+      html=html.replace(/(<div[^>]*>Carteira<\/div>\s*<div[^>]*>)(.*?)(<\/div>)/i,'$1'+fmtM(carteira)+'$3');
+    }
+    if(Array.isArray(s.pontosPrioritarios)){
+      s.pontosPrioritarios.forEach(function(p){
+        var m=manualFor(p&&p.titulo); if(m===null) return;
+        var old=esc((p&&p.detalhe)||''); var neu=esc(m);
+        if(old && old!==neu) html=html.split(old).join(neu);
+      });
+    }
+  }catch(e){}
+  return html;
+}
+function markImportedObsAsCurrent(arr){
+  try{
+    var now=Date.now();
+    (arr||[]).forEach(function(o){
+      if(!o) return;
+      var t=String(o.tipo||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if(t==='cronograma'||t==='financeiro'||t.indexOf('medic')>=0){
+        o.updated_at_local=o.updated_at_local||now;
+        if(!o.id_seq && typeof window.nextSeq==='function') o.id_seq=window.nextSeq('obs');
+      }
+    });
+  }catch(e){}
+  return arr;
+}
+function wrapImports(){
+  if(typeof window.applyStorageData==='function' && !window.applyStorageData.__v102){
+    var oldApply=window.applyStorageData;
+    var na=function(data){
+      if(data&&Array.isArray(data.OBSERVACOES)) markImportedObsAsCurrent(data.OBSERVACOES);
+      var r=oldApply.apply(this,arguments);
+      try{markImportedObsAsCurrent(window.OBSERVACOES); if(typeof window.saveToStorage==='function') window.saveToStorage();}catch(e){}
+      setTimeout(function(){try{if(typeof window.renderObservacoes==='function') window.renderObservacoes();}catch(e){} try{if(typeof window.renderSumario==='function') window.renderSumario();}catch(e){} patchScreen();},120);
+      return r;
+    };
+    na.__v102=true; window.applyStorageData=na;
+  }
+  if(typeof window.applyExcelSheets==='function' && !window.applyExcelSheets.__v102){
+    var oldExcel=window.applyExcelSheets;
+    var ne=function(sheets){
+      var r=oldExcel.apply(this,arguments);
+      try{markImportedObsAsCurrent(window.OBSERVACOES);}catch(e){}
+      return r;
+    };
+    ne.__v102=true; window.applyExcelSheets=ne;
+  }
+  if(typeof window.afterExcelImport==='function' && !window.afterExcelImport.__v102){
+    var oldAfter=window.afterExcelImport;
+    var nf=function(){
+      try{markImportedObsAsCurrent(window.OBSERVACOES);}catch(e){}
+      var p=oldAfter.apply(this,arguments);
+      try{Promise.resolve(p).finally(function(){setTimeout(function(){try{if(typeof window.renderObservacoes==='function') window.renderObservacoes();}catch(e){} try{if(typeof window.renderSumario==='function') window.renderSumario();}catch(e){} patchScreen();},160);});}catch(e){}
+      return p;
+    };
+    nf.__v102=true; window.afterExcelImport=nf;
+  }
+}
+function installHooks(){
+  wrapBuild(); wrapImports();
+  if(typeof window.renderSumario==='function' && !window.renderSumario.__v102){
+    var oldR=window.renderSumario;
+    var nr=function(){var r=oldR.apply(this,arguments); setTimeout(patchScreen,40); setTimeout(patchScreen,220); setTimeout(patchScreen,800); return r;};
+    nr.__v102=true; window.renderSumario=nr;
+    try{if(window.PAGE_RENDERS) window.PAGE_RENDERS.sumario=window.renderSumario;}catch(e){}
+  }
+  if(typeof window.patchSumario==='function' && !window.patchSumario.__v102){
+    var oldPs=window.patchSumario;
+    var nps=function(){var r=oldPs.apply(this,arguments); setTimeout(patchScreen,20); setTimeout(patchScreen,180); return r;};
+    nps.__v102=true; window.patchSumario=nps;
+  }
+  if(typeof window.buildSumarioSlideHtml==='function' && !window.buildSumarioSlideHtml.__v102){
+    var oldB=window.buildSumarioSlideHtml;
+    var nb=function(){return patchSlideHtml(oldB.apply(this,arguments));};
+    nb.__v102=true; window.buildSumarioSlideHtml=nb;
+  }
+  if(typeof window.gerarRelatorio==='function' && !window.gerarRelatorio.__v102){
+    var oldG=window.gerarRelatorio;
+    var ng=function(){var r=oldG.apply(this,arguments); setTimeout(function(){stripTextareasForExport(document); patchScreen();},120); return r;};
+    ng.__v102=true; window.gerarRelatorio=ng;
+  }
+  if(typeof window.exportarPPTX==='function' && !window.exportarPPTX.__v102){
+    var oldP=window.exportarPPTX;
+    var np=function(){wrapBuild(); patchScreen(); try{stripTextareasForExport(document.getElementById('report-content')||document);}catch(e){} return oldP.apply(this,arguments);};
+    np.__v102=true; window.exportarPPTX=np;
+  }
+}
+function init(){installHooks(); patchScreen(); setTimeout(function(){installHooks();patchScreen();},600); setTimeout(function(){installHooks();patchScreen();},1800);}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
+})();
+</script>
+
+
+<script>
+/* v104 — correção direta: Detalhe do Sumário realmente editável no HTML renderizado, salvo e usado no PPT. */
+(function(){
+  'use strict';
+  var KEY='siog_sumario_pontos_detalhes_v104';
+  var COMPAT=['siog_sumario_pontos_detalhes_v103','siog_sumario_pontos_detalhes_v102','siog_sumario_pontos_detalhes_v101','siog_sumario_pontos_detalhes_v75'];
+  function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function read(k){try{return JSON.parse(localStorage.getItem(k)||'{}')||{};}catch(e){return {};}}
+  function write(k,o){try{localStorage.setItem(k,JSON.stringify(o||{}));}catch(e){}}
+  function save(title,value){
+    var n=norm(title); if(!n)return; var val=String(value||'').trim();
+    var o=read(KEY); o[n]=val; write(KEY,o);
+    COMPAT.forEach(function(k){var x=read(k); x[n]=val; x[String(title||'')]=val; write(k,x);});
+  }
+  function get(title,fallback){
+    var n=norm(title); var keys=[KEY].concat(COMPAT);
+    for(var i=0;i<keys.length;i++){var o=read(keys[i]); if(Object.prototype.hasOwnProperty.call(o,n)) return o[n]; if(Object.prototype.hasOwnProperty.call(o,String(title||''))) return o[String(title||'')];}
+    return fallback==null?'':String(fallback);
+  }
+  function moneyNum(v){
+    if(v==null||v==='')return 0; if(typeof v==='number')return isFinite(v)?v:0;
+    var s=String(v).replace(/R\$|\s/g,'');
+    if(s.indexOf(',')>=0 && s.indexOf('.')>=0) s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(',','.');
+    var n=Number(s); return isFinite(n)?n:0;
+  }
+  function carteira(){
+    try{ if(typeof window.calc==='function'){var t=window.calc(); if(t&&moneyNum(t.carteira)>0)return moneyNum(t.carteira);} }catch(e){}
+    try{ if(typeof window.getMedCons==='function'){return (window.getMedCons()||[]).reduce(function(s,x){return s+moneyNum(x&&x.contrato);},0);} }catch(e){}
+    try{ if(typeof window.getCons==='function'){return (window.getCons()||[]).reduce(function(s,x){return s+moneyNum(x&&x.contrato);},0);} }catch(e){}
+    return 0;
+  }
+  function fmtM(v){
+    var n=moneyNum(v); if(!(n>0))return '';
+    try{ if(typeof window.fmtM0==='function') return window.fmtM0(n); }catch(e){}
+    return 'R$ '+Math.trunc(n/1000000).toLocaleString('pt-BR')+'M';
+  }
+  window.__siogSaveSumarioDetalhe=save;
+  window.__siogGetSumarioDetalhe=function(title,fallback){return esc(get(title,fallback));};
+  window.__siogCarteiraMedicoesFmt=function(){return fmtM(carteira())||'R$ 186M';};
+  window.__siogSumarioDetalheInput=function(title,detail){
+    var val=get(title,detail);
+    return '<textarea class="sumario-detalhe-edit-v104" data-ponto="'+esc(title)+'" rows="2" '+
+      'oninput="window.__siogSaveSumarioDetalhe&&window.__siogSaveSumarioDetalhe(this.dataset.ponto,this.value)" '+
+      'onchange="window.__siogSaveSumarioDetalhe&&window.__siogSaveSumarioDetalhe(this.dataset.ponto,this.value)" '+
+      'style="display:block;width:100%;min-width:360px;min-height:34px;box-sizing:border-box;background:rgba(232,119,34,.10);border:1px solid rgba(232,119,34,.75);border-radius:6px;color:var(--tx);font:inherit;font-size:12px;line-height:1.25;padding:5px 7px;resize:vertical;white-space:normal;overflow:auto">'+esc(val)+'</textarea>';
+  };
+  function repaint(){
+    try{document.querySelectorAll('#sumario-content textarea.sumario-detalhe-edit-v104').forEach(function(ta){
+      var title=ta.dataset.ponto||''; var val=get(title,ta.value); if(document.activeElement!==ta && ta.value!==val)ta.value=val;
+    });}catch(e){}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',repaint); else setTimeout(repaint,50);
+})();
+</script>
 </body>
 </html>
+
+<script>
+/* v101 — Sumário Executivo: detalhe editável nos Pontos de Atenção + Carteira Total alinhada às Medições/PPT.
+   Patch isolado: não altera bases, comentários, medições, backup ou importações existentes. */
+(function(){
+'use strict';
+var KEY='siog_sumario_pontos_detalhes_v101';
+function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function n(v){
+  if(v==null||v==='') return 0;
+  if(typeof v==='number') return isFinite(v)?v:0;
+  var s=String(v).replace(/R\$|\s/g,'');
+  if(s.indexOf(',')>=0 && s.indexOf('.')>=0) s=s.replace(/\./g,'').replace(',','.');
+  else s=s.replace(',','.');
+  var x=Number(s); return isFinite(x)?x:0;
+}
+function load(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){return {};}}
+function save(obj){localStorage.setItem(KEY,JSON.stringify(obj||{}));}
+function rowKey(titulo){return norm(titulo||'');}
+function getCarteiraMedicoes(){
+  try{
+    if(typeof window.getMedCons==='function'){
+      return (window.getMedCons()||[]).reduce(function(s,m){return s+n(m&&m.contrato);},0);
+    }
+  }catch(e){}
+  try{
+    var seen={};
+    return (window.MEDICOES||[]).reduce(function(s,m){
+      var k=String((m&&m.id)||'')+'|'+String((m&&m.cliente)||'');
+      if(seen[k]) return s; seen[k]=1;
+      return s+n(m&&m.valor_contrato);
+    },0);
+  }catch(e){return 0;}
+}
+function fmtR(v){try{return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0,minimumFractionDigits:0}).format(Math.round(n(v)));}catch(e){return 'R$ '+Math.round(n(v)).toLocaleString('pt-BR');}}
+function fmtM(v){var x=Math.trunc(Math.abs(n(v))/1000000);return (n(v)<0?'-':'')+'R$ '+x.toLocaleString('pt-BR')+'M';}
+function applyManualToData(data){
+  data=data||{};
+  var det=load();
+  if(Array.isArray(data.pontosPrioritarios)){
+    data.pontosPrioritarios=data.pontosPrioritarios.map(function(p){
+      var cp=Object.assign({},p||{});
+      var k=rowKey(cp.titulo);
+      if(k && Object.prototype.hasOwnProperty.call(det,k)) cp.detalhe=det[k];
+      return cp;
+    });
+  }
+  var carteira=getCarteiraMedicoes();
+  if(carteira>0){
+    data.carteiraV101=carteira;
+    data.fmtCarteira=fmtR(carteira);
+    data.fmtCarteiraM=fmtM(carteira);
+  }
+  return data;
+}
+function installBuildPatch(){
+  if(typeof window.buildSumarioData!=='function' || window.buildSumarioData.__v101) return;
+  var old=window.buildSumarioData;
+  var wrapped=function(){return applyManualToData(old.apply(this,arguments)||{});};
+  wrapped.__v101=true;
+  window.buildSumarioData=wrapped;
+}
+function patchKpiGrid(root){
+  root=root||document;
+  var carteira=getCarteiraMedicoes(); if(!(carteira>0)) return;
+  var labels=['carteira total','carteira'];
+  Array.prototype.slice.call(root.querySelectorAll('.kpi, div')).forEach(function(card){
+    var lblEl=card.querySelector&&card.querySelector('.kpi-lbl, small, div:first-child');
+    var valEl=card.querySelector&&card.querySelector('.kpi-val, b');
+    if(!lblEl||!valEl) return;
+    var l=norm(lblEl.textContent||'');
+    if(labels.indexOf(l)>=0){
+      valEl.textContent=fmtM(carteira);
+      if(l==='carteira') lblEl.textContent='Carteira Total';
+    }
+  });
+}
+function makeDetailsEditable(){
+  var host=document.getElementById('sumario-content'); if(!host) return;
+  var cards=Array.prototype.slice.call(host.querySelectorAll('.card, div'));
+  var target=cards.find(function(el){return /pontos de aten[cç][aã]o priorit[aá]rios/i.test(el.textContent||'') && el.querySelector('table tbody');});
+  if(!target) target=host;
+  var det=load();
+  Array.prototype.slice.call(target.querySelectorAll('table tbody tr')).forEach(function(row){
+    var cells=row.children; if(!cells||cells.length<3) return;
+    var titulo=(cells[1].textContent||'').trim();
+    var detailCell=cells[2];
+    var k=rowKey(titulo); if(!k) return;
+    if(Object.prototype.hasOwnProperty.call(det,k)) detailCell.textContent=det[k];
+    if(detailCell.dataset.v101Edit==='1') return;
+    detailCell.dataset.v101Edit='1';
+    detailCell.contentEditable='true';
+    detailCell.spellcheck=true;
+    detailCell.title='Clique e edite o detalhe. O texto salvo será usado também no PowerPoint.';
+    detailCell.style.cursor='text';
+    detailCell.style.outline='1px dashed rgba(232,119,34,.35)';
+    detailCell.style.borderRadius='4px';
+    detailCell.style.background='rgba(232,119,34,.05)';
+    detailCell.addEventListener('focus',function(){detailCell.style.outline='2px solid rgba(232,119,34,.75)';});
+    function persist(){
+      var d=load(); d[k]=(detailCell.textContent||'').trim(); save(d);
+      try{ if(typeof window.showSaveStatus==='function') window.showSaveStatus('✓ Detalhe do Sumário salvo'); }catch(e){}
+    }
+    detailCell.addEventListener('blur',function(){detailCell.style.outline='1px dashed rgba(232,119,34,.35)'; persist();});
+    detailCell.addEventListener('keydown',function(ev){
+      if(ev.key==='Enter' && !ev.shiftKey){ev.preventDefault(); detailCell.blur();}
+    });
+  });
+}
+function patchSystem(){installBuildPatch(); patchKpiGrid(document); makeDetailsEditable();}
+function patchSlideHtml(html){
+  try{
+    var carteira=getCarteiraMedicoes();
+    if(carteira>0){
+      html=String(html).replace(/(<div[^>]*>Carteira Total<\/div>\s*<div[^>]*>)(.*?)(<\/div>)/i,'$1'+fmtM(carteira)+'$3');
+    }
+    var det=load();
+    var s=(typeof window.buildSumarioData==='function'?window.buildSumarioData():{})||{};
+    if(Array.isArray(s.pontosPrioritarios)){
+      s.pontosPrioritarios.forEach(function(p){
+        var k=rowKey(p&&p.titulo);
+        if(!k || !Object.prototype.hasOwnProperty.call(det,k)) return;
+        var old=esc((p&&p.detalhe)||'');
+        var neu=esc(det[k]);
+        if(old && old!==neu) html=String(html).split(old).join(neu);
+      });
+    }
+  }catch(e){}
+  return html;
+}
+function installRenderHooks(){
+  if(typeof window.renderSumario==='function' && !window.renderSumario.__v101){
+    var oldR=window.renderSumario;
+    var nr=function(){var r=oldR.apply(this,arguments); setTimeout(patchSystem,30); setTimeout(patchSystem,250); return r;};
+    nr.__v101=true; window.renderSumario=nr;
+    try{ if(window.PAGE_RENDERS) window.PAGE_RENDERS.sumario=window.renderSumario; }catch(e){}
+  }
+  if(typeof window.buildSumarioSlideHtml==='function' && !window.buildSumarioSlideHtml.__v101){
+    var oldB=window.buildSumarioSlideHtml;
+    var nb=function(){return patchSlideHtml(oldB.apply(this,arguments));};
+    nb.__v101=true; window.buildSumarioSlideHtml=nb;
+  }
+  if(typeof window.gerarRelatorio==='function' && !window.gerarRelatorio.__v101){
+    var oldG=window.gerarRelatorio;
+    var ng=function(){var r=oldG.apply(this,arguments); setTimeout(function(){patchKpiGrid(document);makeDetailsEditable();},80); setTimeout(function(){patchKpiGrid(document);makeDetailsEditable();},400); return r;};
+    ng.__v101=true; window.gerarRelatorio=ng;
+  }
+  if(typeof window.exportarPPTX==='function' && !window.exportarPPTX.__v101){
+    var oldP=window.exportarPPTX;
+    var np=function(){installBuildPatch(); patchSystem(); return oldP.apply(this,arguments);};
+    np.__v101=true; window.exportarPPTX=np;
+  }
+}
+function init(){installBuildPatch(); installRenderHooks(); patchSystem(); setTimeout(function(){installBuildPatch();installRenderHooks();patchSystem();},1000);}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(init,500);}); else setTimeout(init,300);
+})();
+</script>
+
+<script>
+/* v103 — Sumário Executivo: edição real do campo Detalhe + Carteira igual à aba Medições (R$ 186M) + export PPT.
+   Patch final e isolado: não altera bases, medições ou comentários existentes. */
+(function(){
+  'use strict';
+  var KEY103='siog_sumario_pontos_detalhes_v103';
+  var LEGACY_KEYS=['siog_sumario_pontos_detalhes_v102','siog_sumario_pontos_detalhes_v101','siog_sumario_pontos_detalhes_v75'];
+  function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function readJson(k){try{return JSON.parse(localStorage.getItem(k)||'{}')||{};}catch(e){return {};}}
+  function writeJson(k,o){try{localStorage.setItem(k,JSON.stringify(o||{}));}catch(e){}}
+  function allDetails(){
+    var out={};
+    LEGACY_KEYS.forEach(function(k){var o=readJson(k); Object.keys(o).forEach(function(x){out[norm(x)]=o[x];});});
+    var n=readJson(KEY103); Object.keys(n).forEach(function(x){out[norm(x)]=n[x];});
+    return out;
+  }
+  function saveDetail(title,value){
+    var k=norm(title); if(!k) return;
+    var o=readJson(KEY103); o[k]=String(value||'').trim(); writeJson(KEY103,o);
+    // mantém compatibilidade com os patches antigos que já participam do PowerPoint/importação
+    LEGACY_KEYS.forEach(function(lk){var old=readJson(lk); old[title]=o[k]; old[k]=o[k]; writeJson(lk,old);});
+  }
+  function manualFor(title){var o=allDetails(); var k=norm(title); return Object.prototype.hasOwnProperty.call(o,k)?o[k]:null;}
+  function moneyNum(v){
+    if(v==null||v==='')return 0; if(typeof v==='number')return isFinite(v)?v:0;
+    var s=String(v).replace(/R\$|\s/g,'');
+    if(s.indexOf(',')>=0 && s.indexOf('.')>=0)s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(',','.');
+    var n=Number(s); return isFinite(n)?n:0;
+  }
+  function carteiraMedicoes(){
+    try{ if(typeof window.calc==='function'){ var t=window.calc(); if(t&&moneyNum(t.carteira)>0) return moneyNum(t.carteira); } }catch(e){}
+    try{ if(typeof window.getCons==='function'){ return (window.getCons()||[]).reduce(function(s,x){return s+moneyNum(x&&x.contrato);},0); } }catch(e){}
+    try{ if(typeof window.getMedCons==='function'){ return (window.getMedCons()||[]).reduce(function(s,x){return s+moneyNum(x&&x.contrato);},0); } }catch(e){}
+    try{
+      var seen={};
+      return (window.MEDICOES||[]).reduce(function(s,m){var k=String(m&&m.id)+'|'+String(m&&m.cliente); if(seen[k])return s; seen[k]=1; return s+moneyNum(m&&m.valor_contrato);},0);
+    }catch(e){return 0;}
+  }
+  function fmtM(v){
+    try{ if(typeof window.fmtM0==='function') return window.fmtM0(v); }catch(e){}
+    var n=moneyNum(v), m=Math.trunc(Math.abs(n)/1000000); return (n<0?'-':'')+'R$ '+m.toLocaleString('pt-BR')+'M';
+  }
+  function fmtR(v){try{return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0,minimumFractionDigits:0}).format(Math.round(moneyNum(v)));}catch(e){return 'R$ '+Math.round(moneyNum(v)).toLocaleString('pt-BR');}}
+  function applyManualToSumarioData(data){
+    data=data||{};
+    var carteira=carteiraMedicoes();
+    if(carteira>0){
+      data.fmtCarteira=fmtM(carteira);
+      data.fmtCarteiraM=fmtM(carteira);
+      data.carteiraV103=carteira;
+      try{ var t=typeof window.calc==='function'?window.calc():null; if(t){ data.fmtRecebido=fmtM(t.rec||0); data.pctRecebido=t.carteira?Math.round((t.rec||0)/t.carteira*100):data.pctRecebido; data.fmtVendaV91=fmtM((t.carteira||0)-(t.loc||0)); data.fmtLocV91=fmtM(t.loc||0); } }catch(e){}
+    }
+    if(Array.isArray(data.pontosPrioritarios)){
+      data.pontosPrioritarios=data.pontosPrioritarios.map(function(p){
+        var cp=Object.assign({},p||{}); var m=manualFor(cp.titulo); if(m!==null) cp.detalhe=m; return cp;
+      });
+    }
+    return data;
+  }
+  function patchBuildData(){
+    if(typeof window.buildSumarioData==='function' && !window.buildSumarioData.__v103_final){
+      var old=window.buildSumarioData;
+      var nw=function(){return applyManualToSumarioData(old.apply(this,arguments)||{});};
+      nw.__v103_final=true; window.buildSumarioData=nw;
+    }
+  }
+  function isPontosTable(tbl){
+    if(!tbl) return false;
+    var txt=norm(tbl.textContent||'');
+    var head=norm((tbl.querySelector('thead')||tbl).textContent||'');
+    var parent=tbl.closest('.card,section,div')||tbl.parentElement;
+    var ptxt=norm(parent&&parent.textContent||'');
+    return head.indexOf('detalhe')>=0 && head.indexOf('ponto')>=0 && ptxt.indexOf('pontos de atencao prioritarios')>=0;
+  }
+  function detailCellInfo(row){
+    var c=row&&row.children; if(!c||c.length<2)return null;
+    // tabela original possui 3 colunas: farol | ponto | detalhe
+    if(c.length>=3) return {title:(c[1].textContent||'').trim(), cell:c[2]};
+    return {title:(c[0].textContent||'').trim(), cell:c[1]};
+  }
+  function makeEditableCell(cell,title){
+    if(!cell||!title) return;
+    var manual=manualFor(title);
+    var current=manual!==null?manual:(cell.querySelector('textarea,input')?(cell.querySelector('textarea,input').value||''):(cell.textContent||'').trim());
+    if(cell.dataset.v103Editor==='1'){
+      var ta=cell.querySelector('textarea[data-v103="1"]');
+      if(ta && manual!==null && ta.value!==manual) ta.value=manual;
+      return;
+    }
+    cell.dataset.v103Editor='1';
+    cell.innerHTML='';
+    cell.style.padding='3px 6px';
+    cell.style.overflow='visible';
+    cell.style.whiteSpace='normal';
+    cell.style.maxWidth='none';
+    var ta=document.createElement('textarea');
+    ta.setAttribute('data-v103','1');
+    ta.value=current;
+    ta.title='Edite aqui o detalhe. O texto salvo será usado no PowerPoint.';
+    ta.rows=2;
+    ta.style.width='100%';
+    ta.style.minWidth='260px';
+    ta.style.minHeight='34px';
+    ta.style.background='rgba(232,119,34,.08)';
+    ta.style.border='1px solid rgba(232,119,34,.55)';
+    ta.style.borderRadius='6px';
+    ta.style.color='var(--tx)';
+    ta.style.font='inherit';
+    ta.style.fontSize='12px';
+    ta.style.lineHeight='1.25';
+    ta.style.padding='5px 7px';
+    ta.style.boxSizing='border-box';
+    ta.style.resize='vertical';
+    ta.addEventListener('input',function(){saveDetail(title,ta.value);});
+    ta.addEventListener('change',function(){saveDetail(title,ta.value);});
+    ta.addEventListener('blur',function(){saveDetail(title,ta.value); try{ if(typeof window.showSaveStatus==='function') window.showSaveStatus('✓ Detalhe do Sumário salvo'); }catch(e){} });
+    cell.appendChild(ta);
+  }
+  function patchEditableDetails(){
+    var host=document.getElementById('sumario-content'); if(!host) return;
+    Array.prototype.slice.call(host.querySelectorAll('table')).forEach(function(tbl){
+      if(!isPontosTable(tbl)) return;
+      Array.prototype.slice.call(tbl.querySelectorAll('tbody tr')).forEach(function(row){
+        var info=detailCellInfo(row); if(info&&info.title&&info.cell) makeEditableCell(info.cell,info.title);
+      });
+    });
+  }
+  function patchKpis(){
+    var host=document.getElementById('sumario-content')||document;
+    var carteira=carteiraMedicoes(); if(!(carteira>0)) return;
+    Array.prototype.slice.call(host.querySelectorAll('.kpi')).forEach(function(card){
+      var lbl=card.querySelector('.kpi-lbl, small, div:first-child'); var val=card.querySelector('.kpi-val, b');
+      if(!lbl||!val)return; var l=norm(lbl.textContent||'');
+      if(l==='carteira'||l==='carteira total'){
+        lbl.textContent='Carteira Total';
+        val.textContent=fmtM(carteira);
+        val.style.whiteSpace='nowrap'; val.style.overflow='hidden'; val.style.textOverflow='ellipsis';
+      }
+    });
+  }
+  function patchScreen(){ patchBuildData(); patchKpis(); patchEditableDetails(); }
+  function patchSlideHtml(html){
+    try{
+      var carteira=carteiraMedicoes();
+      if(carteira>0){
+        html=String(html).replace(/(Carteira Total[^<]*<\/div>\s*<div[^>]*>)(.*?)(<\/div>)/i,'$1'+esc(fmtM(carteira))+'$3');
+        html=html.replace(/(Carteira[^<]*<\/div>\s*<div[^>]*>)(.*?)(<\/div>)/i,'$1'+esc(fmtM(carteira))+'$3');
+      }
+      var s=typeof window.buildSumarioData==='function'?window.buildSumarioData():{};
+      if(s&&Array.isArray(s.pontosPrioritarios)){
+        s.pontosPrioritarios.forEach(function(p){
+          var m=manualFor(p&&p.titulo); if(m===null) return;
+          var old=esc((p&&p.detalhe)||''); var neu=esc(m);
+          if(old && old!==neu) html=html.split(old).join(neu);
+        });
+      }
+    }catch(e){}
+    return html;
+  }
+  function patchExports(){
+    if(typeof window.buildSumarioSlideHtml==='function' && !window.buildSumarioSlideHtml.__v103_final){
+      var oldB=window.buildSumarioSlideHtml;
+      var nb=function(){ patchBuildData(); return patchSlideHtml(oldB.apply(this,arguments)); };
+      nb.__v103_final=true; window.buildSumarioSlideHtml=nb;
+    }
+    if(typeof window.exportarPPTX==='function' && !window.exportarPPTX.__v103_final){
+      var oldP=window.exportarPPTX;
+      var np=function(){ patchBuildData(); patchScreen(); return oldP.apply(this,arguments); };
+      np.__v103_final=true; window.exportarPPTX=np;
+    }
+  }
+  function patchRender(){
+    if(typeof window.renderSumario==='function' && !window.renderSumario.__v103_final){
+      var oldR=window.renderSumario;
+      var nr=function(){
+        patchBuildData();
+        var r=oldR.apply(this,arguments);
+        [30,160,450,900,1600].forEach(function(ms){setTimeout(patchScreen,ms);});
+        return r;
+      };
+      nr.__v103_final=true; window.renderSumario=nr;
+      try{ if(window.PAGE_RENDERS) window.PAGE_RENDERS.sumario=window.renderSumario; }catch(e){}
+    }
+  }
+  function patchImports(){
+    // Reaplica a lógica após importação Excel/JSON, sem bloquear substituição dos comentários importados.
+    ['applyStorageData','applyExcelSheets','afterExcelImport','restoreFromBackup','importExcel'].forEach(function(name){
+      var fn=window[name];
+      if(typeof fn==='function' && !fn.__v103_final){
+        var wrapped=function(){ var r=fn.apply(this,arguments); setTimeout(function(){try{ if(typeof window.renderSumario==='function') window.renderSumario(); }catch(e){} patchScreen();},300); return r; };
+        wrapped.__v103_final=true; window[name]=wrapped;
+      }
+    });
+  }
+  function install(){ patchBuildData(); patchRender(); patchExports(); patchImports(); patchScreen(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install); else install();
+  [500,1500,3000].forEach(function(ms){setTimeout(install,ms);});
+  try{
+    var mo=new MutationObserver(function(){ clearTimeout(window.__sumario_v103_timer); window.__sumario_v103_timer=setTimeout(patchScreen,80); });
+    mo.observe(document.documentElement,{childList:true,subtree:true});
+  }catch(e){}
+})();
+</script>
+
+
+
+<script>
+/* v105 — correção exportação: sincroniza textos editados no Sumário antes de gerar PowerPoint e aplica no slide/relatório. */
+(function(){
+  'use strict';
+  if(window.__siog_sumario_v105_ok) return; window.__siog_sumario_v105_ok=true;
+  var KEYS=['siog_sumario_pontos_detalhes_v105','siog_sumario_pontos_detalhes_v104','siog_sumario_pontos_detalhes_v103','siog_sumario_pontos_detalhes_v102','siog_sumario_pontos_detalhes_v101','siog_sumario_pontos_detalhes_v75'];
+  function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function read(k){try{return JSON.parse(localStorage.getItem(k)||'{}')||{};}catch(e){return {};}}
+  function write(k,o){try{localStorage.setItem(k,JSON.stringify(o||{}));}catch(e){}}
+  function save(title,value){
+    var raw=String(title||'').trim(), k=norm(raw); if(!k) return;
+    var val=String(value==null?'':value).trim();
+    KEYS.forEach(function(key){var o=read(key); o[k]=val; o[raw]=val; write(key,o);});
+  }
+  function get(title,fallback){
+    var raw=String(title||'').trim(), k=norm(raw);
+    for(var i=0;i<KEYS.length;i++){var o=read(KEYS[i]); if(Object.prototype.hasOwnProperty.call(o,k)) return String(o[k]||''); if(Object.prototype.hasOwnProperty.call(o,raw)) return String(o[raw]||'');}
+    return fallback==null?'':String(fallback);
+  }
+  function titleFromRow(row){
+    if(!row||!row.children||row.children.length<3) return '';
+    return String((row.children[1]&&row.children[1].textContent)||'').trim();
+  }
+  function isPontosTable(tbl){
+    if(!tbl) return false;
+    /* v109: restringe o patch SOMENTE à tabela de Pontos de Atenção Prioritários.
+       Antes, o container do Sumário fazia o Ranking de Prazo ser tratado como se fosse
+       a tabela de pontos, transformando o campo DESVIO em texto editável. */
+    var headTxt=String(((tbl.querySelector&&tbl.querySelector('thead'))||tbl).textContent||'')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    if(!(headTxt.indexOf('ponto')>=0 && headTxt.indexOf('detalhe')>=0)) return false;
+    var box=tbl.closest ? (tbl.closest('.card,.rel-module,section')||tbl.parentElement) : tbl.parentElement;
+    var txt=String((box&&box.textContent)||tbl.textContent||'');
+    return /pontos\s+de\s+aten[cç][aã]o\s+priorit[aá]rios/i.test(txt);
+  }
+  function syncFromTextareas(root){
+    root=root||document;
+    try{
+      Array.prototype.slice.call(root.querySelectorAll('textarea')).forEach(function(ta){
+        var title=ta.getAttribute('data-ponto')||'';
+        if(!title){var row=ta.closest&&ta.closest('tr'); title=titleFromRow(row);}
+        if(title) save(title,ta.value);
+      });
+    }catch(e){}
+  }
+  function patchPontosTables(root,forExport){
+    root=root||document; syncFromTextareas(root);
+    try{
+      Array.prototype.slice.call(root.querySelectorAll('table')).forEach(function(tbl){
+        if(!isPontosTable(tbl)) return;
+        Array.prototype.slice.call(tbl.querySelectorAll('tbody tr')).forEach(function(row){
+          if(!row.children||row.children.length<3) return;
+          var title=titleFromRow(row); if(!title) return;
+          var td=row.children[2];
+          var ta=td.querySelector&&td.querySelector('textarea');
+          var saved=get(title, ta?ta.value:td.textContent);
+          if(ta && !forExport){ if(document.activeElement!==ta && ta.value!==saved) ta.value=saved; return; }
+          td.innerHTML=''; td.appendChild(document.createTextNode(saved));
+        });
+      });
+    }catch(e){}
+  }
+  function patchHtml(html){
+    try{
+      var div=document.createElement('div'); div.innerHTML=String(html||''); patchPontosTables(div,true); return div.innerHTML;
+    }catch(e){return html;}
+  }
+  function moneyNum(v){
+    if(v==null||v==='')return 0; if(typeof v==='number')return isFinite(v)?v:0;
+    var s=String(v).replace(/R\$|\s/g,''); if(s.indexOf(',')>=0&&s.indexOf('.')>=0)s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(',','.');
+    var n=Number(s); return isFinite(n)?n:0;
+  }
+  function carteira(){
+    try{ if(typeof window.calc==='function'){var t=window.calc(); if(t&&moneyNum(t.carteira)>0)return moneyNum(t.carteira);} }catch(e){}
+    try{ if(typeof window.getMedCons==='function'){var v=(window.getMedCons()||[]).reduce(function(s,m){return s+moneyNum(m&&m.contrato);},0); if(v>0)return v;} }catch(e){}
+    return 186000000;
+  }
+  function fmtM(v){return 'R$ '+Math.trunc(moneyNum(v)/1000000).toLocaleString('pt-BR')+'M';}
+  function patchCarteira(root){
+    root=root||document; var v=fmtM(carteira());
+    try{Array.prototype.slice.call(root.querySelectorAll('.kpi')).forEach(function(kpi){
+      var lbl=kpi.querySelector('.kpi-lbl'), val=kpi.querySelector('.kpi-val');
+      if(lbl&&val&&/carteira/i.test(lbl.textContent||'')){lbl.textContent='Carteira Total'; val.textContent=v;}
+    });}catch(e){}
+  }
+  window.__siogSaveSumarioDetalhe=save;
+  window.__siogGetSumarioDetalhe=function(title,fallback){return esc(get(title,fallback));};
+  window.__siogCarteiraMedicoesFmt=function(){return fmtM(carteira());};
+  function applyScreen(){syncFromTextareas(document); patchPontosTables(document.getElementById('sumario-content')||document,false); patchCarteira(document);}
+  function install(){
+    if(typeof window.buildSumarioSlideHtml==='function' && !window.buildSumarioSlideHtml.__v105){
+      var oldB=window.buildSumarioSlideHtml;
+      var nb=function(){syncFromTextareas(document); return patchHtml(oldB.apply(this,arguments));};
+      nb.__v105=true; window.buildSumarioSlideHtml=nb;
+    }
+    if(typeof window.gerarRelatorio==='function' && !window.gerarRelatorio.__v105){
+      var oldG=window.gerarRelatorio;
+      var ng=function(){syncFromTextareas(document); var r=oldG.apply(this,arguments); setTimeout(function(){var rc=document.getElementById('report-content'); if(rc){patchPontosTables(rc,true); patchCarteira(rc);}},30); return r;};
+      ng.__v105=true; window.gerarRelatorio=ng;
+    }
+    if(typeof window.exportarPPTX==='function' && !window.exportarPPTX.__v105){
+      var oldP=window.exportarPPTX;
+      var np=function(){install(); syncFromTextareas(document); var rc=document.getElementById('report-content'); if(rc){patchPontosTables(rc,true); patchCarteira(rc);} return oldP.apply(this,arguments);};
+      np.__v105=true; window.exportarPPTX=np;
+    }
+    applyScreen();
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(install,400); setTimeout(install,1400);});
+  else {setTimeout(install,100); setTimeout(install,1000);}
+})();
+</script>
+
+
+<script>
+/* v107 — libera o lápis dos comentários sem alterar/importar/zerar dados. */
+(function(){
+  'use strict';
+  if(window.__siog_obs_lapis_v107) return; window.__siog_obs_lapis_v107=true;
+
+  function modalAberto(){
+    var m=document.getElementById('mo-obs');
+    return !!(m && m.classList && m.classList.contains('open'));
+  }
+  function getIdx(btn){
+    var oc=String((btn&&btn.getAttribute&&btn.getAttribute('onclick'))||'');
+    var m=oc.match(/openObsModal\s*\(\s*(\d+)/);
+    if(m) return parseInt(m[1],10);
+    var box=btn && btn.closest ? btn.closest('[data-obs-key]') : null;
+    if(box){
+      var key=String(box.getAttribute('data-obs-key')||'');
+      try{
+        if(typeof window.__siog_obs_key==='function' && Array.isArray(window.OBSERVACOES)){
+          var i=window.OBSERVACOES.findIndex(function(o,j){return String(window.__siog_obs_key(o,j))===key;});
+          if(i>=0) return i;
+        }
+      }catch(e){}
+      try{
+        if(Array.isArray(window.OBSERVACOES)){
+          var i2=window.OBSERVACOES.findIndex(function(o){return String((o&&o.id_seq)||(o&&o.id)||'')===key;});
+          if(i2>=0) return i2;
+        }
+      }catch(e){}
+    }
+    return -1;
+  }
+  function getOrigem(btn, idx){
+    var oc=String((btn&&btn.getAttribute&&btn.getAttribute('onclick'))||'');
+    var m=oc.match(/openObsModal\s*\([^,]+,\s*['\"]([^'\"]+)['\"]/);
+    if(m) return m[1];
+    if(btn && btn.closest){
+      if(btn.closest('#crono-comments')) return 'Cronograma';
+      if(btn.closest('#med-comments')) return 'Financeiro';
+    }
+    try{return (window.OBSERVACOES[idx]||{}).tipo;}catch(e){}
+    return undefined;
+  }
+  function abrir(idx, origem){
+    try{
+      if(typeof window.openObsModal==='function'){
+        window.openObsModal(idx, origem);
+        if(modalAberto()) return true;
+      }
+    }catch(e){}
+    try{
+      var o=(window.OBSERVACOES||[])[idx];
+      if(!o) return false;
+      if(typeof window._editObsIdx!=='undefined') window._editObsIdx=idx;
+      try{ _editObsIdx=idx; }catch(_e){}
+      var t=document.getElementById('mo-obs-title'); if(t) t.textContent='Editar Bloco';
+      var tipo=document.getElementById('fo-tipo');
+      if(tipo){ Array.prototype.forEach.call(tipo.options,function(op){op.disabled=false;op.hidden=false;}); tipo.value=o.tipo||origem||'Geral da Semana'; }
+      var obra=document.getElementById('fo-obra');
+      try{ if(obra && typeof window.fillObraSelectFromReferencias==='function') window.fillObraSelectFromReferencias(obra,{firstHtml:'<option value="">— Geral / Sem obra —</option>',mode:'obra'}); }catch(_e){}
+      if(obra) obra.value=o.obra||'';
+      var sem=document.getElementById('fo-semana'); if(sem) sem.value=o.semana||'';
+      var cor=document.getElementById('fo-cor'); if(cor) cor.value=o.cor||'n';
+      var tit=document.getElementById('fo-titulo'); if(tit) tit.value=o.titulo||'';
+      var txt=document.getElementById('fo-texto'); if(txt) txt.value=o.texto||'';
+      if(typeof window.openMo==='function') window.openMo('mo-obs'); else { var mo=document.getElementById('mo-obs'); if(mo) mo.classList.add('open'); }
+      setTimeout(function(){try{var x=document.getElementById('fo-texto'); if(x) x.focus();}catch(_e){}},50);
+      return true;
+    }catch(e){return false;}
+  }
+  function ehLapis(btn){
+    if(!btn) return false;
+    var oc=String(btn.getAttribute('onclick')||'');
+    var txt=String(btn.textContent||'').trim();
+    return /openObsModal\s*\(/.test(oc) || txt==='✏' || txt.toLowerCase()==='editar';
+  }
+  function preparar(root){
+    try{
+      Array.prototype.forEach.call((root||document).querySelectorAll('button'),function(b){
+        if(!ehLapis(b)) return;
+        b.type='button';
+        b.draggable=false;
+        b.style.pointerEvents='auto';
+        b.style.cursor='pointer';
+        b.style.position='relative';
+        b.style.zIndex='50';
+        b.addEventListener('mousedown',function(ev){ev.stopPropagation();},true);
+        b.addEventListener('dragstart',function(ev){ev.preventDefault();ev.stopPropagation();return false;},true);
+      });
+    }catch(e){}
+  }
+  document.addEventListener('click',function(ev){
+    var btn=ev.target && ev.target.closest ? ev.target.closest('button') : null;
+    if(!btn || !ehLapis(btn)) return;
+    var idx=getIdx(btn);
+    if(!(idx>=0)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if(ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+    abrir(idx,getOrigem(btn,idx));
+    return false;
+  },true);
+  function instalar(){preparar(document);}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(instalar,200);setTimeout(instalar,1000);});
+  else {setTimeout(instalar,100);setTimeout(instalar,800);}
+  try{new MutationObserver(function(){clearTimeout(window.__siog_lapis_v107_timer);window.__siog_lapis_v107_timer=setTimeout(instalar,100);}).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
+})();
+</script>
+
+
+<script>
+/* v110 — Ajuste exclusivo do PowerPoint: Sumário Executivo reorganizado e valores do Resultado Consolidado abreviados. Não altera nem reinicializa dados. */
+(function(){
+  'use strict';
+  if(window.__siog_sumario_ppt_v110) return;
+  window.__siog_sumario_ppt_v110=true;
+
+  function norm(t){
+    return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
+  }
+  function compactMoney(v){
+    var n=Number(v);
+    if(!isFinite(n)) n=0;
+    var a=Math.abs(n), div=1, suf='';
+    if(a>=1000000000){div=1000000000;suf='B';}
+    else if(a>=1000000){div=1000000;suf='M';}
+    else if(a>=1000){div=1000;suf='K';}
+    var val=a/div;
+    var txt=(val>=100 && suf ? val.toFixed(0) : val.toFixed(1)).replace(/\.0$/,'');
+    return 'R$'+(n<0?'-':'')+txt+suf;
+  }
+  function metrics(){
+    try{
+      var k=JSON.parse(localStorage.getItem('siog_resultado_consolidado_metricas_pptx_v65')||'null');
+      return k&&k.m&&k.a?k:null;
+    }catch(e){return null;}
+  }
+  function titleOf(el){
+    if(!el) return '';
+    var first=el.firstElementChild;
+    return norm(first ? first.textContent : el.textContent);
+  }
+  function findBlock(root, phrase){
+    var wanted=norm(phrase), all=Array.prototype.slice.call(root.querySelectorAll('div'));
+    var title=all.find(function(el){return norm(el.textContent)===wanted;});
+    if(!title) title=all.find(function(el){return norm(el.textContent).indexOf(wanted)>=0 && el.children.length===0;});
+    if(!title) return null;
+    var cur=title.parentElement;
+    while(cur && cur!==root){
+      if(cur.querySelector('table') || /display\s*:\s*flex/i.test(cur.getAttribute('style')||'')) return cur;
+      cur=cur.parentElement;
+    }
+    return title.parentElement;
+  }
+  function rebuildResult(root,isLight){
+    Array.prototype.slice.call(root.querySelectorAll('.v83-resultado-ppt,.resultado-consolidado-v80,.resultado-consolidado-v79,#resultado-executivo-export,.v110-resultado-ppt')).forEach(function(x){x.remove();});
+    var k=metrics(); if(!k) return null;
+    var border=isLight?'#dfe3e8':'#2e2e2e', bg=isLight?'#f7f8fa':'#1e1e1e', muted=isLight?'#667085':'#aaa';
+    function pct(v){var n=Number(v)||0;return (n*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';}
+    function C(l,v){return '<div style="background:'+bg+';border:1px solid '+border+';border-top:3px solid #E87722;border-radius:8px;padding:7px 9px;box-sizing:border-box;min-height:55px">'+
+      '<div style="font-size:8px;color:'+muted+';text-transform:uppercase;font-weight:700;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l+'</div>'+
+      '<div style="font-size:16px;font-weight:800;color:#E87722;margin-top:4px;white-space:nowrap">'+v+'</div></div>';}
+    var h='<div class="v110-resultado-ppt" style="margin:0 0 10px 0;border-bottom:1px solid '+border+';padding-bottom:10px">'+
+      '<div style="font-size:11px;font-weight:800;color:#E87722;text-transform:uppercase;margin-bottom:7px">Resultado Econômico Consolidado — Participação CMC</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px">'+
+      C('Mai · Receita',compactMoney(k.m[0]))+C('Mai · Rentab.',compactMoney(k.m[4]))+C('Mai · %',pct(k.m[5]))+
+      C('Acum. · Receita',compactMoney(k.a[0]))+C('Acum. · Rentab.',compactMoney(k.a[4]))+C('Acum. · %',pct(k.a[5]))+
+      '</div></div>';
+    var box=document.createElement('div'); box.innerHTML=h; return box.firstElementChild;
+  }
+  function reorganize(html,isLight){
+    try{
+      var holder=document.createElement('div'); holder.innerHTML=String(html||'');
+      var root=holder.firstElementChild; if(!root) return html;
+      var children=Array.prototype.slice.call(root.children);
+      var header=children[0]||null;
+      var kpis=children.find(function(el){
+        var st=el.getAttribute('style')||'';
+        return /grid-template-columns\s*:\s*repeat\(7,\s*1fr\)/i.test(st) || (el.children&&el.children.length===7&&norm(el.textContent).indexOf('carteira total')>=0);
+      });
+      var pontos=findBlock(root,'Pontos de Atenção Prioritários');
+      var ranking=findBlock(root,'Ranking de Prazo');
+      var radar=findBlock(root,'Radar Financeiro');
+      var resultado=rebuildResult(root,!!isLight);
+      if(!(header&&kpis&&pontos&&ranking&&radar&&resultado)) return holder.innerHTML;
+
+      [header,kpis,pontos,ranking,radar].forEach(function(el){if(el&&el.parentElement)el.parentElement.removeChild(el);});
+      while(root.firstChild) root.removeChild(root.firstChild);
+      root.appendChild(header);
+      root.appendChild(resultado);
+      kpis.style.marginBottom='10px';
+      root.appendChild(kpis);
+
+      var main=document.createElement('div');
+      main.setAttribute('style','display:grid;grid-template-columns:0.95fr 1.55fr;gap:14px;align-items:start');
+      var left=document.createElement('div');
+      left.setAttribute('style','display:flex;flex-direction:column;gap:12px;min-width:0');
+      radar.style.minWidth='0'; ranking.style.minWidth='0'; pontos.style.minWidth='0';
+      left.appendChild(radar); left.appendChild(ranking);
+      main.appendChild(left); main.appendChild(pontos);
+      root.appendChild(main);
+      return holder.innerHTML;
+    }catch(e){return html;}
+  }
+  function install(){
+    if(typeof window.buildSumarioSlideHtml!=='function' || window.buildSumarioSlideHtml.__v110) return;
+    var old=window.buildSumarioSlideHtml;
+    var wrapped=function(isLight){return reorganize(old.apply(this,arguments),!!isLight);};
+    wrapped.__v110=true;
+    window.buildSumarioSlideHtml=wrapped;
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(install,200);setTimeout(install,1200);});
+  else {setTimeout(install,100);setTimeout(install,900);}
+})();
+</script>
