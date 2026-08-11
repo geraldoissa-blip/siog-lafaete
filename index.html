@@ -11010,13 +11010,13 @@ function gerarRelatorio(){
              '<div style="font-size:16px;font-weight:800;color:#E87722;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fmtR(v)+'</div></div>').join('')}
         </div>
         <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:-2px 0 10px;padding:7px 10px;border:1px solid #e5e7eb;border-left:3px solid #E87722;border-radius:6px;background:#fff;font-size:8.5px;color:#667085"><strong style="color:#E87722">Conciliação contratual</strong><span>Adiantamento a compensar: <b style="color:#E87722">${fmtR(tots.ad)}</b></span><span>Faturamento direto: <b style="color:#4a9eff">${fmtR(tots.fd)}</b></span><span>Saldo contratual: <b style="color:${tots.sc<0?'#ff6b6b':'#1a7a3a'}">${fmtR(tots.sc)}</b></span></div>
-        <table class="med-export-table" style="width:100%;border-collapse:collapse;font-size:9.8px;table-layout:fixed"><colgroup><col style="width:24%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:12%"></colgroup><thead><tr style="background:#1a1a1a">
-          ${['Cliente','Contrato','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber','Pend. à Faturar'].map(h=>TH(h,'white-space:normal;word-break:normal;overflow-wrap:normal')).join('')}
+        <table class="med-export-table" style="width:100%;border-collapse:collapse;font-size:9.2px;table-layout:fixed"><colgroup><col style="width:20%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:6%"><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:9%"></colgroup><thead><tr style="background:#1a1a1a">
+          ${['Cliente / Ajustes','Contrato Base','Medido','Faturado','Recebido','% Rec.','NF Venc.','A Receber','Pend. Faturar','Saldo Contr.'].map(h=>TH(h,'white-space:normal;word-break:normal;overflow-wrap:normal')).join('')}
         </tr></thead><tbody>
         ${c2.map(m=>{const pct=m.contrato?(m.rec/m.contrato*100).toFixed(0)+'%':'—';
-          return`<tr style="border-bottom:1px solid #222">${TD('<div style="font-size:9.6px;font-weight:700;color:#111">'+m.cliente+'</div><div style="font-size:7.2px;color:#667085;margin-top:2px;line-height:1.25;white-space:nowrap">Adiant.: <b style="color:#E87722">'+(m.adiant>0?fmtR(m.adiant):'—')+'</b> · Fat. direto: <b style="color:#4a9eff">'+(m.fd>0?fmtR(m.fd):'—')+'</b> · Saldo: <b style="color:'+(m.saldo_contrato<0?'#ff6b6b':'#1a7a3a')+'">'+fmtR(m.saldo_contrato)+'</b></div>','white-space:normal;overflow:visible;word-break:normal')}${[m.contrato,m.med,m.fat].map(v=>TD(fmtR(v),'text-align:right;color:#667085;font-weight:600;white-space:nowrap')).join('')}<td style="padding:5px 8px;text-align:right;color:#48c774;white-space:nowrap">${fmtR(m.rec)}</td>${TD(pct,'text-align:right;white-space:nowrap')}<td style="padding:5px 8px;text-align:right;color:#ff6b6b;white-space:nowrap">${m.nfv>0?fmtR(m.nfv):'—'}</td><td style="padding:5px 8px;text-align:right;white-space:nowrap">${m.ar>0?fmtR(m.ar):'—'}</td><td style="padding:5px 8px;text-align:right;white-space:nowrap;color:#E87722;font-weight:700">${m.pf>0?fmtR(m.pf):'—'}</td></tr>`;
+          return`<tr style="border-bottom:1px solid #222">${TD('<div style="font-size:9.4px;font-weight:700;color:#111">'+m.cliente+'</div><div style="font-size:6.7px;color:#667085;margin-top:2px;line-height:1.25;white-space:normal">Direto <b style="color:#4a9eff">'+(m.fd>0?fmtR(m.fd):'—')+'</b> · Pleito <b style="color:#9b59b6">'+(m.pleito>0?fmtR(m.pleito):'—')+'</b> · Aditivo <b style="color:#008c8c">'+(m.aditivo>0?fmtR(m.aditivo):'—')+'</b></div>','white-space:normal;overflow:visible;word-break:normal')}${[m.contrato,m.med,m.fat].map(v=>TD(fmtR(v),'text-align:right;color:#667085;font-weight:600;white-space:nowrap')).join('')}<td style="padding:5px 8px;text-align:right;color:#48c774;white-space:nowrap">${fmtR(m.rec)}</td>${TD(pct,'text-align:right;white-space:nowrap')}<td style="padding:5px 8px;text-align:right;color:#ff6b6b;white-space:nowrap">${m.nfv>0?fmtR(m.nfv):'—'}</td><td style="padding:5px 8px;text-align:right;white-space:nowrap">${m.ar>0?fmtR(m.ar):'—'}</td><td style="padding:5px 8px;text-align:right;white-space:nowrap;color:#E87722;font-weight:700">${m.pf>0?fmtR(m.pf):'—'}</td><td style="padding:5px 8px;text-align:right;white-space:nowrap;color:${m.saldo_contrato<0?'#ff6b6b':'#1a7a3a'};font-weight:800">${fmtR(m.saldo_contrato)}</td></tr>`;
         }).join('')}
-        <tr style="background:#1a1a1a;font-weight:700"><td style="padding:7px 8px">TOTAL GERAL</td>${[tots.c,tots.m,tots.f].map(v=>TD(fmtR(v),'text-align:right;font-weight:700;white-space:nowrap')).join('')}<td style="padding:7px 8px;text-align:right;color:#48c774;font-weight:700;white-space:nowrap">${fmtR(tots.r)}</td>${TD(tots.c?(tots.r/tots.c*100).toFixed(0)+'%':'—','text-align:right;font-weight:700;white-space:nowrap')}<td style="padding:7px 8px;text-align:right;color:#ff6b6b;font-weight:700;white-space:nowrap">${fmtR(tots.nv)}</td><td style="padding:7px 8px;text-align:right;font-weight:700;white-space:nowrap">${fmtR(tots.ar)}</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#E87722;white-space:nowrap">${fmtR(tots.pf)}</td></tr>
+        <tr style="background:#1a1a1a;font-weight:700"><td style="padding:7px 8px">TOTAL GERAL</td>${[tots.c,tots.m,tots.f].map(v=>TD(fmtR(v),'text-align:right;font-weight:700;white-space:nowrap')).join('')}<td style="padding:7px 8px;text-align:right;color:#48c774;font-weight:700;white-space:nowrap">${fmtR(tots.r)}</td>${TD(tots.c?(tots.r/tots.c*100).toFixed(0)+'%':'—','text-align:right;font-weight:700;white-space:nowrap')}<td style="padding:7px 8px;text-align:right;color:#ff6b6b;font-weight:700;white-space:nowrap">${fmtR(tots.nv)}</td><td style="padding:7px 8px;text-align:right;font-weight:700;white-space:nowrap">${fmtR(tots.ar)}</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:#E87722;white-space:nowrap">${fmtR(tots.pf)}</td><td style="padding:7px 8px;text-align:right;font-weight:800;color:${tots.sc<0?'#ff6b6b':'#1a7a3a'};white-space:nowrap">${fmtR(tots.sc)}</td></tr>
         </tbody></table>
       </div>
       <div>
@@ -11159,7 +11159,7 @@ function __siog_resultadoConsolidadoSlidesHtml_v62(){
 function __siog_updateModeloResultadoStatus_v62(nome){
   const el=document.getElementById('modelo-resultado-status');
   const b=document.getElementById('btn-modelo-resultado');
-  const n=nome||localStorage.getItem('siog_modelo_resultado_nome_v62')||'Resultado_Economico_CMC_Maio2026_CoresLafaete.pptx';
+  const n=nome||localStorage.getItem('siog_modelo_resultado_nome_v62')||'Resultado_Economico_CMC_Junho_2026.pptx';
   if(el) el.innerHTML=`Modelo de Resultado Consolidado: <strong style="color:var(--or)">${String(n).replace(/</g,'&lt;')}</strong> · 27 slides serão anexados após o relatório semanal, na mesma ordem do modelo (páginas 1 a 27). O slide “Obrigado” não será exportado.`;
   if(b) b.style.display='inline-flex';
 }
@@ -13551,7 +13551,7 @@ function executiveBlock(includeRanking){
   return '<div id="resultado-executivo-export" style="margin-top:12px;border-top:2px solid #E87722;padding-top:10px">'+
     '<div style="font-size:11px;font-weight:800;color:#E87722;text-transform:uppercase;margin-bottom:8px">Resultado Econômico Consolidado — Participação CMC</div>'+ 
     '<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:7px">'+
-      card('Mai · Receita Gerencial',executiveValueMillions(t.m[0]),'#E87722')+card('Mai · Rentabilidade no Canteiro',executiveValueMillions(t.m[4]),'#E87722')+card('Mai · Margem',executivePct(t.m[5]),'#E87722')+
+      card(((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Receita Gerencial'),executiveValueMillions(t.m[0]),'#E87722')+card(((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Rentabilidade no Canteiro'),executiveValueMillions(t.m[4]),'#E87722')+card(((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Margem'),executivePct(t.m[5]),'#E87722')+
       card('Acum. · Receita Gerencial',executiveValueMillions(t.a[0]),'#E87722')+card('Acum. · Rentabilidade no Canteiro',executiveValueMillions(t.a[4]),'#E87722')+card('Acum. · Margem',executivePct(t.a[5]),'#E87722')+
     '</div>'+ 
     (includeRanking===false ? '' : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px">'+rankTable('Melhores Resultados Acumulados',r.best)+rankTable('Maiores Pontos de Atenção',r.worst)+'</div>')+ 
@@ -14053,7 +14053,7 @@ function moneyM(v){v=Number(v)||0; return 'R$ '+Math.trunc(Math.abs(v)/1000000).
 function ensureResultadoResumo(root){
   root=root||document; const content=root.querySelector('#report-content')||root; const sum=[...content.querySelectorAll('.rel-module')].find(x=>(x.getAttribute('data-title')||'')==='Sumário Executivo'); if(!sum)return;
   if(sum.querySelector('#resultado-executivo-export'))return;
-  let b=''; try{ if(window.__getResultadoConsolidadoData&&window.__getResultadoConsolidadoParts){ const d=window.__getResultadoConsolidadoData(); const t=(d&&d.totals)||{m:[0,0,0,0,0,0],a:[0,0,0,0,0,0]}; const pct=x=>(Number(x)||0).toLocaleString('pt-BR',{style:'percent',minimumFractionDigits:1,maximumFractionDigits:1}); const card=(l,v)=>'<div style="background:#f7f8fa;border:1px solid #dfe3e8;border-top:3px solid #E87722;border-radius:8px;padding:8px 10px;min-height:58px"><div style="font-size:8.5px;color:#667085;text-transform:uppercase;font-weight:700;letter-spacing:.25px">'+l+'</div><div style="font-size:15px;font-weight:800;color:#E87722;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+v+'</div></div>'; b='<div id="resultado-executivo-export" style="margin-top:12px;border-top:2px solid #E87722;padding-top:10px"><div style="font-size:11px;font-weight:800;color:#E87722;text-transform:uppercase;margin-bottom:8px">Resultado Econômico Consolidado — Participação CMC</div><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:7px">'+card('Mai · Receita Gerencial',moneyM(t.m[0]))+card('Mai · Rentabilidade no Canteiro',moneyM(t.m[4]))+card('Mai · Margem',pct(t.m[5]))+card('Acum. · Receita Gerencial',moneyM(t.a[0]))+card('Acum. · Rentabilidade no Canteiro',moneyM(t.a[4]))+card('Acum. · Margem',pct(t.a[5]))+'</div></div>'; }}catch(e){}
+  let b=''; try{ if(window.__getResultadoConsolidadoData&&window.__getResultadoConsolidadoParts){ const d=window.__getResultadoConsolidadoData(); const t=(d&&d.totals)||{m:[0,0,0,0,0,0],a:[0,0,0,0,0,0]}; const pct=x=>(Number(x)||0).toLocaleString('pt-BR',{style:'percent',minimumFractionDigits:1,maximumFractionDigits:1}); const card=(l,v)=>'<div style="background:#f7f8fa;border:1px solid #dfe3e8;border-top:3px solid #E87722;border-radius:8px;padding:8px 10px;min-height:58px"><div style="font-size:8.5px;color:#667085;text-transform:uppercase;font-weight:700;letter-spacing:.25px">'+l+'</div><div style="font-size:15px;font-weight:800;color:#E87722;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+v+'</div></div>'; b='<div id="resultado-executivo-export" style="margin-top:12px;border-top:2px solid #E87722;padding-top:10px"><div style="font-size:11px;font-weight:800;color:#E87722;text-transform:uppercase;margin-bottom:8px">Resultado Econômico Consolidado — Participação CMC</div><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:7px">'+card(((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Receita Gerencial'),moneyM(t.m[0]))+card(((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Rentabilidade no Canteiro'),moneyM(t.m[4]))+card(((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Margem'),pct(t.m[5]))+card('Acum. · Receita Gerencial',moneyM(t.a[0]))+card('Acum. · Rentabilidade no Canteiro',moneyM(t.a[4]))+card('Acum. · Margem',pct(t.a[5]))+'</div></div>'; }}catch(e){}
   if(b){const box=sum.querySelector('div[style*="background:#fff"]')||sum; box.insertAdjacentHTML('beforeend',b);}
 }
 function apply(){dashPetroContracts(document); ensureResultadoResumo(document);}
@@ -14087,9 +14087,9 @@ function block(){
   return '<div class="resultado-consolidado-v80" style="margin:0 0 16px 0;border-top:2px solid #E87722;padding-top:10px">'+
     '<div style="font-size:11px;font-weight:800;color:#E87722;text-transform:uppercase;margin-bottom:8px">Resultado Econômico Consolidado — Participação CMC</div>'+
     '<div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px">'+
-      card('Mai · Receita',fmtMoney(k.m[0]))+
-      card('Mai · Rentab.',fmtMoney(k.m[4]))+
-      card('Mai · %',pct(k.m[5]))+
+      card((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Receita',fmtMoney(k.m[0]))+
+      card((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Rentab.',fmtMoney(k.m[4]))+
+      card((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · %',pct(k.m[5]))+
       card('Acum. · Receita',fmtMoney(k.a[0]))+
       card('Acum. · Rentab.',fmtMoney(k.a[4]))+
       card('Acum. · %',pct(k.a[5]))+
@@ -14223,7 +14223,7 @@ function buildResBlock(isLight){
   return '<div class="v83-resultado-ppt" style="margin-top:14px;border-top:2px solid #E87722;padding-top:8px">'+
     '<div style="font-size:11px;font-weight:800;color:#E87722;text-transform:uppercase;margin-bottom:8px">Resultado Econômico Consolidado — Participação CMC</div>'+
     '<div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px">'+
-      C('Mai · Receita',money(k.m[0]))+C('Mai · Rentab.',money(k.m[4]))+C('Mai · %',pct(k.m[5]))+
+      C((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Receita',money(k.m[0]))+C((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Rentab.',money(k.m[4]))+C((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · %',pct(k.m[5]))+
       C('Acum. · Receita',money(k.a[0]))+C('Acum. · Rentab.',money(k.a[4]))+C('Acum. · %',pct(k.a[5]))+
     '</div></div>';
 }
@@ -15362,6 +15362,40 @@ var prev=window.renderMedicoes;if(typeof prev==='function'){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(run,1100);});else setTimeout(run,700);
 })();
 </script>
+
+<script id="siog-v39-mes-resultado-consolidado">
+(function(){
+'use strict';
+/* Competência do Resultado Econômico Consolidado.
+   Usa primeiro a identificação do arquivo/competência importada e, nesta base,
+   assume JUN somente quando nenhuma competência puder ser identificada. */
+window.__siogMesResultadoConsolidado=function(){
+  var txt=[];
+  function add(v){ if(v!==undefined&&v!==null&&String(v).trim()) txt.push(String(v)); }
+  try{
+    var mk=JSON.parse(localStorage.getItem('siog_resultado_consolidado_metricas_pptx_v65')||'null');
+    if(mk){ add(mk.competencia); add(mk.mes); add(mk.month); add(mk.periodo); add(mk.source); add(mk.name); add(mk.filename); }
+  }catch(e){}
+  try{ add(localStorage.getItem('siog_modelo_resultado_nome_v62')); }catch(e){}
+  /* Não usa o texto HTML antigo como fonte prioritária, pois ele próprio continha MAI fixo. */
+  var raw=txt.join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  var meses=[
+    ['janeiro','jan','Jan'],['fevereiro','fev','Fev'],['marco','mar','Mar'],['abril','abr','Abr'],
+    ['maio','mai','Mai'],['junho','jun','Jun'],['julho','jul','Jul'],['agosto','ago','Ago'],
+    ['setembro','set','Set'],['outubro','out','Out'],['novembro','nov','Nov'],['dezembro','dez','Dez']
+  ];
+  var best=null;
+  meses.forEach(function(m){
+    var re=new RegExp('(?:^|[^a-z])(?:'+m[0]+'|'+m[1]+')(?:[^a-z]|$)','g'), mt;
+    while((mt=re.exec(raw))){ if(!best||mt.index>best.i) best={i:mt.index,l:m[2]}; }
+  });
+  if(best) return best.l;
+  var dm=raw.match(/(?:competencia|periodo|mes)?[^0-9]{0,10}(0?[1-9]|1[0-2])[\/\-](?:20)?\d{2}/i);
+  if(dm) return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][Number(dm[1])-1];
+  return 'Jun';
+};
+})();
+</script>
 </body>
 </html>
 
@@ -16009,7 +16043,7 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
     var h='<div class="v110-resultado-ppt" style="margin:0 0 10px 0;border-bottom:1px solid '+border+';padding-bottom:10px">'+
       '<div style="font-size:11px;font-weight:800;color:#E87722;text-transform:uppercase;margin-bottom:7px">Resultado Econômico Consolidado — Participação CMC</div>'+
       '<div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px">'+
-      C('Mai · Receita',compactMoney(k.m[0]))+C('Mai · Rentab.',compactMoney(k.m[4]))+C('Mai · %',pct(k.m[5]))+
+      C((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Receita',compactMoney(k.m[0]))+C((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · Rentab.',compactMoney(k.m[4]))+C((window.__siogMesResultadoConsolidado?window.__siogMesResultadoConsolidado():'Jun')+' · %',pct(k.m[5]))+
       C('Acum. · Receita',compactMoney(k.a[0]))+C('Acum. · Rentab.',compactMoney(k.a[4]))+C('Acum. · %',pct(k.a[5]))+
       '</div></div>';
     var box=document.createElement('div'); box.innerHTML=h; return box.firstElementChild;
@@ -16574,7 +16608,7 @@ function calcCons(){
   var map={}; var hoje=new Date().toISOString().slice(0,10);
   (window.MEDICOES||[]).forEach(function(m){
     var k=String(m.id||'')+'|'+String(m.cliente||'');
-    if(!map[k])map[k]={id:m.id||'',cliente:m.cliente||'',contrato:num(m.valor_contrato),med:0,fat:0,rec_nf:0,rec:0,nfv:0,ar:0,pf:0,adiant_rec:0,adiant_comp:0,adiant:0,fd:0,saldo_contrato:0,saldo_a_medir:0,fechamento:0,diferenca:0,status_fechamento:'',nf_qtd:0};
+    if(!map[k])map[k]={id:m.id||'',cliente:m.cliente||'',contrato:num(m.valor_contrato),contrato_atualizado:num(m.valor_contrato),med:0,fat:0,rec_nf:0,rec:0,nfv:0,ar:0,pf:0,adiant_rec:0,adiant_comp:0,adiant:0,fd:0,fd_lancado:0,fd_ajuste:0,pleito:0,aditivo:0,saldo_contrato:0,saldo_a_medir:0,fechamento:0,diferenca:0,status_fechamento:'',nf_qtd:0};
     var o=map[k]; if(num(m.valor_contrato)>0)o.contrato=num(m.valor_contrato);
     var t=norm(m.tipo),v=num(m.valor),temNF=!!m.data_nf,temRec=!!m.data_rec_real;
     var medicao=(t==='medicao');
@@ -16602,13 +16636,23 @@ function calcCons(){
     }
   });
   Object.keys(map).forEach(function(k){var o=map[k];
+    // Ajustes aprovados informados no cabeçalho por obra. Eles passam a fazer parte
+    // da fonte única usada pela tela e também pela exportação do relatório/PPT.
+    var finAdj={}; try{finAdj=JSON.parse(localStorage.getItem('siog_fin_header_v34')||'{}')||{};}catch(_e){finAdj={};}
+    var a=finAdj[k]||{};
+    o.fd_lancado=o.fd;
+    o.fd_ajuste=num(a.direto);
+    o.pleito=num(a.pleito);
+    o.aditivo=num(a.aditivo);
+    o.fd=o.fd_lancado+o.fd_ajuste;
+    o.contrato_atualizado=o.contrato+o.pleito+o.aditivo;
     o.adiant=Math.max(0,o.adiant_rec-o.adiant_comp);
     o.rec=o.rec_nf+o.adiant_rec;
-    o.saldo_a_medir=o.contrato-o.med-o.fd;
+    o.saldo_a_medir=o.contrato_atualizado-o.med-o.fd;
     o.saldo_contrato=o.saldo_a_medir;
-    // Equação didática: Contrato = NFs emitidas + pendente a faturar + faturamento direto + saldo a medir.
+    // Fechamento usa o contrato atualizado (base + pleitos + aditivos aprovados).
     o.fechamento=o.fat+o.pf+o.fd+o.saldo_a_medir;
-    o.diferenca=o.contrato-o.fechamento;
+    o.diferenca=o.contrato_atualizado-o.fechamento;
     if(Math.abs(o.diferenca)<=0.01)o.status_fechamento='FECHADO';
     else if(o.diferenca<0)o.status_fechamento='EXCEDIDO';
     else o.status_fechamento='DIVERGENTE';
@@ -17339,7 +17383,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 if(window.__siog_v34_header_safe)return; window.__siog_v34_header_safe=true;
 var STORE='siog_fin_header_v34';
 function n(v){v=Number(String(v==null?'':v).replace(/\./g,'').replace(',','.'));return Number.isFinite(v)?v:0;}
-function fmt(v){try{return fmtR(Number(v)||0);}catch(e){return 'R$ '+(Number(v)||0).toLocaleString('pt-BR',{maximumFractionDigits:0});}}
+function fmt(v){return 'R$ '+(Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0});}
 function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
 function load(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')||{};}catch(e){return {};}}
 function save(o){try{localStorage.setItem(STORE,JSON.stringify(o));return true;}catch(e){alert('Não foi possível salvar os ajustes financeiros. Exporte o backup e tente novamente.');return false;}}
@@ -17348,7 +17392,7 @@ function q(){var e=document.getElementById('sm-q');return e?String(e.value||'').
 function baseRows(){try{return typeof window.getMedCons==='function'?(window.getMedCons()||[]):[];}catch(e){return [];}}
 function filtered(){var z=q();return baseRows().filter(function(o){return !z||String(o.id||'').toLowerCase().includes(z)||String(o.cliente||'').toLowerCase().includes(z);});}
 function adjFor(o){var a=load()[key(o)]||{};return {direto:Number(a.direto)||0,pleito:Number(a.pleito)||0,aditivo:Number(a.aditivo)||0};}
-function merged(o){var a=adjFor(o),med=Number(o.med!=null?o.med:o.medido)||0,contr=Number(o.contrato)||0,fdBase=Number(o.fd!=null?o.fd:o.direto)||0;return {id:o.id,cliente:o.cliente,contrato:contr,med:med,direto:fdBase+a.direto,pleito:a.pleito,aditivo:a.aditivo,saldo:contr+a.pleito+a.aditivo-med-(fdBase+a.direto),advRec:Number(o.advRec)||0,advComp:Number(o.advComp)||0,advSaldo:Number(o.advSaldo!=null?o.advSaldo:o.adiant)||0};}
+function merged(o){var a=adjFor(o),med=Number(o.med!=null?o.med:o.medido)||0,contr=Number(o.contrato)||0;var direto=Number(o.fd!=null?o.fd:o.direto)||0;var pleito=Number(o.pleito!=null?o.pleito:a.pleito)||0;var aditivo=Number(o.aditivo!=null?o.aditivo:a.aditivo)||0;var saldo=Number(o.saldo_contrato);if(!Number.isFinite(saldo))saldo=contr+pleito+aditivo-med-direto;return {id:o.id,cliente:o.cliente,contrato:contr,med:med,direto:direto,pleito:pleito,aditivo:aditivo,saldo:saldo,advRec:Number(o.advRec)||0,advComp:Number(o.advComp)||0,advSaldo:Number(o.advSaldo!=null?o.advSaldo:o.adiant)||0};}
 function ensurePanel(){
  var panel=document.getElementById('v34-fin-header'); if(panel)return panel;
  var table=document.getElementById('tbody-med-cons'); if(!table)return null;
@@ -17361,16 +17405,320 @@ function ensurePanel(){
  return panel;
 }
 var current=null;
-function updateSaldo(){if(!current)return;var contr=Number(current.contrato)||0,med=Number(current.med!=null?current.med:current.medido)||0,fdBase=Number(current.fd!=null?current.fd:current.direto)||0,fd=n(document.getElementById('v34-direto').value),pl=n(document.getElementById('v34-pleito').value),ad=n(document.getElementById('v34-aditivo').value),s=contr+pl+ad-med-fdBase-fd;var e=document.getElementById('v34-saldo');e.textContent=fmt(s);e.style.color=s<0?'var(--r2)':'var(--g2)';}
+function updateSaldo(){if(!current)return;var contr=Number(current.contrato)||0,med=Number(current.med!=null?current.med:current.medido)||0,fdBase=Number(current.fd_lancado!=null?current.fd_lancado:((Number(current.fd)||0)-(Number(current.fd_ajuste)||0)))||0,fd=n(document.getElementById('v34-direto').value),pl=n(document.getElementById('v34-pleito').value),ad=n(document.getElementById('v34-aditivo').value),s=contr+pl+ad-med-fdBase-fd;var e=document.getElementById('v34-saldo');e.textContent=fmt(s).replace(/&nbsp;|\u00a0/g,' ');e.style.color=s<0?'var(--r2)':'var(--g2)';}
 function showPanel(){var p=ensurePanel();if(!p)return;var list=filtered();if(!q()||list.length!==1){p.style.display='none';current=null;return;}current=list[0];var a=adjFor(current);p.style.display='block';document.getElementById('v34-proj-name').textContent=String(current.id||'')+' — '+String(current.cliente||'');document.getElementById('v34-direto').value=a.direto?a.direto.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';document.getElementById('v34-pleito').value=a.pleito?a.pleito.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';document.getElementById('v34-aditivo').value=a.aditivo?a.aditivo.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';updateSaldo();}
 function saveCurrent(){if(!current)return;var all=load();all[key(current)]={direto:n(document.getElementById('v34-direto').value),pleito:n(document.getElementById('v34-pleito').value),aditivo:n(document.getElementById('v34-aditivo').value)};if(save(all)){patchSystem();try{showSaveStatus('✓ Ajustes financeiros salvos');}catch(e){};alert('Ajustes financeiros salvos para '+current.cliente+'.');}}
 function detail(o,light){var m=merged(o),muted=light?'#667085':'var(--tx3)',green=light?'#198754':'var(--g2)',bg=light?'#fbfcfd':'rgba(255,255,255,.018)',border=light?'#e5e7eb':'#343434';var items=[['Adiant. recebido',fmt(m.advRec),'#E87722'],['Compensado',fmt(m.advComp),green],['A compensar',fmt(m.advSaldo),m.advSaldo>0?'#E87722':green],['Fat. direto',fmt(m.direto),'#4a9eff'],['Pleito',fmt(m.pleito),m.pleito>0?'#9b59b6':muted],['Aditivo',fmt(m.aditivo),m.aditivo>0?'#00a6a6':muted],['Saldo contrato',fmt(m.saldo),m.saldo<0?'#ff5a5f':green]];return '<div class="v34-faixa" style="display:grid;grid-template-columns:repeat(7,minmax(max-content,1fr));column-gap:16px;width:100%;padding:5px 10px;background:'+bg+';border-top:1px solid '+border+';font-size:'+(light?'7px':'8.3px')+';line-height:1.18">'+items.map(function(it){return '<span style="white-space:nowrap;color:'+muted+'"><span style="font-weight:600">'+it[0]+':</span> <b style="color:'+it[2]+'">'+it[1]+'</b></span>';}).join('')+'</div>';}
 function patchSystem(){try{var by={};baseRows().forEach(function(o){by[key(o)]=o;});var tb=document.getElementById('tbody-med-cons');if(!tb)return;tb.querySelectorAll('tr.v25-detail-row,tr.v27-detail-row,tr.v34-detail-row').forEach(function(x){x.remove();});tb.querySelectorAll('tr[data-key]').forEach(function(tr){var o=by[tr.getAttribute('data-key')];if(!o)return;var d=document.createElement('tr');d.className='v25-detail-row v34-detail-row';var td=document.createElement('td');td.colSpan=Math.max(1,tr.children.length);td.style.cssText='padding:0 8px 3px;border-bottom:1px solid #333;background:#1b1b1b';td.innerHTML=detail(o,false);d.appendChild(td);tr.parentNode.insertBefore(d,tr.nextSibling);});showPanel();}catch(e){console.warn('v34 system',e);}}
-function patchReport(){try{var root=document.getElementById('report-content')||document.getElementById('rel-preview');if(!root)return;var sec=[].slice.call(root.querySelectorAll('.rel-module')).find(function(x){return x.getAttribute('data-title')==='Medições';});if(!sec)return;var table=sec.querySelector('table.med-export-table');if(!table)return;var by={};baseRows().forEach(function(o){by[norm(o.cliente)]=o;});table.querySelectorAll('tbody tr.v25-detail-row,tbody tr.v27-detail-row,tbody tr.v34-detail-row').forEach(function(x){x.remove();});[].slice.call(table.querySelectorAll('tbody tr')).forEach(function(tr){var td=tr.children[0];if(!td||/total geral/i.test(td.textContent||''))return;var name=norm((td.querySelector('div')||td).textContent||'');var o=by[name];if(!o)return;var d=document.createElement('tr');d.className='v25-detail-row v34-detail-row';var x=document.createElement('td');x.colSpan=Math.max(1,tr.children.length);x.style.cssText='padding:0 4px 2px;border-bottom:1px solid #e5e7eb;background:#fff';x.innerHTML=detail(o,true);d.appendChild(x);tr.parentNode.insertBefore(d,tr.nextSibling);});}catch(e){console.warn('v34 report',e);}}
+function patchReport(){/* v35: o relatório já exibe os ajustes e o saldo na própria linha, evitando faixas duplicadas. */}
 function bind(){var s=document.getElementById('sm-q');if(s&&!s.__v34){s.__v34=true;s.addEventListener('input',function(){setTimeout(function(){patchSystem();},30);});}}
 var oldR=window.renderMedicoes;if(typeof oldR==='function'){window.renderMedicoes=function(){var r=oldR.apply(this,arguments);setTimeout(patchSystem,40);return r;};try{renderMedicoes=window.renderMedicoes;if(window.PAGE_RENDERS)window.PAGE_RENDERS.medicoes=window.renderMedicoes;}catch(e){}}
 var oldG=window.gerarRelatorio;if(typeof oldG==='function'){window.gerarRelatorio=function(){var r=oldG.apply(this,arguments);setTimeout(patchReport,80);return r;};try{gerarRelatorio=window.gerarRelatorio;}catch(e){}}
 function start(){bind();try{if(typeof renderMedicoes==='function')renderMedicoes();else patchSystem();}catch(e){patchSystem();}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(start,1000);});else setTimeout(start,700);
+})();
+</script>
+
+
+<script id="siog-v35-correcao-mes-financeiro-layout">
+(function(){
+'use strict';
+if(window.__siog_v35_final)return; window.__siog_v35_final=true;
+var FIN_KEY='siog_fin_header_v34';
+var METRICS_KEY='siog_resultado_consolidado_metricas_pptx_v65';
+function monthLabel(){
+  var src='',obj=null;
+  try{obj=JSON.parse(localStorage.getItem(METRICS_KEY)||'null');src=String((obj&&obj.competencia)||(obj&&obj.source)||'');}catch(e){}
+  var map=[['janeiro','Jan'],['fevereiro','Fev'],['março','Mar'],['marco','Mar'],['abril','Abr'],['maio','Mai'],['junho','Jun'],['julho','Jul'],['agosto','Ago'],['setembro','Set'],['outubro','Out'],['novembro','Nov'],['dezembro','Dez']];
+  var low=src.toLowerCase(); for(var i=0;i<map.length;i++) if(low.indexOf(map[i][0])>=0) return map[i][1];
+  var m=low.match(/(?:^|\D)(0?[1-9]|1[0-2])(?:\D|$)/); if(m){var labels=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];return labels[Number(m[1])-1];}
+  return 'Mês';
+}
+function fixMonthHtml(html){var lab=monthLabel();return String(html||'').replace(/\bMai\s*·/g,lab+' ·').replace(/Resultado\s+Mai\b/g,'Resultado '+lab);}
+function fixMonthDom(root){if(!root)return;var html=root.innerHTML,novo=fixMonthHtml(html);if(novo!==html)root.innerHTML=novo;}
+var oldSum=window.buildSumarioSlideHtml;if(typeof oldSum==='function'){window.buildSumarioSlideHtml=function(){return fixMonthHtml(oldSum.apply(this,arguments));};try{buildSumarioSlideHtml=window.buildSumarioSlideHtml;}catch(e){}}
+var oldRender=window.renderSumario;if(typeof oldRender==='function'){window.renderSumario=function(){var r=oldRender.apply(this,arguments);fixMonthDom(document.getElementById('sumario-content'));return r;};try{renderSumario=window.renderSumario;if(window.PAGE_RENDERS)window.PAGE_RENDERS.sumario=window.renderSumario;}catch(e){}}
+var oldGer=window.gerarRelatorio;if(typeof oldGer==='function'){window.gerarRelatorio=function(){var r=oldGer.apply(this,arguments);fixMonthDom(document.getElementById('rel-preview')||document.getElementById('report-content'));return r;};try{gerarRelatorio=window.gerarRelatorio;}catch(e){}}
+// Inclui os ajustes financeiros do cabeçalho no Backup/Restaurar.
+var oldBuild=window.buildStoragePayload;if(typeof oldBuild==='function'){window.buildStoragePayload=function(){var p=oldBuild.apply(this,arguments)||{};try{p.FIN_HEADER_V34=JSON.parse(localStorage.getItem(FIN_KEY)||'{}')||{};}catch(e){p.FIN_HEADER_V34={};}return p;};try{buildStoragePayload=window.buildStoragePayload;}catch(e){}}
+var oldApply=window.applyStorageData;if(typeof oldApply==='function'){window.applyStorageData=function(d){var r=oldApply.apply(this,arguments);try{if(d&&d.FIN_HEADER_V34)localStorage.setItem(FIN_KEY,JSON.stringify(d.FIN_HEADER_V34));}catch(e){}return r;};try{applyStorageData=window.applyStorageData;}catch(e){}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{renderSumario();}catch(e){}},1200);});
+})();
+</script>
+
+
+<script id="siog-v37-layout-financeiro-condicional">
+(function(){
+'use strict';
+if(window.__siog_v37_conditional_fin)return; window.__siog_v37_conditional_fin=true;
+var STORE='siog_fin_header_v34';
+function num(v){v=Number(v||0);return Number.isFinite(v)?v:0;}
+function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+function key(o){return String(o.id||'')+'|'+String(o.cliente||'');}
+function load(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')||{};}catch(e){return {};}}
+function money(v){try{return typeof fmtR==='function'?fmtR(v):'R$ '+num(v).toLocaleString('pt-BR',{maximumFractionDigits:0});}catch(e){return 'R$ '+num(v).toLocaleString('pt-BR');}}
+
+/* Fonte única: preserva lançamentos existentes e soma os ajustes digitados no cabeçalho.
+   O faturamento direto já chega somado pela rotina anterior; aqui complementamos Pleito/Aditivo,
+   que na v36 ainda podiam ser substituídos pelos lançamentos históricos. */
+var priorCons=window.getMedCons;
+function consV37(){
+  var rows=typeof priorCons==='function'?(priorCons.apply(this,arguments)||[]):[];
+  var adj=load();
+  rows.forEach(function(o){
+    var a=adj[key(o)]||{};
+    var baseContrato=num(o.contrato_original!=null?o.contrato_original:o.contrato);
+    var pLanc=num(o.pleito), aLanc=num(o.aditivo);
+    var pHead=num(a.pleito), aHead=num(a.aditivo);
+    // A rotina anterior pode já ter incorporado o cabeçalho. Só somamos quando não está refletido.
+    var pTotal=pLanc, aTotal=aLanc;
+    if(pHead && Math.abs(pLanc-pHead)>0.01) pTotal=pLanc+pHead;
+    else if(pHead && pLanc===0) pTotal=pHead;
+    if(aHead && Math.abs(aLanc-aHead)>0.01) aTotal=aLanc+aHead;
+    else if(aHead && aLanc===0) aTotal=aHead;
+    o.pleito=pTotal; o.aditivo=aTotal;
+    o.contrato_original=baseContrato;
+    o.contrato_atualizado=baseContrato+pTotal+aTotal;
+    o.saldo_contrato=o.contrato_atualizado-num(o.med!=null?o.med:o.medido)-num(o.fd!=null?o.fd:o.direto);
+    o.saldoMedir=o.saldo_contrato; o.saldo_a_medir=o.saldo_contrato;
+  });
+  return rows;
+}
+window.getMedCons=consV37; try{getMedCons=consV37;}catch(e){}
+
+function merged(o){
+  var a=load()[key(o)]||{};
+  var direto=num(o.fd!=null?o.fd:o.direto);
+  var pleito=num(o.pleito), aditivo=num(o.aditivo);
+  // Para a exibição, garante que valores do cabeçalho sejam considerados mesmo em registros antigos.
+  if(num(a.pleito)>0 && pleito===0) pleito=num(a.pleito);
+  if(num(a.aditivo)>0 && aditivo===0) aditivo=num(a.aditivo);
+  var contrato=num(o.contrato_original!=null?o.contrato_original:o.contrato);
+  var med=num(o.med!=null?o.med:o.medido);
+  var saldo=contrato+pleito+aditivo-med-direto;
+  return {direto:direto,pleito:pleito,aditivo:aditivo,saldo:saldo};
+}
+function hasAdj(m){return Math.abs(m.direto)>0.009||Math.abs(m.pleito)>0.009||Math.abs(m.aditivo)>0.009;}
+function detail(m,light){
+  if(!hasAdj(m)) return '';
+  var muted=light?'#667085':'var(--tx3)',green=light?'#198754':'var(--g2)',bg=light?'#fbfcfd':'rgba(255,255,255,.018)',border=light?'#e5e7eb':'#343434';
+  var items=[];
+  if(Math.abs(m.direto)>0.009)items.push(['Fat. direto',money(m.direto),'#4a9eff']);
+  if(Math.abs(m.pleito)>0.009)items.push(['Pleito aprovado',money(m.pleito),'#9b59b6']);
+  if(Math.abs(m.aditivo)>0.009)items.push(['Aditivo aprovado',money(m.aditivo),'#00a6a6']);
+  items.push(['Saldo contrato',money(m.saldo),m.saldo<0?'#ff5a5f':green]);
+  return '<div class="v37-faixa" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;width:100%;padding:5px 10px;background:'+bg+';border-top:1px solid '+border+';font-size:'+(light?'7px':'8.3px')+';line-height:1.2"><strong style="color:'+(light?'#E87722':'var(--or)')+'">Ajustes contratuais</strong>'+items.map(function(it){return '<span style="white-space:nowrap;color:'+muted+'"><span style="font-weight:600">'+it[0]+':</span> <b style="color:'+it[2]+'">'+it[1]+'</b></span>';}).join('')+'</div>';
+}
+function patchSystem(){
+  try{
+    var rows=consV37(), by={}; rows.forEach(function(o){by[key(o)]=o;});
+    var tb=document.getElementById('tbody-med-cons'); if(!tb)return;
+    tb.querySelectorAll('tr.v25-detail-row,tr.v27-detail-row,tr.v34-detail-row,tr.v37-detail-row').forEach(function(x){x.remove();});
+    tb.querySelectorAll('tr[data-key]').forEach(function(tr){
+      var o=by[tr.getAttribute('data-key')]; if(!o)return; var m=merged(o); if(!hasAdj(m))return;
+      var d=document.createElement('tr');d.className='v37-detail-row';
+      var td=document.createElement('td');td.colSpan=Math.max(1,tr.children.length);td.style.cssText='padding:0 8px 3px;border-bottom:1px solid #333;background:#1b1b1b';td.innerHTML=detail(m,false);d.appendChild(td);tr.parentNode.insertBefore(d,tr.nextSibling);
+    });
+  }catch(e){console.warn('v37 system',e);}
+}
+function patchReport(){
+  try{
+    var root=document.getElementById('report-content')||document.getElementById('rel-preview'); if(!root)return;
+    var sec=[].slice.call(root.querySelectorAll('.rel-module')).find(function(x){return x.getAttribute('data-title')==='Medições';}); if(!sec)return;
+    var table=sec.querySelector('table.med-export-table'); if(!table)return;
+    var by={};consV37().forEach(function(o){by[norm(o.cliente)]=o;});
+    // Remove quaisquer faixas antigas para evitar duplicidade.
+    table.querySelectorAll('tr.v25-detail-row,tr.v27-detail-row,tr.v34-detail-row,tr.v37-detail-row').forEach(function(x){x.remove();});
+    [].slice.call(table.querySelectorAll('tbody tr')).forEach(function(tr){
+      var td=tr.children[0]; if(!td||/total geral/i.test(td.textContent||''))return;
+      var divs=td.querySelectorAll(':scope > div');
+      var client=divs.length?divs[0].textContent:td.textContent;
+      var o=by[norm(client)]; if(!o)return; var m=merged(o);
+      // A linha principal continua limpa: remove o texto antigo "Direto · Pleito · Aditivo".
+      [].slice.call(td.querySelectorAll('div')).forEach(function(d){if(/Direto\s|Pleito\s|Aditivo\s/i.test(d.textContent||''))d.remove();});
+      if(!hasAdj(m))return;
+      var d=document.createElement('tr');d.className='v37-detail-row';var x=document.createElement('td');x.colSpan=Math.max(1,tr.children.length);x.style.cssText='padding:0 4px 2px;border-bottom:1px solid #e5e7eb;background:#fff';x.innerHTML=detail(m,true);d.appendChild(x);tr.parentNode.insertBefore(d,tr.nextSibling);
+    });
+  }catch(e){console.warn('v37 report',e);}
+}
+var oldR=window.renderMedicoes;if(typeof oldR==='function'){window.renderMedicoes=function(){var r=oldR.apply(this,arguments);setTimeout(patchSystem,70);return r;};try{renderMedicoes=window.renderMedicoes;if(window.PAGE_RENDERS)window.PAGE_RENDERS.medicoes=window.renderMedicoes;}catch(e){}}
+var oldG=window.gerarRelatorio;if(typeof oldG==='function'){window.gerarRelatorio=function(){var r=oldG.apply(this,arguments);setTimeout(patchReport,120);return r;};try{gerarRelatorio=window.gerarRelatorio;}catch(e){}}
+function start(){setTimeout(patchSystem,250);}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+</script>
+
+<script id="siog-v38-correcoes-exportacao-definitivas">
+(function(){
+'use strict';
+if(window.__siog_v38_final)return; window.__siog_v38_final=true;
+var FIN_KEY='siog_fin_header_v34';
+var METRICS_KEY='siog_resultado_consolidado_metricas_pptx_v65';
+var TEXT_KEY='siog_resultado_consolidado_slides_text_v111';
+var NAME_KEY='siog_modelo_resultado_nome_v62';
+function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+function num(v){if(v==null||v==='')return 0;if(typeof v==='number')return isFinite(v)?v:0;var s=String(v).replace(/R\$|\s/g,'');if(s.indexOf(',')>=0&&s.indexOf('.')>=0)s=s.replace(/\./g,'').replace(',','.');else s=s.replace(',','.');var n=Number(s);return isFinite(n)?n:0;}
+function money(v){try{return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:0,maximumFractionDigits:0}).format(Math.round(num(v)));}catch(e){return 'R$ '+Math.round(num(v)).toLocaleString('pt-BR');}}
+function finkey(o){return String(o&&o.id||'')+'|'+String(o&&o.cliente||'');}
+function fin(){try{return JSON.parse(localStorage.getItem(FIN_KEY)||'{}')||{};}catch(e){return {};}}
+function monthLabel(){
+  var parts=[];
+  try{var m=JSON.parse(localStorage.getItem(METRICS_KEY)||'null');if(m){parts.push(m.competencia,m.source,m.name);}}catch(e){}
+  try{parts.push(localStorage.getItem(NAME_KEY)||'');}catch(e){}
+  try{parts.push(localStorage.getItem(TEXT_KEY)||'');}catch(e){}
+  var s=norm(parts.filter(Boolean).join(' '));
+  var defs=[
+   ['janeiro|jan\\b|jan/|jan-','Jan'],['fevereiro|fev\\b|fev/|fev-','Fev'],['marco|mar\\b|mar/|mar-','Mar'],['abril|abr\\b|abr/|abr-','Abr'],
+   ['maio|mai\\b|mai/|mai-','Mai'],['junho|jun\\b|jun/|jun-','Jun'],['julho|jul\\b|jul/|jul-','Jul'],['agosto|ago\\b|ago/|ago-','Ago'],
+   ['setembro|set\\b|set/|set-','Set'],['outubro|out\\b|out/|out-','Out'],['novembro|nov\\b|nov/|nov-','Nov'],['dezembro|dez\\b|dez/|dez-','Dez']
+  ];
+  // Prioriza a ocorrência textual mais recente/relevante na concatenação.
+  var best=null;
+  defs.forEach(function(d){var re=new RegExp(d[0],'i'),mt=re.exec(s);if(mt&&(!best||mt.index>best.i))best={i:mt.index,l:d[1]};});
+  if(best)return best.l;
+  var mt=s.match(/(?:compet[eê]ncia|resultado|m[eê]s)?\D{0,8}(0?[1-9]|1[0-2])[\/-](?:20)?\d{2}/i);
+  if(mt){return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][Number(mt[1])-1];}
+  // O modelo incorporado nesta versão é o consolidado de junho; nunca assume "Mai" sem evidência.
+  return 'Jun';
+}
+function fixMonthHtml(html){var lab=monthLabel();return String(html||'')
+ .replace(/\bMai\s*·/gi,lab+' ·')
+ .replace(/\bMAI\s*·/g,lab.toUpperCase()+' ·')
+ .replace(/Resultado\s+Mai\b/gi,'Resultado '+lab)
+ .replace(/Resultado\s+MAI\b/g,'Resultado '+lab.toUpperCase());}
+function fixMonthDom(root){if(!root)return;var h=root.innerHTML,n=fixMonthHtml(h);if(n!==h)root.innerHTML=n;}
+
+function getRows(){try{return typeof window.getMedCons==='function'?(window.getMedCons()||[]):[];}catch(e){return [];}}
+function merged(o){
+ var h=fin()[finkey(o)]||{};
+ var direto=num(h.direto); if(!direto) direto=num(o.fd!=null?o.fd:o.direto);
+ var pleito=num(h.pleito); if(!pleito) pleito=num(o.pleito);
+ var aditivo=num(h.aditivo); if(!aditivo) aditivo=num(o.aditivo);
+ var contrato=num(o.contrato_original!=null?o.contrato_original:o.contrato);
+ var med=num(o.med!=null?o.med:o.medido);
+ return {direto:direto,pleito:pleito,aditivo:aditivo,saldo:contrato+pleito+aditivo-med-direto};
+}
+function hasAdj(m){return Math.abs(m.direto)>0.009||Math.abs(m.pleito)>0.009||Math.abs(m.aditivo)>0.009;}
+function detail(m){
+ var a=[];
+ if(Math.abs(m.direto)>0.009)a.push('<span><b>Fat. direto:</b> <strong style="color:#4a9eff">'+money(m.direto)+'</strong></span>');
+ if(Math.abs(m.pleito)>0.009)a.push('<span><b>Pleito aprovado:</b> <strong style="color:#9b59b6">'+money(m.pleito)+'</strong></span>');
+ if(Math.abs(m.aditivo)>0.009)a.push('<span><b>Aditivo aprovado:</b> <strong style="color:#008c8c">'+money(m.aditivo)+'</strong></span>');
+ a.push('<span><b>Saldo contratual:</b> <strong style="color:'+(m.saldo<0?'#e53935':'#1a7a3a')+'">'+money(m.saldo)+'</strong></span>');
+ return '<div class="v38-ajuste-condicional" style="display:flex;gap:18px;flex-wrap:wrap;padding:4px 7px;font-size:6.8px;line-height:1.2;color:#667085;background:#fbfcfd;border-top:1px solid #e5e7eb"><strong style="color:#E87722">Ajustes contratuais</strong>'+a.join('')+'</div>';
+}
+function sanitizeMedReport(){
+ var root=document.getElementById('report-content')||document.getElementById('rel-preview'); if(!root)return;
+ var sec=[].slice.call(root.querySelectorAll('.rel-module')).find(function(x){return x.getAttribute('data-title')==='Medições';});if(!sec)return;
+ var table=sec.querySelector('table.med-export-table');if(!table)return;
+ // Remove todas as faixas/linhas legadas que imprimiam zeros em todas as obras.
+ sec.querySelectorAll('.v14-report-fechamento,.v17-report-band,.v18-report-band,.v19-report-band,.v20-report-band').forEach(function(x){x.remove();});
+ table.querySelectorAll('.v14-rel-row,.v17-rel-row,.v18-rel-row,.v19-rel-row,.v20-rel-row,.v25-detail-row,.v27-detail-row,.v34-detail-row,.v36-detail-row,.v37-detail-row,.v38-detail-row').forEach(function(x){
+   var tr=x.closest&&x.closest('tr'); if(tr&&tr!==x&&tr.children.length===1&&tr.querySelector('.v25-detail-row,.v27-detail-row,.v34-detail-row,.v36-detail-row,.v37-detail-row'))tr.remove(); else x.remove();
+ });
+ // Também remove, da célula principal, o detalhe antigo "Direto · Pleito · Aditivo".
+ [].slice.call(table.querySelectorAll('tbody tr')).forEach(function(tr){
+   if(tr.className&&/detail-row/.test(tr.className))return;
+   var td=tr.children[0]; if(!td||/total geral/i.test(td.textContent||''))return;
+   [].slice.call(td.querySelectorAll('div')).forEach(function(d){var t=d.textContent||'';if(/Direto\s|Pleito\s|Aditivo\s/i.test(t)||/Adiant\. recebido/i.test(t))d.remove();});
+ });
+ var by={};getRows().forEach(function(o){by[norm(o.cliente)]=o;});
+ [].slice.call(table.querySelectorAll('tbody tr')).forEach(function(tr){
+   if(tr.className&&/detail-row/.test(tr.className))return;
+   var td=tr.children[0]; if(!td||/total geral/i.test(td.textContent||''))return;
+   var client=norm((td.querySelector('div')||td).textContent||''); var o=by[client];if(!o)return;
+   var m=merged(o);if(!hasAdj(m))return;
+   var nr=document.createElement('tr');nr.className='v38-detail-row';var c=document.createElement('td');c.colSpan=Math.max(1,tr.children.length);c.style.cssText='padding:0;border-bottom:1px solid #e5e7eb;background:#fff';c.innerHTML=detail(m);nr.appendChild(c);tr.parentNode.insertBefore(nr,tr.nextSibling);
+ });
+}
+
+// Último wrapper: executa de forma síncrona, antes de a apresentação copiar o HTML.
+var oldGer=window.gerarRelatorio;
+if(typeof oldGer==='function'){
+ window.gerarRelatorio=function(){var r=oldGer.apply(this,arguments);sanitizeMedReport();fixMonthDom(document.getElementById('rel-preview')||document.getElementById('report-content'));return r;};
+ try{gerarRelatorio=window.gerarRelatorio;}catch(e){}
+}
+var oldBuild=window.buildSumarioSlideHtml;
+if(typeof oldBuild==='function'){
+ window.buildSumarioSlideHtml=function(){return fixMonthHtml(oldBuild.apply(this,arguments));};
+ try{buildSumarioSlideHtml=window.buildSumarioSlideHtml;}catch(e){}
+}
+var oldRender=window.renderSumario;
+if(typeof oldRender==='function'){
+ window.renderSumario=function(){var r=oldRender.apply(this,arguments);fixMonthDom(document.getElementById('sumario-content'));return r;};
+ try{renderSumario=window.renderSumario;if(window.PAGE_RENDERS)window.PAGE_RENDERS.sumario=window.renderSumario;}catch(e){}
+}
+function start(){fixMonthDom(document.getElementById('sumario-content'));}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(start,1200);});else setTimeout(start,700);
+})();
+</script>
+
+
+
+<script id="siog-v40-competencia-resultado-definitiva">
+(function(){
+'use strict';
+if(window.__siog_v40_competencia_ok) return; window.__siog_v40_competencia_ok=true; window.__siog_v41_competencia_ok=true;
+var NAME_KEY='siog_modelo_resultado_nome_v62';
+var METRICS_KEY='siog_resultado_consolidado_metricas_pptx_v65';
+var TEXT_KEY='siog_resultado_consolidado_slides_text_v111';
+var COMP_KEY='siog_resultado_consolidado_competencia_v40';
+var labs=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+function detectOne(raw){
+  var s=norm(raw); if(!s) return '';
+  var names=[['janeiro','jan'],['fevereiro','fev'],['marco','mar'],['abril','abr'],['maio','mai'],['junho','jun'],['julho','jul'],['agosto','ago'],['setembro','set'],['outubro','out'],['novembro','nov'],['dezembro','dez']];
+  for(var i=0;i<names.length;i++){
+    var a=names[i];
+    var re=new RegExp('(?:^|[^a-z])(?:'+a[0]+'|'+a[1]+')(?:[^a-z]|$)','i');
+    if(re.test(s)) return labs[i];
+  }
+  // formatos 06-2026, 06/2026, 2026-06, 2026_06 e variantes em nomes de arquivo
+  var m=s.match(/(?:^|[^0-9])(0?[1-9]|1[0-2])\s*[-_\/.]\s*(?:20)?\d{2}(?:[^0-9]|$)/);
+  if(m) return labs[Number(m[1])-1];
+  m=s.match(/(?:^|[^0-9])20\d{2}\s*[-_\/.]\s*(0?[1-9]|1[0-2])(?:[^0-9]|$)/);
+  if(m) return labs[Number(m[1])-1];
+  return '';
+}
+function competencia(){
+  // v41: a competência deve acompanhar o Resultado Consolidado realmente usado na exportação.
+  // 1) arquivo/modelo PPTX efetivamente importado (metadado salvo pelo v114).
+  var x='';
+  try{
+    var model=JSON.parse(localStorage.getItem('siog_modelo_resultado_consolidado_pptx_v1')||'null');
+    if(model){ x=detectOne(model.name)||detectOne(model.source); if(x){localStorage.setItem(COMP_KEY,x);return x;} }
+  }catch(e){}
+  // 2) fonte dos indicadores extraídos do PPTX.
+  try{
+    var k=JSON.parse(localStorage.getItem(METRICS_KEY)||'null');
+    if(k){ x=detectOne(k.source)||detectOne(k.name)||detectOne(k.competencia); if(x){localStorage.setItem(COMP_KEY,x);return x;} }
+  }catch(e){}
+  // 3) nome corrente do modelo. Só é usado depois dos metadados acima, evitando nome antigo de maio prevalecer.
+  try{ x=detectOne(localStorage.getItem(NAME_KEY)||''); if(x){localStorage.setItem(COMP_KEY,x);return x;} }catch(e){}
+  // 4) textos extraídos, se existirem.
+  try{ x=detectOne(localStorage.getItem(TEXT_KEY)||''); if(x){localStorage.setItem(COMP_KEY,x);return x;} }catch(e){}
+  // 5) o conjunto padrão incorporado nesta versão é o Resultado Econômico de JUNHO/2026.
+  // Se ainda não houve importação válida, não reutiliza uma competência antiga salva (ex.: MAI).
+  return 'Jun';
+}
+window.__siogMesResultadoConsolidado=competencia;
+function fixHtml(html){
+  var l=competencia(), U=l.toUpperCase();
+  return String(html||'')
+    .replace(/\b(?:JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\s*·\s*(RECEITA|RENTAB\.?|%|RECEITA GERENCIAL|RENTABILIDADE NO CANTEIRO|MARGEM)/gi,function(all,rest){return (all===all.toUpperCase()?U:l)+' · '+rest;})
+    .replace(/\b(?:Jan|Fev|Mar|Abr|Mai|Jun|Jul|Ago|Set|Out|Nov|Dez)\s*·/g,l+' ·');
+}
+function fixNode(root){if(!root)return; var h=root.innerHTML,n=fixHtml(h); if(n!==h) root.innerHTML=n;}
+function fixAll(){fixNode(document.getElementById('sumario-content'));fixNode(document.getElementById('report-content'));fixNode(document.getElementById('rel-preview'));}
+// Corrige qualquer rotina de Sumário que ainda gere rótulo fixo.
+var ob=window.buildSumarioSlideHtml;
+if(typeof ob==='function'&&!ob.__v40){var nb=function(){return fixHtml(ob.apply(this,arguments));};nb.__v40=true;window.buildSumarioSlideHtml=nb;try{buildSumarioSlideHtml=nb;}catch(e){}}
+var og=window.gerarRelatorio;
+if(typeof og==='function'&&!og.__v40){var ng=function(){var r=og.apply(this,arguments);fixAll();setTimeout(fixAll,0);setTimeout(fixAll,80);return r;};ng.__v40=true;window.gerarRelatorio=ng;try{gerarRelatorio=ng;}catch(e){}}
+var oe=window.exportarPPTX;
+if(typeof oe==='function'&&!oe.__v40){var ne=function(){fixAll();return oe.apply(this,arguments);};ne.__v40=true;window.exportarPPTX=ne;try{exportarPPTX=ne;}catch(e){}}
+// Rotinas antigas injetam os cards com atraso. Observa somente o Sumário/relatório e corrige logo após a injeção.
+var timer=0;try{new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(fixAll,10);}).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(fixAll,400);setTimeout(fixAll,1600);});else{setTimeout(fixAll,100);setTimeout(fixAll,1000);}
 })();
 </script>
