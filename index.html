@@ -18892,3 +18892,103 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   window.__siog_v123_force_draw=draw;
 })();
 </script>
+
+<script>
+/* v124 — Backup compartilhável: Sumário Executivo sempre editável após Restaurar.
+   Conceito: o backup transporta o conteúdo, nunca um bloqueio de edição.
+   Ao restaurar um backup de outra semana/computador, o snapshot recebido é aberto
+   como base editável da semana/sessão atual, preservando exatamente os textos recebidos. */
+(function(){
+  'use strict';
+  if(window.__siog_v124_sumario_backup_editavel) return;
+  window.__siog_v124_sumario_backup_editavel=true;
+
+  var SNAP_STORE='siog_sumario_snapshot_v122';
+  var MANUAL_STORE='siog_sumario_manual_points_v122';
+
+  function read(k,fb){try{var r=localStorage.getItem(k);if(r==null||r==='')return fb;var v=JSON.parse(r);return v==null?fb:v;}catch(e){return fb;}}
+  function write(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+  function weekKey(){
+    var d=new Date();d.setHours(0,0,0,0);var day=d.getDay();d.setDate(d.getDate()-(day===0?6:day-1));
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+
+  /* O snapshot é a fotografia exata do Sumário exportado. Se veio de outra semana,
+     mantém os textos e chaves, mas passa a ser o snapshot editável da sessão atual.
+     Isso NÃO reativa comentários históricos: somente reaproveita o que estava visível
+     no Sumário do backup recebido. */
+  function normalizeRestoredSnapshot(){
+    var s=read(SNAP_STORE,null), wk=weekKey();
+    if(!s||!Array.isArray(s.points)||!s.points.length) return false;
+    if(s.weekKey===wk) return false;
+    var originalWeek=s.weekKey||'';
+    s=Object.assign({},s,{
+      weekKey:wk,
+      restoredFromWeek:originalWeek,
+      editableAfterRestore:true,
+      restoredForEditingAt:Date.now()
+    });
+    write(SNAP_STORE,s);
+
+    /* Sincroniza também os detalhes manuais na semana atual para que novas edições
+       continuem viajando normalmente no próximo Backup. */
+    var m=read(MANUAL_STORE,{weeks:{}});
+    if(!m||typeof m!=='object')m={weeks:{}};
+    if(!m.weeks||typeof m.weeks!=='object')m.weeks={};
+    if(!m.weeks[wk]||typeof m.weeks[wk]!=='object')m.weeks[wk]={};
+    s.points.forEach(function(p){
+      var k=String((p&&p._key)||'').trim(); if(!k) return;
+      m.weeks[wk][k]={value:String(p&&p.detalhe==null?'':p.detalhe),title:String((p&&p.titulo)||''),updatedAt:Date.now(),restored:true};
+    });
+    write(MANUAL_STORE,m);
+    return true;
+  }
+
+  function forceEditable(){
+    try{
+      var host=document.getElementById('sumario-content'); if(!host)return;
+      host.querySelectorAll('textarea').forEach(function(ta){
+        var row=ta.closest&&ta.closest('tr'), tbl=row&&row.closest&&row.closest('table');
+        if(!tbl)return;
+        var h=String(((tbl.querySelector('thead')||tbl).textContent)||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+        if(h.indexOf('ponto')<0||h.indexOf('detalhe')<0)return;
+        ta.removeAttribute('readonly');
+        ta.removeAttribute('disabled');
+        ta.readOnly=false;
+        ta.disabled=false;
+        ta.style.pointerEvents='auto';
+        ta.style.cursor='text';
+      });
+    }catch(e){}
+  }
+
+  var prevRender=window.renderSumario;
+  if(typeof prevRender==='function'){
+    window.renderSumario=function(){
+      var migrated=normalizeRestoredSnapshot(), r;
+      try{r=prevRender.apply(this,arguments);}catch(e){}
+      setTimeout(function(){
+        try{if(migrated&&typeof window.__siog_v123_force_draw==='function')window.__siog_v123_force_draw();}catch(e){}
+        forceEditable();
+      },20);
+      setTimeout(forceEditable,180);
+      setTimeout(forceEditable,650);
+      return r;
+    };
+    try{renderSumario=window.renderSumario;if(window.PAGE_RENDERS)window.PAGE_RENDERS.sumario=window.renderSumario;}catch(e){}
+  }
+
+  /* Segurança adicional para restaurações que redesenham o Sumário por observers. */
+  try{
+    var mo=new MutationObserver(function(){
+      var migrated=normalizeRestoredSnapshot();
+      if(migrated){try{if(typeof window.__siog_v123_force_draw==='function')window.__siog_v123_force_draw();}catch(e){}}
+      forceEditable();
+    });
+    var start=function(){var h=document.getElementById('sumario-content');if(h)mo.observe(h,{childList:true,subtree:true});};
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(start,700);});else setTimeout(start,250);
+  }catch(e){}
+
+  setTimeout(function(){normalizeRestoredSnapshot();forceEditable();},500);
+})();
+</script>
