@@ -15613,6 +15613,100 @@ window.__siogMesResultadoConsolidado=function(){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(init,700);});else setTimeout(init,300);
 })();
 </script>
+
+<script>
+/* v110 — Ranking de Prazo: somente datas/desvios numéricos; nunca comentários. */
+(function(){
+  'use strict';
+  if(window.__siog_ranking_prazo_v110) return;
+  window.__siog_ranking_prazo_v110=true;
+
+  function norm(s){
+    return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  }
+  function esc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});
+  }
+  function validExcelDate(v){
+    if(typeof v==='number') return isFinite(v) && v>0;
+    if(typeof v==='string' && /^\s*\d+(?:\.\d+)?\s*$/.test(v)) return isFinite(Number(v)) && Number(v)>0;
+    return false;
+  }
+  function makeRanking(){
+    var arr=[];
+    try{
+      var ativos=(window.PROJETOS||[]).filter(function(p){return p && p.status==='Ativo';});
+      arr=ativos.map(function(p){
+        var prazo=p.prazo_cli, tend=p.tendencia;
+        if(!validExcelDate(prazo) || !validExcelDate(tend)) return null;
+        var d=Math.round(Number(tend)-Number(prazo));
+        if(!isFinite(d) || d===0) return null;
+        return {obra:String(p.obra||''), desvio:d, tend:(typeof window.xl2str==='function'?window.xl2str(Number(tend)):String(tend)), _abs:Math.abs(d)};
+      }).filter(Boolean).sort(function(a,b){return b.desvio-a.desvio;});
+    }catch(e){arr=[];}
+    return arr;
+  }
+
+  function patchData(){
+    var fn=window.buildSumarioData;
+    if(typeof fn!=='function' || fn.__ranking_v110) return;
+    var wrapped=function(){
+      var out=fn.apply(this,arguments)||{};
+      out.rankingPrazo=makeRanking();
+      return out;
+    };
+    wrapped.__ranking_v110=true;
+    window.buildSumarioData=wrapped;
+  }
+
+  function isRankingTable(tbl){
+    if(!tbl || !tbl.querySelector) return false;
+    var th=Array.prototype.map.call(tbl.querySelectorAll('thead th'),function(x){return norm(x.textContent);});
+    return th.length>=4 && th[1].indexOf('obra')>=0 && th[2].indexOf('desvio')>=0 && th[3].indexOf('tendencia')>=0;
+  }
+
+  function repairRankingTables(root){
+    root=root||document;
+    var ranking=makeRanking();
+    try{
+      Array.prototype.slice.call(root.querySelectorAll('table')).forEach(function(tbl){
+        if(!isRankingTable(tbl)) return;
+        var tbody=tbl.querySelector('tbody');
+        if(!tbody) return;
+        var limit=8;
+        try{
+          var box=tbl.closest('.slide');
+          if(box) limit=6;
+        }catch(e){}
+        var rows=ranking.slice(0,limit).map(function(r,i){
+          var d=Number(r.desvio);
+          var cls=d>0?'var(--r2,#ff3131)':d<0?'var(--g2,#28a745)':'var(--tx2,#aaa)';
+          return '<tr><td style="padding:4px 8px;color:var(--tx3,#888)">'+(i+1)+'°</td>'+ 
+                 '<td style="padding:4px 8px">'+esc(r.obra)+'</td>'+ 
+                 '<td style="padding:4px 8px;color:'+cls+';font-weight:700;white-space:nowrap">'+(d>0?'+':'')+d+' d</td>'+ 
+                 '<td style="padding:4px 8px;color:var(--tx2,#aaa);white-space:nowrap">'+esc(r.tend||'—')+'</td></tr>';
+        }).join('');
+        tbody.innerHTML=rows || '<tr><td colspan="4" style="padding:10px 8px;color:var(--tx3,#888);font-style:italic">Sem desvios de prazo identificados.</td></tr>';
+      });
+    }catch(e){}
+  }
+
+  function install(){
+    patchData();
+    repairRankingTables(document.getElementById('sumario-content')||document);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){setTimeout(install,100);});
+  else setTimeout(install,50);
+  [400,1000,2200,4000].forEach(function(ms){setTimeout(install,ms);});
+  try{
+    var mo=new MutationObserver(function(){
+      clearTimeout(window.__ranking_v110_timer);
+      window.__ranking_v110_timer=setTimeout(function(){patchData(); repairRankingTables(document.getElementById('sumario-content')||document);},80);
+    });
+    mo.observe(document.documentElement,{childList:true,subtree:true});
+  }catch(e){}
+})();
+</script>
 </body>
 </html>
 
