@@ -15477,6 +15477,142 @@ window.__siogMesResultadoConsolidado=function(){
 };
 })();
 </script>
+
+
+
+
+<script>
+/* v120 — REGRA DEFINITIVA DOS PONTOS DE ATENÇÃO
+   - Semana nova começa zerada.
+   - Só entram comentários de Cronograma/Financeiro SALVOS ou EDITADOS na semana corrente e com cor vermelha/amarela.
+   - O texto vem do comentário, mas o detalhe do Sumário é editável.
+   - Edições do Sumário são armazenadas por ANO+SEMANA real e viajam no Backup/Restaurar.
+   - Restaurar backup não transforma comentário antigo em comentário da semana atual. */
+(function(){
+  'use strict';
+  if(window.__siog_v120_regra_definitiva) return;
+  window.__siog_v120_regra_definitiva=true;
+
+  var STORE='siog_sumario_pontos_semana_v119'; // mantém compatibilidade com o backup já corrigido
+  var busy=false;
+
+  function norm(s){
+    try{return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+    catch(e){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim();}
+  }
+  function monday(d){
+    d=new Date(d||Date.now()); d.setHours(0,0,0,0);
+    var day=d.getDay(); d.setDate(d.getDate()-(day===0?6:day-1)); return d;
+  }
+  function weekBounds(){var a=monday(new Date()), b=new Date(a); b.setDate(b.getDate()+7); return [a.getTime(),b.getTime()];}
+  function isoWeekKey(){
+    var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+3-((d.getDay()+6)%7));
+    var y=d.getFullYear(), w1=new Date(y,0,4); var wn=1+Math.round(((d-w1)/86400000-3+((w1.getDay()+6)%7))/7);
+    return y+'-W'+String(wn).padStart(2,'0');
+  }
+  function readStore(){
+    try{var x=JSON.parse(localStorage.getItem(STORE)||'{"weeks":{}}'); if(!x||typeof x!=='object')x={weeks:{}}; if(!x.weeks||typeof x.weeks!=='object')x.weeks={}; return x;}
+    catch(e){return {weeks:{}};}
+  }
+  function writeStore(x){try{localStorage.setItem(STORE,JSON.stringify(x||{weeks:{}}));}catch(e){}}
+  function isModule(o){var t=norm(o&&o.tipo); return t==='cronograma'||t==='financeiro'||t==='medicoes'||t==='medicoes e financeiro'||t==='medicao e financeiro';}
+  function color(o){
+    var vals=[o&&o.cor,o&&o.farol,o&&o.status,o&&o.criticidade].map(norm).join(' ');
+    if(vals.indexOf('🔴')>=0||/(^|\s)(r|vermelho|critico|crítico)(\s|$)/.test(vals))return '🔴';
+    if(vals.indexOf('🟡')>=0||/(^|\s)(y|amarelo|atencao|atenção)(\s|$)/.test(vals))return '🟡';
+    return '';
+  }
+  function deleted(o,i){try{return typeof window.__siog_get_deleted_obs_keys==='function'&&window.__siog_get_deleted_obs_keys().has(window.__siog_obs_key(o,i));}catch(e){return false;}}
+  function sourceKey(o,i){
+    var id=String(o&& (o.id_seq||o.id||o.uuid||'') ||'').trim(); if(id)return 'id:'+id;
+    return 'obs:'+norm(o&&o.obra)+'|'+norm(o&&o.tipo)+'|'+norm(o&&o.titulo)+'|'+norm(o&&o.texto)+'|'+i;
+  }
+  function sourcePoints(){
+    var b=weekBounds(), all=Array.isArray(window.OBSERVACOES)?window.OBSERVACOES:[], rows=[];
+    all.forEach(function(o,i){
+      if(!o||!isModule(o)||deleted(o,i))return;
+      var c=color(o); if(!c)return;
+      var ts=Number(o.updated_at_local||0);
+      // ESSENCIAL: comentário antigo não entra só por ter semana/número igual. Precisa ter sido salvo/editado nesta semana real.
+      if(!Number.isFinite(ts)||ts<b[0]||ts>=b[1])return;
+      rows.push({
+        cor:c,
+        titulo:String(o.obra||o.projeto||o.cliente||'Geral').trim()||'Geral',
+        detalhe:String(o.texto||o.titulo||'').trim(),
+        categoria:String(o.tipo||'Comentário'),
+        _key:sourceKey(o,i),
+        _ts:ts
+      });
+    });
+    rows.sort(function(a,b){var ca=a.cor==='🔴'?0:1, cb=b.cor==='🔴'?0:1; return ca-cb || a._ts-b._ts;});
+    return rows;
+  }
+  function manualForWeek(){var x=readStore(), k=isoWeekKey(); return (x.weeks[k]&&typeof x.weeks[k]==='object')?x.weeks[k]:{};}
+  function setManual(k,val,title){
+    if(!k)return; var x=readStore(), wk=isoWeekKey(); if(!x.weeks[wk]||typeof x.weeks[wk]!=='object')x.weeks[wk]={};
+    x.weeks[wk][k]={value:String(val==null?'':val),title:String(title||''),updated_at:Date.now()}; writeStore(x);
+  }
+  function points(){
+    var m=manualForWeek();
+    return sourcePoints().map(function(p){var q=Object.assign({},p), v=m[p._key]; if(v&&typeof v==='object'&&Object.prototype.hasOwnProperty.call(v,'value'))q.detalhe=String(v.value); else if(typeof v==='string')q.detalhe=v; return q;});
+  }
+
+  // Última camada: força o Sumário a usar APENAS a regra v120.
+  var prevBuild=window.buildSumarioData;
+  window.buildSumarioData=function(){
+    var d={}; try{d=typeof prevBuild==='function'?(prevBuild.apply(this,arguments)||{}):{};}catch(e){d={};}
+    var p=points(); d.pontosPrioritarios=p; d.criticos=p.filter(function(x){return x.cor==='🔴';}); return d;
+  };
+  try{buildSumarioData=window.buildSumarioData;}catch(e){}
+
+  function isPontosTable(tbl){
+    if(!tbl)return false; var txt=norm(tbl.textContent||'');
+    if(txt.indexOf('ponto')<0||txt.indexOf('detalhe')<0)return false;
+    var box=tbl.closest?tbl.closest('.card,section,.rel-module'):null; return !box||norm(box.textContent||'').indexOf('pontos de atencao prioritarios')>=0;
+  }
+  function patchEditors(){
+    if(busy)return; busy=true;
+    try{
+      var ps=points(), host=document.getElementById('sumario-content'); if(!host)return;
+      Array.prototype.slice.call(host.querySelectorAll('table')).filter(isPontosTable).forEach(function(tbl){
+        var rows=Array.prototype.slice.call(tbl.querySelectorAll('tbody tr'));
+        rows.forEach(function(row,idx){
+          if(idx>=ps.length)return; var p=ps[idx], cells=row.children; if(!cells||cells.length<2)return;
+          // coluna detalhe = última célula, independentemente de versões anteriores do layout
+          var td=cells[cells.length-1], ta=td.querySelector('textarea');
+          if(!ta){td.innerHTML=''; ta=document.createElement('textarea'); td.appendChild(ta);}
+          ta.style.width='100%';ta.style.minHeight='42px';ta.style.border='1px solid rgba(232,119,34,.65)';ta.style.borderRadius='6px';ta.style.padding='6px 8px';ta.style.background='rgba(232,119,34,.06)';ta.style.color='var(--tx)';ta.style.font='inherit';ta.style.fontSize='11px';ta.style.lineHeight='1.25';ta.style.resize='vertical';ta.style.boxSizing='border-box';
+          ta.setAttribute('data-v120-key',p._key);ta.setAttribute('data-v120-title',p.titulo);
+          if(document.activeElement!==ta&&ta.value!==p.detalhe)ta.value=p.detalhe;
+          if(ta.dataset.v120Bound!=='1'){
+            ta.dataset.v120Bound='1';
+            ta.addEventListener('input',function(){setManual(ta.getAttribute('data-v120-key'),ta.value,ta.getAttribute('data-v120-title'));});
+            ta.addEventListener('blur',function(){setManual(ta.getAttribute('data-v120-key'),ta.value.trim(),ta.getAttribute('data-v120-title'));});
+          }
+        });
+      });
+    }finally{busy=false;}
+  }
+
+  var prevRender=window.renderSumario;
+  window.renderSumario=function(){var r; try{r=typeof prevRender==='function'?prevRender.apply(this,arguments):undefined;}catch(e){} setTimeout(patchEditors,10);setTimeout(patchEditors,160);return r;};
+  try{renderSumario=window.renderSumario;if(window.PAGE_RENDERS)window.PAGE_RENDERS.sumario=window.renderSumario;}catch(e){}
+
+  // Após salvar comentário, renderiza novamente. O wrapper v60 já grava updated_at_local=Date.now().
+  var prevSalvar=window.salvarObs;
+  if(typeof prevSalvar==='function'){
+    window.salvarObs=function(){var r=prevSalvar.apply(this,arguments);setTimeout(function(){try{window.renderSumario();}catch(e){}},30);return r;};
+    try{salvarObs=window.salvarObs;}catch(e){}
+  }
+
+  // Diagnóstico/backup: continua no mesmo STORE que já é exportado no bloco SUMARIO_PONTOS_SEMANA_V119.
+  window.__siog_v120_week_key=isoWeekKey;
+  window.__siog_v120_points=points;
+
+  function init(){try{window.renderSumario();}catch(e){}setTimeout(patchEditors,500);}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(init,700);});else setTimeout(init,300);
+})();
+</script>
 </body>
 </html>
 
@@ -16903,6 +17039,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   var STORE='backups';
   var RECORD='dados_principais';
   var MAIN_KEY='siog_lafaete_data_v6_original_com_dados';
+  var WEEKLY_SUM_KEY='siog_sumario_pontos_semana_v119';
   var OLD_KEYS=[
     'siog_lafaete_index_relatorio_dados_preservados_v10_20260423',
     'siog_lafaete_data_v6_original_com_dados_backup',
@@ -17973,5 +18110,368 @@ var oldGerar=window.gerarRelatorio;
 if(typeof oldGerar==='function'){window.gerarRelatorio=function(){applySatDefault();return oldGerar.apply(this,arguments);};try{gerarRelatorio=window.gerarRelatorio;}catch(_e){}}
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){applySatDefault();restoreStored();});else{applySatDefault();restoreStored();}
+})();
+</script>
+
+<script>
+/* v118 — Backup espelho entre computadores.
+   Corrige somente a restauração/exportação do estado do Sumário Executivo e Petrobras.
+   Também impede que a restauração de um BACKUP transforme comentários antigos em comentários da semana atual. */
+(function(){
+  'use strict';
+  if(window.__siog_v118_backup_espelho_ok) return;
+  window.__siog_v118_backup_espelho_ok=true;
+
+  var SUM_KEYS=[
+    'siog_sumario_pontos_detalhes_v75',
+    'siog_sumario_pontos_detalhes_v101',
+    'siog_sumario_pontos_detalhes_v102',
+    'siog_sumario_pontos_detalhes_v103',
+    'siog_sumario_pontos_detalhes_v104',
+    'siog_sumario_pontos_detalhes_v105'
+  ];
+  var PETRO_KEY='siog_petrobras_v75_imports';
+  var MAIN_KEY='siog_lafaete_data_v6_original_com_dados';
+
+  function norm(s){
+    try{return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+    catch(e){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim();}
+  }
+  function readJson(k,fb){
+    try{var r=localStorage.getItem(k); if(r===null||r==='') return fb; var v=JSON.parse(r); return v==null?fb:v;}catch(e){return fb;}
+  }
+  function isPontosTable(tbl){
+    if(!tbl) return false;
+    var head=String(((tbl.querySelector&&tbl.querySelector('thead'))||tbl).textContent||'');
+    var nhead=norm(head);
+    return nhead.indexOf('ponto')>=0 && nhead.indexOf('detalhe')>=0;
+  }
+  function titleFromRow(row,editor){
+    if(!row) return '';
+    var byData=(editor&&editor.getAttribute&&editor.getAttribute('data-ponto'))||'';
+    if(String(byData).trim()) return String(byData).trim();
+    var cells=Array.prototype.slice.call(row.children||[]);
+    var editorCell=editor&&editor.closest?editor.closest('td,th'):null;
+    var candidates=cells.filter(function(c){return c!==editorCell;}).map(function(c){return String(c.textContent||'').trim();}).filter(Boolean);
+    if(candidates.length) return candidates[candidates.length-1];
+    return '';
+  }
+  function captureSummary(){
+    var out={};
+    // Compatibilidade com qualquer versão já usada no navegador.
+    SUM_KEYS.forEach(function(k){
+      var o=readJson(k,{});
+      if(o && !Array.isArray(o) && typeof o==='object') Object.keys(o).forEach(function(key){out[key]=String(o[key]==null?'':o[key]);});
+    });
+    // O que está visível na tela prevalece, inclusive campos propositalmente em branco.
+    try{
+      var host=document.getElementById('sumario-content')||document;
+      Array.prototype.slice.call(host.querySelectorAll('table')).forEach(function(tbl){
+        if(!isPontosTable(tbl)) return;
+        Array.prototype.slice.call(tbl.querySelectorAll('tbody tr')).forEach(function(row){
+          var editor=row.querySelector('textarea,input,[contenteditable="true"]');
+          if(!editor) return;
+          var title=titleFromRow(row,editor); if(!title) return;
+          var value=('value' in editor)?String(editor.value||''):String(editor.textContent||'');
+          value=value.trim();
+          out[title]=value;
+          var nk=norm(title); if(nk) out[nk]=value;
+        });
+      });
+    }catch(e){}
+    // Mantém todas as versões sincronizadas para que qualquer patch de tela leia o mesmo conteúdo.
+    try{SUM_KEYS.forEach(function(k){localStorage.setItem(k,JSON.stringify(out));});}catch(e){}
+    return out;
+  }
+  function capturePetro(){
+    var raw=readJson(PETRO_KEY,null);
+    if(raw && typeof raw==='object') return raw;
+    // Se a tela Petrobras estiver carregada, usa exatamente o conjunto que o módulo está lendo.
+    try{if(typeof window.loadPetro==='function'){var p=window.loadPetro(); if(p&&typeof p==='object') return p;}}catch(e){}
+    return null;
+  }
+
+  var oldBuild=(typeof window.buildStoragePayload==='function')?window.buildStoragePayload:null;
+  function buildMirrorPayload(){
+    var p={};
+    try{p=oldBuild?oldBuild():{};}catch(e){p={};}
+    // Garante a base principal mesmo que algum patch anterior falhe.
+    try{if(!Array.isArray(p.PROJETOS))p.PROJETOS=window.PROJETOS||[];}catch(e){}
+    try{if(!Array.isArray(p.RDO))p.RDO=window.RDO||[];}catch(e){}
+    try{if(!Array.isArray(p.DOCUMENTACAO))p.DOCUMENTACAO=window.DOCUMENTACAO||[];}catch(e){}
+    try{if(!Array.isArray(p.MEDICOES))p.MEDICOES=window.MEDICOES||[];}catch(e){}
+    try{if(!Array.isArray(p.PESQUISAS))p.PESQUISAS=window.PESQUISAS||[];}catch(e){}
+    try{if(!Array.isArray(p.OBSERVACOES))p.OBSERVACOES=window.OBSERVACOES||[];}catch(e){}
+    try{if(!p.AVANCOS)p.AVANCOS=window.AVANCOS||{};}catch(e){}
+    p.ts=Date.now();
+    p.BACKUP_VERSION='SIOG-v118-espelho';
+    p.SUMARIO_PONTOS_DETALHES=captureSummary();
+    p.SUMARIO_PONTOS_SEMANA_V119=readJson(WEEKLY_SUM_KEY,{weeks:{}});
+    p.PETROBRAS_IMPORTS=capturePetro();
+    return p;
+  }
+  window.buildStoragePayload=buildMirrorPayload;
+  try{buildStoragePayload=buildMirrorPayload;}catch(e){}
+
+  function exportMirror(){
+    var payload=buildMirrorPayload();
+    var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    var url=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=url; a.download='siog-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  }
+  window.exportBackup=exportMirror;
+  try{exportBackup=exportMirror;}catch(e){}
+
+  function restoreSpecial(data){
+    // Se o backup trouxer o bloco, ele SUBSTITUI o estado local do colega, inclusive campos vazios.
+    if(Object.prototype.hasOwnProperty.call(data,'SUMARIO_PONTOS_DETALHES')){
+      var d=(data.SUMARIO_PONTOS_DETALHES && typeof data.SUMARIO_PONTOS_DETALHES==='object' && !Array.isArray(data.SUMARIO_PONTOS_DETALHES))?data.SUMARIO_PONTOS_DETALHES:{};
+      try{SUM_KEYS.forEach(function(k){localStorage.setItem(k,JSON.stringify(d));});}catch(e){}
+    }
+    if(Object.prototype.hasOwnProperty.call(data,'SUMARIO_PONTOS_SEMANA_V119')){
+      try{
+        var ws=(data.SUMARIO_PONTOS_SEMANA_V119 && typeof data.SUMARIO_PONTOS_SEMANA_V119==='object')?data.SUMARIO_PONTOS_SEMANA_V119:{weeks:{}};
+        localStorage.setItem(WEEKLY_SUM_KEY,JSON.stringify(ws));
+      }catch(e){}
+    }
+    if(Object.prototype.hasOwnProperty.call(data,'PETROBRAS_IMPORTS')){
+      try{
+        if(data.PETROBRAS_IMPORTS && typeof data.PETROBRAS_IMPORTS==='object') localStorage.setItem(PETRO_KEY,JSON.stringify(data.PETROBRAS_IMPORTS));
+        else localStorage.removeItem(PETRO_KEY);
+      }catch(e){}
+    }
+  }
+  function applyExact(data){
+    // Restauração de backup = espelho. Não altera datas/updated_at_local dos comentários.
+    try{if(Array.isArray(data.PROJETOS))window.PROJETOS=data.PROJETOS;}catch(e){try{PROJETOS=data.PROJETOS;}catch(_e){}}
+    try{if(Array.isArray(data.RDO))window.RDO=data.RDO;}catch(e){try{RDO=data.RDO;}catch(_e){}}
+    try{if(Array.isArray(data.DOCUMENTACAO))window.DOCUMENTACAO=data.DOCUMENTACAO;}catch(e){try{DOCUMENTACAO=data.DOCUMENTACAO;}catch(_e){}}
+    try{if(Array.isArray(data.MEDICOES))window.MEDICOES=data.MEDICOES;}catch(e){try{MEDICOES=data.MEDICOES;}catch(_e){}}
+    try{if(Array.isArray(data.PESQUISAS))window.PESQUISAS=data.PESQUISAS;}catch(e){try{PESQUISAS=data.PESQUISAS;}catch(_e){}}
+    try{if(Array.isArray(data.OBSERVACOES))window.OBSERVACOES=data.OBSERVACOES;}catch(e){try{OBSERVACOES=data.OBSERVACOES;}catch(_e){}}
+    try{if(data.AVANCOS&&typeof data.AVANCOS==='object')window.AVANCOS=data.AVANCOS;}catch(e){try{AVANCOS=data.AVANCOS;}catch(_e){}}
+    try{if(data.EXCLUIDOS_ABA)window.EXCLUIDOS_ABA=data.EXCLUIDOS_ABA;}catch(e){try{EXCLUIDOS_ABA=data.EXCLUIDOS_ABA;}catch(_e){}}
+    try{if(typeof data.SAT_RELATORIO_OBS==='string')window.SAT_RELATORIO_OBS=data.SAT_RELATORIO_OBS;}catch(e){try{SAT_RELATORIO_OBS=data.SAT_RELATORIO_OBS;}catch(_e){}}
+    try{if(Array.isArray(data.MASTER_OBRAS))window.MASTER_OBRAS=data.MASTER_OBRAS;}catch(e){try{MASTER_OBRAS=data.MASTER_OBRAS;}catch(_e){}}
+    restoreSpecial(data);
+    try{if(typeof window.sincronizarListaMestreObras==='function')window.sincronizarListaMestreObras();}catch(e){}
+    try{if(typeof window.applyDocumentacaoDateCorrections==='function')window.applyDocumentacaoDateCorrections();}catch(e){}
+  }
+  function refreshAll(){
+    ['renderProjetos','renderRDO','renderDocumentacao','renderGarantias','renderArts','renderMedicoes','renderSatisfacao','renderObservacoes','renderCronograma','renderDashboard','renderSumario','updateBadges','populateAllSelects'].forEach(function(n){
+      try{if(typeof window[n]==='function')window[n]();}catch(e){}
+    });
+  }
+  function persistExact(data){
+    var p=Object.assign({},data,{ts:Date.now()});
+    try{localStorage.setItem(MAIN_KEY,JSON.stringify(p));}catch(e){}
+    try{localStorage.setItem('siog_lafaete_index_relatorio_dados_preservados_v10_20260423',JSON.stringify(p));}catch(e){}
+    try{if(typeof window.saveToStorage==='function')window.saveToStorage();}catch(e){}
+  }
+  function valid(data){return !!(data&&typeof data==='object'&&Array.isArray(data.PROJETOS)&&Array.isArray(data.MEDICOES));}
+  function importMirror(){
+    var inp=document.createElement('input');
+    inp.type='file'; inp.accept='.json,.zip,application/json,application/zip'; inp.style.display='none'; document.body.appendChild(inp);
+    inp.onchange=async function(){
+      var file=inp.files&&inp.files[0]; if(!file){inp.remove();return;}
+      try{
+        var txt='';
+        if(/\.zip$/i.test(file.name)){
+          if(!window.JSZip) throw new Error('Leitor ZIP indisponível. Descompacte o backup e selecione o arquivo JSON.');
+          var z=await JSZip.loadAsync(await file.arrayBuffer());
+          var names=Object.keys(z.files).filter(function(n){return /\.json$/i.test(n)&&!z.files[n].dir;});
+          if(!names.length) throw new Error('O ZIP não contém um arquivo JSON de backup.');
+          txt=await z.files[names[0]].async('string');
+        }else txt=await file.text();
+        var data=JSON.parse(txt);
+        if(!valid(data)) throw new Error('Arquivo sem as bases de Projetos e Medições.');
+        applyExact(data);
+        persistExact(data);
+        refreshAll(); setTimeout(refreshAll,120); setTimeout(refreshAll,650);
+        var extra=[];
+        extra.push(Object.prototype.hasOwnProperty.call(data,'SUMARIO_PONTOS_DETALHES')?'Sumário incluído':'Sumário não existia neste backup antigo');
+        extra.push(Object.prototype.hasOwnProperty.call(data,'SUMARIO_PONTOS_SEMANA_V119')?'Pontos semanais incluídos':'Pontos semanais não existiam neste backup antigo');
+        extra.push(Object.prototype.hasOwnProperty.call(data,'PETROBRAS_IMPORTS')?'Petrobras incluída':'Petrobras não existia neste backup antigo');
+        alert('✅ Backup restaurado como espelho do computador de origem.\n\n'+extra.join(' • ')+'.');
+      }catch(err){alert('Erro ao importar o backup: '+err.message+'\n\nNenhum dado foi apagado.');}
+      finally{inp.remove();}
+    };
+    inp.click();
+  }
+  window.importBackup=importMirror;
+  try{importBackup=importMirror;}catch(e){}
+})();
+</script>
+
+
+<script>
+/* v119 — Pontos de Atenção por semana + edição compartilhável via Backup.
+   Regra final:
+   1) Cada semana começa sem herdar textos manuais da semana anterior.
+   2) Só entram pontos originados dos comentários VERMELHOS/AMARELOS das abas Cronograma e Financeiro da semana de referência.
+   3) O detalhe nasce do comentário, mas permanece editável no Sumário Executivo.
+   4) A edição manual é guardada por semana e acompanha Backup/Restaurar entre computadores. */
+(function(){
+  'use strict';
+  if(window.__siog_v119_pontos_semanais_ok) return;
+  window.__siog_v119_pontos_semanais_ok=true;
+
+  var STORE='siog_sumario_pontos_semana_v119';
+  var LEGACY=[
+    'siog_sumario_pontos_detalhes_v75','siog_sumario_pontos_detalhes_v101','siog_sumario_pontos_detalhes_v102',
+    'siog_sumario_pontos_detalhes_v103','siog_sumario_pontos_detalhes_v104','siog_sumario_pontos_detalhes_v105'
+  ];
+  var busy=false, lastWeek='';
+
+  function norm(s){
+    try{return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+    catch(e){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim();}
+  }
+  function read(){
+    try{var x=JSON.parse(localStorage.getItem(STORE)||'{"weeks":{}}'); if(!x||typeof x!=='object')x={weeks:{}}; if(!x.weeks||typeof x.weeks!=='object')x.weeks={}; return x;}
+    catch(e){return {weeks:{}};}
+  }
+  function write(x){try{localStorage.setItem(STORE,JSON.stringify(x||{weeks:{}}));}catch(e){}}
+  function weekNum(){
+    try{var el=document.getElementById('rel-semana'); var m=String(el&&el.value||'').match(/(\d+)/); if(m)return String(parseInt(m[1],10));}catch(e){}
+    try{var n=typeof window.getSemanaAtual==='function'?window.getSemanaAtual():''; var mm=String(n||'').match(/(\d+)/); if(mm)return String(parseInt(mm[1],10));}catch(e){}
+    return '';
+  }
+  function isModule(o){var t=norm(o&&o.tipo); return t==='cronograma'||t==='financeiro'||t==='medicoes'||t==='medicoes e financeiro'||t==='medicao e financeiro';}
+  function color(o){
+    var c=norm(o&&o.cor);
+    if(c==='r'||c==='vermelho'||c==='critico'||c==='critico 🔴'||c==='🔴')return 'r';
+    if(c==='y'||c==='amarelo'||c==='atencao'||c==='atenção'||c==='🟡')return 'y';
+    return '';
+  }
+  function obsWeek(o){var m=String(o&&o.semana||'').match(/(\d+)/); return m?String(parseInt(m[1],10)):'';}
+  function deleted(o,i){try{return typeof window.__siog_get_deleted_obs_keys==='function'&&window.__siog_get_deleted_obs_keys().has(window.__siog_obs_key(o,i));}catch(e){return false;}}
+  function sourcePoints(){
+    var w=weekNum(), all=Array.isArray(window.OBSERVACOES)?window.OBSERVACOES:[];
+    var rows=[];
+    all.forEach(function(o,i){
+      if(!o||!isModule(o)||deleted(o,i))return;
+      var c=color(o); if(!c)return;
+      if(w && obsWeek(o)!==w)return;
+      rows.push({
+        cor:c==='r'?'🔴':'🟡',
+        titulo:String(o.obra||'Geral'),
+        detalhe:String(o.texto||o.titulo||'').trim().substring(0,500),
+        categoria:String(o.tipo||'Comentário'),
+        _obsIndex:i
+      });
+    });
+    // críticos primeiro, depois atenção, mantendo a ordem cadastrada dentro de cada grupo
+    rows.sort(function(a,b){return (a.cor==='🔴'?0:1)-(b.cor==='🔴'?0:1);});
+    var seen={};
+    rows.forEach(function(p){
+      var base=norm(p.titulo)+'|'+norm(p.categoria);
+      var n=(seen[base]||0)+1; seen[base]=n;
+      p._v119key=base+'|'+n;
+    });
+    return rows;
+  }
+  function manualMap(){var x=read(), w=weekNum(); return (x.weeks[w]&&typeof x.weeks[w]==='object')?x.weeks[w]:{};}
+  function setManual(key,value,title){
+    var w=weekNum(); if(!w||!key)return;
+    var x=read(); if(!x.weeks[w]||typeof x.weeks[w]!=='object')x.weeks[w]={};
+    x.weeks[w][key]={value:String(value==null?'':value),title:String(title||''),updated_at:Date.now()};
+    write(x);
+    syncLegacy();
+  }
+  function applyManual(rows){
+    var m=manualMap();
+    return rows.map(function(p){
+      var q=Object.assign({},p), v=m[p._v119key];
+      if(v&&typeof v==='object'&&Object.prototype.hasOwnProperty.call(v,'value'))q.detalhe=String(v.value||'');
+      else if(typeof v==='string')q.detalhe=v;
+      return q;
+    });
+  }
+  function currentPoints(){return applyManual(sourcePoints());}
+  function syncLegacy(){
+    // As versões antigas do editor continuam existindo no HTML. Mantemos nelas SOMENTE a semana corrente,
+    // evitando que um texto manual da semana passada reapareça na semana nova.
+    var map={};
+    currentPoints().forEach(function(p){map[p.titulo]=p.detalhe; map[norm(p.titulo)]=p.detalhe;});
+    try{LEGACY.forEach(function(k){localStorage.setItem(k,JSON.stringify(map));});}catch(e){}
+  }
+
+  // Última palavra na construção do Sumário: reconstrói os pontos exclusivamente da semana selecionada.
+  var oldBuild=window.buildSumarioData;
+  if(typeof oldBuild==='function'){
+    window.buildSumarioData=function(){
+      var d={}; try{d=oldBuild.apply(this,arguments)||{};}catch(e){d={};}
+      var pts=currentPoints();
+      d.pontosPrioritarios=pts;
+      d.criticos=pts.filter(function(p){return p.cor==='🔴';});
+      return d;
+    };
+    try{buildSumarioData=window.buildSumarioData;}catch(e){}
+  }
+
+  function isPontosTable(tbl){
+    if(!tbl)return false;
+    var head=norm((((tbl.querySelector&&tbl.querySelector('thead'))||tbl).textContent)||'');
+    if(head.indexOf('ponto')<0||head.indexOf('detalhe')<0)return false;
+    var box=tbl.closest?tbl.closest('.card,section,.rel-module'):null;
+    return !box||norm(box.textContent||'').indexOf('pontos de atencao prioritarios')>=0;
+  }
+  function patchScreen(){
+    if(busy)return; busy=true;
+    try{
+      var w=weekNum();
+      if(w!==lastWeek){lastWeek=w; syncLegacy();}
+      var pts=currentPoints(), host=document.getElementById('sumario-content');
+      if(!host)return;
+      var tables=Array.prototype.slice.call(host.querySelectorAll('table')).filter(isPontosTable);
+      tables.forEach(function(tbl){
+        var rows=Array.prototype.slice.call(tbl.querySelectorAll('tbody tr'));
+        rows.forEach(function(row,idx){
+          if(idx>=pts.length)return;
+          var p=pts[idx], cells=row.children; if(!cells||cells.length<3)return;
+          var td=cells[2], ta=td.querySelector('textarea');
+          if(!ta){
+            td.innerHTML=''; ta=document.createElement('textarea'); td.appendChild(ta);
+            ta.style.width='100%'; ta.style.minHeight='42px'; ta.style.border='1px solid rgba(232,119,34,.65)';
+            ta.style.borderRadius='6px'; ta.style.padding='6px 8px'; ta.style.background='rgba(232,119,34,.06)';
+            ta.style.color='var(--tx)'; ta.style.font='inherit'; ta.style.fontSize='11px'; ta.style.lineHeight='1.25'; ta.style.resize='vertical'; ta.style.boxSizing='border-box';
+          }
+          ta.setAttribute('data-v119-key',p._v119key); ta.setAttribute('data-v119-title',p.titulo);
+          if(document.activeElement!==ta && ta.value!==p.detalhe)ta.value=p.detalhe;
+          if(ta.dataset.v119Bound!=='1'){
+            ta.dataset.v119Bound='1';
+            ta.addEventListener('input',function(){setManual(ta.getAttribute('data-v119-key'),ta.value,ta.getAttribute('data-v119-title'));});
+            ta.addEventListener('blur',function(){setManual(ta.getAttribute('data-v119-key'),ta.value.trim(),ta.getAttribute('data-v119-title')); try{if(typeof window.showSaveStatus==='function')window.showSaveStatus('✓ Detalhe desta semana salvo');}catch(e){}});
+          }
+        });
+      });
+    }finally{busy=false;}
+  }
+
+  // Reaplica depois das rotinas antigas, inclusive quando muda a semana de referência.
+  var oldRender=window.renderSumario;
+  if(typeof oldRender==='function'){
+    window.renderSumario=function(){syncLegacy(); var r=oldRender.apply(this,arguments); setTimeout(patchScreen,0); setTimeout(patchScreen,120); return r;};
+    try{renderSumario=window.renderSumario; if(window.PAGE_RENDERS)window.PAGE_RENDERS.sumario=window.renderSumario;}catch(e){}
+  }
+  document.addEventListener('change',function(ev){if(ev.target&&ev.target.id==='rel-semana'){syncLegacy(); try{window.renderSumario();}catch(e){} setTimeout(patchScreen,50);}},true);
+  try{new MutationObserver(function(){clearTimeout(window.__siog_v119_timer);window.__siog_v119_timer=setTimeout(patchScreen,40);}).observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
+
+  // PowerPoint/relatório usam o mesmo detalhe manual da semana selecionada.
+  var oldSlide=window.buildSumarioSlideHtml;
+  if(typeof oldSlide==='function'){
+    window.buildSumarioSlideHtml=function(){syncLegacy(); return oldSlide.apply(this,arguments);};
+    try{buildSumarioSlideHtml=window.buildSumarioSlideHtml;}catch(e){}
+  }
+
+  // Exposição para o backup e para diagnóstico.
+  window.__siog_v119_export_weekly=function(){return read();};
+  window.__siog_v119_import_weekly=function(x){write(x&&typeof x==='object'?x:{weeks:{}});syncLegacy();try{window.renderSumario();}catch(e){}};
+
+  function init(){syncLegacy(); try{window.renderSumario();}catch(e){} setTimeout(patchScreen,80); setTimeout(patchScreen,500);}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(init,500);}); else setTimeout(init,200);
 })();
 </script>
