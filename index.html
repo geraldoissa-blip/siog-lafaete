@@ -402,6 +402,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <!-- Correção v47: exportação PPT/PDF respeita a ordem classificada nas abas, preserva vigências manuais e exibe observação semanal da satisfação -->
 <!-- Correção v48: campos de checklist da Documentação permitem N/A manual, exibindo traço na tela e no relatório/PDF/PPT -->
 <!-- Correção v49: campos de documentos pendentes permitem salvar traço (-) manual sem voltar para Pendente automático -->
+<!-- Correção v101: backup passa a incluir detalhes editáveis do Sumário Executivo e dados importados de Notas/RMs Petrobras -->
 <!-- Correção v50: traço (-) gravado no campo prevalece sobre regra automática de Pendente na aba ARTs & Documentos -->
 <!-- Correção v51: faróis do RDO congelados pela segunda-feira da semana do relatório -->
 <!-- Correção v52: observação automática do RDO por status e ordenação padrão por ID nas abas -->
@@ -11251,6 +11252,59 @@ const STORAGE_KEYS_TO_TRY = [
   'siog_lafaete_index_relatorio_dados_preservados_v10_20260423'
 ];
 
+/* v101 — backup completo: inclui detalhes editáveis do Sumário e as importações Petrobras. */
+function __siogBackupReadJsonKey(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if(raw === null || raw === '') return fallback;
+    const value = JSON.parse(raw);
+    return value == null ? fallback : value;
+  } catch(_e) { return fallback; }
+}
+
+function __siogBackupCaptureSumarioDetalhes() {
+  const keys = [
+    'siog_sumario_pontos_detalhes_v75',
+    'siog_sumario_pontos_detalhes_v101',
+    'siog_sumario_pontos_detalhes_v102',
+    'siog_sumario_pontos_detalhes_v103',
+    'siog_sumario_pontos_detalhes_v104',
+    'siog_sumario_pontos_detalhes_v105'
+  ];
+  let details = {};
+  // Mescla todas as versões antigas/novas para não perder texto salvo por patches posteriores.
+  keys.forEach(key => {
+    const obj = __siogBackupReadJsonKey(key, {});
+    if(obj && !Array.isArray(obj) && typeof obj === 'object') Object.assign(details, obj);
+  });
+  try {
+    const host = document.getElementById('sumario-content');
+    if(host) {
+      [...host.querySelectorAll('table tbody tr')].forEach(r => {
+        const c = r.children;
+        if(!c || c.length < 3) return;
+        const obra = String(c[1].textContent || '').trim();
+        if(!obra) return;
+        const det = c[2];
+        const ta = det && det.querySelector ? det.querySelector('textarea,input') : null;
+        let value = null;
+        if(ta) value = String(ta.value || '').trim();
+        else if(det && (det.isContentEditable || det.dataset.editV75 === '1' || det.dataset.v102Edit === '1')) value = String(det.textContent || '').trim();
+        if(value !== null) {
+          details[obra] = value;
+          try {
+            const norm = obra.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+            if(norm) details[norm] = value;
+          } catch(_e) {}
+        }
+      });
+    }
+    // Mantém todas as chaves compatíveis sincronizadas, inclusive a versão mais recente (v105).
+    keys.forEach(key => localStorage.setItem(key, JSON.stringify(details)));
+  } catch(_e) {}
+  return details;
+}
+
 function buildStoragePayload() {
   return {
     ts: Date.now(),
@@ -11264,6 +11318,10 @@ function buildStoragePayload() {
     EXCLUIDOS_ABA,
     SAT_RELATORIO_OBS,
     MASTER_OBRAS,
+    // Estes dois blocos antes ficavam somente em chaves separadas do localStorage
+    // e por isso não acompanhavam o arquivo JSON de backup para outro computador.
+    SUMARIO_PONTOS_DETALHES: __siogBackupCaptureSumarioDetalhes(),
+    PETROBRAS_IMPORTS: __siogBackupReadJsonKey('siog_petrobras_v75_imports', null),
   };
 }
 
@@ -11282,6 +11340,28 @@ function applyStorageData(data) {
   if(data.EXCLUIDOS_ABA)                            EXCLUIDOS_ABA = data.EXCLUIDOS_ABA;
   if(typeof data.SAT_RELATORIO_OBS === 'string')    SAT_RELATORIO_OBS = data.SAT_RELATORIO_OBS;
   if(Array.isArray(data.MASTER_OBRAS))              MASTER_OBRAS = data.MASTER_OBRAS;
+
+  // v101: restaura também os estados que são gravados fora da base principal.
+  // Fazemos isto antes das renderizações para a Petrobras ser reconstruída com os arquivos importados
+  // e para os textos editáveis do Sumário já aparecerem preenchidos no outro computador.
+  try {
+    if(data.SUMARIO_PONTOS_DETALHES && !Array.isArray(data.SUMARIO_PONTOS_DETALHES) && typeof data.SUMARIO_PONTOS_DETALHES === 'object') {
+      [
+        'siog_sumario_pontos_detalhes_v75',
+        'siog_sumario_pontos_detalhes_v101',
+        'siog_sumario_pontos_detalhes_v102',
+        'siog_sumario_pontos_detalhes_v103',
+        'siog_sumario_pontos_detalhes_v104',
+        'siog_sumario_pontos_detalhes_v105'
+      ].forEach(function(key){ localStorage.setItem(key, JSON.stringify(data.SUMARIO_PONTOS_DETALHES)); });
+    }
+  } catch(_e) {}
+  try {
+    if(data.PETROBRAS_IMPORTS && typeof data.PETROBRAS_IMPORTS === 'object') {
+      localStorage.setItem('siog_petrobras_v75_imports', JSON.stringify(data.PETROBRAS_IMPORTS));
+    }
+  } catch(_e) {}
+
   try{sincronizarListaMestreObras();}catch(_e){}
   applyDocumentacaoDateCorrections();
 }
