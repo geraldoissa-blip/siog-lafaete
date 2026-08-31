@@ -18610,3 +18610,181 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{window.renderSumario();}catch(e){}patchEditors();},700);});else setTimeout(function(){try{window.renderSumario();}catch(e){}patchEditors();},300);
 })();
 </script>
+
+<script>
+/* v122 — Pontos de Atenção realmente semanais + backup espelho.
+   Regra definitiva:
+   1) uma semana nova começa SEM pontos;
+   2) um ponto só nasce quando um comentário de Cronograma ou Financeiro/Medições é SALVO/EDITADO naquela semana e está amarelo/vermelho;
+   3) o detalhe do Sumário é editável e fica salvo por semana;
+   4) backup/restauração transportam exatamente a lista visível e as edições;
+   5) comentários históricos não são reativados por data antiga, renderização anterior ou restauração de dados gerais. */
+(function(){
+  'use strict';
+  if(window.__siog_v122_week_points_exact) return;
+  window.__siog_v122_week_points_exact=true;
+
+  var ACTIVE_STORE='siog_sumario_active_points_v122';
+  var MANUAL_STORE='siog_sumario_manual_points_v122';
+  var SNAP_STORE='siog_sumario_snapshot_v122';
+  var STATE_STORE='siog_sumario_state_v122';
+  var PETRO_KEY='siog_petrobras_v75_imports';
+  var MAIN_KEY='siog_lafaete_data_v6_original_com_dados';
+  var PRESERVE_KEY='siog_lafaete_index_relatorio_dados_preservados_v10_20260423';
+  var renderBusy=false;
+
+  function norm(s){try{return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}catch(e){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim();}}
+  function read(k,fb){try{var r=localStorage.getItem(k);if(r==null||r==='')return fb;var x=JSON.parse(r);return x==null?fb:x;}catch(e){return fb;}}
+  function write(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+  function remove(k){try{localStorage.removeItem(k);}catch(e){}}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function mondayTs(){var d=new Date();d.setHours(0,0,0,0);var day=d.getDay();d.setDate(d.getDate()-(day===0?6:day-1));return d.getTime();}
+  function weekKey(){var d=new Date(mondayTs());return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function isModule(o){var t=norm(o&&o.tipo);return t==='cronograma'||t==='financeiro'||t==='medicoes'||t==='medicoes e financeiro'||t==='medicao e financeiro';}
+  function pointColor(o){var c=norm(o&&o.cor);if(c==='r'||c==='vermelho'||c==='critico'||c==='crítico'||c.indexOf('🔴')>=0)return '🔴';if(c==='y'||c==='amarelo'||c==='atencao'||c==='atenção'||c.indexOf('🟡')>=0)return '🟡';return '';}
+  function deleted(o,i){try{return typeof window.__siog_get_deleted_obs_keys==='function'&&window.__siog_get_deleted_obs_keys().has(window.__siog_obs_key(o,i));}catch(e){return false;}}
+  function sourceKey(o,i){var id=String(o&&(o.id_seq||o.id||o.uuid)||'').trim();if(id)return 'id:'+id;var born=String(o&&(o.created_at_local||o.created_at||'')).trim();return 'obs:'+norm(o&&o.obra)+'|'+norm(o&&o.tipo)+'|'+norm(o&&o.titulo)+'|'+born+'|'+i;}
+  function weekBucket(storeKey){var x=read(storeKey,{weeks:{}});if(!x||typeof x!=='object')x={weeks:{}};if(!x.weeks||typeof x.weeks!=='object')x.weeks={};var wk=weekKey();if(!x.weeks[wk]||typeof x.weeks[wk]!=='object')x.weeks[wk]={};return {root:x,bucket:x.weeks[wk],week:wk};}
+
+  function initWeek(){
+    var wk=weekKey(), st=read(STATE_STORE,{});
+    if(!st||st.week!==wk){
+      /* Não apaga histórico de outras semanas; apenas garante que a semana nova nasce limpa. */
+      var a=read(ACTIVE_STORE,{weeks:{}});if(!a||typeof a!=='object')a={weeks:{}};if(!a.weeks||typeof a.weeks!=='object')a.weeks={};a.weeks[wk]={};write(ACTIVE_STORE,a);
+      var m=read(MANUAL_STORE,{weeks:{}});if(!m||typeof m!=='object')m={weeks:{}};if(!m.weeks||typeof m.weeks!=='object')m.weeks={};m.weeks[wk]={};write(MANUAL_STORE,m);
+      remove(SNAP_STORE);
+      write(STATE_STORE,{week:wk,startedAt:Date.now()});
+    }
+  }
+
+  function activeMap(){initWeek();return weekBucket(ACTIVE_STORE).bucket;}
+  function manualMap(){initWeek();return weekBucket(MANUAL_STORE).bucket;}
+  function setActive(key,on){if(!key)return;var w=weekBucket(ACTIVE_STORE);if(on)w.bucket[key]={active:true,updatedAt:Date.now()};else delete w.bucket[key];write(ACTIVE_STORE,w.root);}
+  function setManual(key,value,title){if(!key)return;var w=weekBucket(MANUAL_STORE);w.bucket[key]={value:String(value==null?'':value),title:String(title||''),updatedAt:Date.now()};write(MANUAL_STORE,w.root);updateSnapshotDetail(key,value,title);}
+  function clearSnapshot(){remove(SNAP_STORE);}
+  function getSnapshot(){var s=read(SNAP_STORE,null);return (s&&s.weekKey===weekKey()&&Array.isArray(s.points))?s:null;}
+  function saveSnapshot(points){var s={version:122,weekKey:weekKey(),savedAt:Date.now(),points:(points||[]).map(function(p){return {cor:p.cor,titulo:p.titulo,detalhe:String(p.detalhe==null?'':p.detalhe),categoria:p.categoria||'',_key:p._key||''};})};write(SNAP_STORE,s);return s;}
+  function updateSnapshotDetail(key,value,title){var s=getSnapshot();if(!s)return;var hit=false;s.points.forEach(function(p){if(p._key===key){p.detalhe=String(value==null?'':value);if(title)p.titulo=title;hit=true;}});if(hit){s.savedAt=Date.now();write(SNAP_STORE,s);}}
+
+  function calculatedPoints(){
+    initWeek();
+    var all=Array.isArray(window.OBSERVACOES)?window.OBSERVACOES:[], act=activeMap(), man=manualMap(), rows=[];
+    all.forEach(function(o,i){
+      if(!o||!isModule(o)||deleted(o,i))return;
+      var c=pointColor(o);if(!c)return;
+      var k=sourceKey(o,i);if(!act[k]||!act[k].active)return;
+      var detail=String(o.texto||o.titulo||'').trim(), mv=man[k];
+      if(mv&&typeof mv==='object'&&Object.prototype.hasOwnProperty.call(mv,'value'))detail=String(mv.value==null?'':mv.value);
+      rows.push({cor:c,titulo:String(o.obra||o.projeto||o.cliente||'Geral').trim()||'Geral',detalhe:detail,categoria:String(o.tipo||'Comentário'),_key:k,_ts:Number((act[k]&&act[k].updatedAt)||0)});
+    });
+    rows.sort(function(a,b){return (a.cor==='🔴'?0:1)-(b.cor==='🔴'?0:1)||a._ts-b._ts;});
+    return rows;
+  }
+  function currentPoints(){var s=getSnapshot();return s?s.points.map(function(p){return Object.assign({},p);}):calculatedPoints();}
+
+  function findSavedObservation(){
+    var all=Array.isArray(window.OBSERVACOES)?window.OBSERVACOES:[], best=null,bestI=-1,bestTs=-1;
+    all.forEach(function(o,i){if(!o||!isModule(o))return;var ts=Number(o.updated_at_local||o.created_at_local||0);if(Number.isFinite(ts)&&ts>bestTs){bestTs=ts;best=o;bestI=i;}});
+    return best?{obs:best,index:bestI,key:sourceKey(best,bestI)}:null;
+  }
+  function activateLatestSaved(){var x=findSavedObservation();if(!x)return;clearSnapshot();if(pointColor(x.obs))setActive(x.key,true);else setActive(x.key,false);}
+
+  var prevBuild=window.buildSumarioData;
+  window.buildSumarioData=function(){
+    var d={};try{d=typeof prevBuild==='function'?(prevBuild.apply(this,arguments)||{}):{};}catch(e){d={};}
+    var p=currentPoints();d.pontosPrioritarios=p;d.criticos=p.filter(function(x){return x.cor==='🔴';});
+    return d;
+  };
+  try{buildSumarioData=window.buildSumarioData;}catch(e){}
+
+  function isPontosTable(tbl){if(!tbl)return false;var h=norm((((tbl.querySelector&&tbl.querySelector('thead'))||tbl).textContent)||'');return h.indexOf('ponto')>=0&&h.indexOf('detalhe')>=0;}
+  function hardRenderPoints(){
+    if(renderBusy)return;renderBusy=true;
+    try{
+      initWeek();
+      var host=document.getElementById('sumario-content')||document;
+      var tables=Array.prototype.slice.call(host.querySelectorAll('table'));
+      var tbl=tables.find(isPontosTable);if(!tbl)return;
+      var tbody=tbl.querySelector('tbody');if(!tbody){tbody=document.createElement('tbody');tbl.appendChild(tbody);}
+      var pts=currentPoints();
+      tbody.innerHTML='';
+      pts.forEach(function(p){
+        var tr=document.createElement('tr');
+        tr.innerHTML='<td style="font-weight:700;vertical-align:top"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:'+(p.cor==='🔴'?'#ff5b62':'#ffc107')+'"></span>'+esc(p.titulo)+'</td><td style="vertical-align:top"><textarea data-v122-key="'+esc(p._key)+'" data-v122-title="'+esc(p.titulo)+'" style="width:100%;min-height:42px;border:1px solid rgba(232,119,34,.85);border-radius:6px;padding:6px 8px;background:rgba(232,119,34,.08);color:var(--tx);font:inherit;font-size:11px;line-height:1.25;resize:vertical;box-sizing:border-box"></textarea></td>';
+        var ta=tr.querySelector('textarea');ta.value=String(p.detalhe==null?'':p.detalhe);
+        ta.addEventListener('input',function(){setManual(ta.getAttribute('data-v122-key'),ta.value,ta.getAttribute('data-v122-title'));});
+        ta.addEventListener('blur',function(){setManual(ta.getAttribute('data-v122-key'),ta.value.trim(),ta.getAttribute('data-v122-title'));});
+        tbody.appendChild(tr);
+      });
+    }finally{renderBusy=false;}
+  }
+
+  var prevRender=window.renderSumario;
+  window.renderSumario=function(){var r;try{r=typeof prevRender==='function'?prevRender.apply(this,arguments):undefined;}catch(e){}setTimeout(hardRenderPoints,0);setTimeout(hardRenderPoints,100);setTimeout(hardRenderPoints,350);return r;};
+  try{renderSumario=window.renderSumario;if(window.PAGE_RENDERS)window.PAGE_RENDERS.sumario=window.renderSumario;}catch(e){}
+
+  var prevSalvar=window.salvarObs;
+  if(typeof prevSalvar==='function'){
+    window.salvarObs=function(){var r=prevSalvar.apply(this,arguments);setTimeout(function(){activateLatestSaved();try{window.renderSumario();}catch(e){}},25);return r;};
+    try{salvarObs=window.salvarObs;}catch(e){}
+  }
+  var prevExcluir=window.excluirObsPorSeq;
+  if(typeof prevExcluir==='function'){
+    window.excluirObsPorSeq=function(){var r=prevExcluir.apply(this,arguments);clearSnapshot();setTimeout(function(){try{window.renderSumario();}catch(e){}},25);return r;};
+    try{excluirObsPorSeq=window.excluirObsPorSeq;}catch(e){}
+  }
+
+  function captureVisible(){
+    try{document.querySelectorAll('#sumario-content textarea[data-v122-key]').forEach(function(ta){setManual(ta.getAttribute('data-v122-key'),ta.value,ta.getAttribute('data-v122-title')||'');});}catch(e){}
+    return currentPoints();
+  }
+  function basePayload(){try{return typeof window.buildStoragePayload==='function'?(window.buildStoragePayload()||{}):{};}catch(e){return {};}}
+  function buildBackup(){
+    var pts=captureVisible(),p=basePayload();
+    try{p.PROJETOS=Array.isArray(window.PROJETOS)?window.PROJETOS:p.PROJETOS||[];}catch(e){}
+    try{p.RDO=Array.isArray(window.RDO)?window.RDO:p.RDO||[];}catch(e){}
+    try{p.DOCUMENTACAO=Array.isArray(window.DOCUMENTACAO)?window.DOCUMENTACAO:p.DOCUMENTACAO||[];}catch(e){}
+    try{p.MEDICOES=Array.isArray(window.MEDICOES)?window.MEDICOES:p.MEDICOES||[];}catch(e){}
+    try{p.PESQUISAS=Array.isArray(window.PESQUISAS)?window.PESQUISAS:p.PESQUISAS||[];}catch(e){}
+    try{p.OBSERVACOES=Array.isArray(window.OBSERVACOES)?window.OBSERVACOES:p.OBSERVACOES||[];}catch(e){}
+    try{p.AVANCOS=window.AVANCOS||p.AVANCOS||{};}catch(e){}
+    p.ts=Date.now();p.BACKUP_VERSION='SIOG-v122-semanal-espelho';
+    p.SUMARIO_ACTIVE_POINTS_V122=read(ACTIVE_STORE,{weeks:{}});
+    p.SUMARIO_MANUAL_POINTS_V122=read(MANUAL_STORE,{weeks:{}});
+    p.SUMARIO_SNAPSHOT_V122=saveSnapshot(pts);
+    p.SUMARIO_STATE_V122=read(STATE_STORE,{week:weekKey()});
+    p.PETROBRAS_IMPORTS=read(PETRO_KEY,null);
+    return p;
+  }
+  function exportV122(){var p=buildBackup(),blob=new Blob([JSON.stringify(p,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='siog-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);}
+  window.exportBackup=exportV122;try{exportBackup=exportV122;}catch(e){}
+
+  function applyArray(data,n){try{if(Array.isArray(data[n])){window[n]=data[n];try{eval(n+'=window[n]');}catch(_e){}}}catch(e){}}
+  function restoreV122(data){
+    ['PROJETOS','RDO','DOCUMENTACAO','MEDICOES','PESQUISAS','OBSERVACOES'].forEach(function(n){applyArray(data,n);});
+    try{if(data.AVANCOS&&typeof data.AVANCOS==='object'){window.AVANCOS=data.AVANCOS;try{AVANCOS=data.AVANCOS;}catch(_e){}}}catch(e){}
+    if(Object.prototype.hasOwnProperty.call(data,'SUMARIO_ACTIVE_POINTS_V122'))write(ACTIVE_STORE,data.SUMARIO_ACTIVE_POINTS_V122||{weeks:{}});else{var a=read(ACTIVE_STORE,{weeks:{}});if(!a.weeks)a.weeks={};a.weeks[weekKey()]={};write(ACTIVE_STORE,a);}
+    if(Object.prototype.hasOwnProperty.call(data,'SUMARIO_MANUAL_POINTS_V122'))write(MANUAL_STORE,data.SUMARIO_MANUAL_POINTS_V122||{weeks:{}});
+    if(Object.prototype.hasOwnProperty.call(data,'SUMARIO_SNAPSHOT_V122'))write(SNAP_STORE,data.SUMARIO_SNAPSHOT_V122||{});else clearSnapshot();
+    /* Estado local passa a considerar a semana real do computador. Snapshot de outra semana é automaticamente ignorado. */
+    write(STATE_STORE,{week:weekKey(),restoredAt:Date.now()});
+    if(Object.prototype.hasOwnProperty.call(data,'PETROBRAS_IMPORTS')){if(data.PETROBRAS_IMPORTS&&typeof data.PETROBRAS_IMPORTS==='object')write(PETRO_KEY,data.PETROBRAS_IMPORTS);else remove(PETRO_KEY);}
+    try{localStorage.setItem(MAIN_KEY,JSON.stringify(data));}catch(e){}
+    try{localStorage.setItem(PRESERVE_KEY,JSON.stringify(data));}catch(e){}
+    try{if(typeof window.saveToStorage==='function')window.saveToStorage();}catch(e){}
+  }
+  function refreshAll(){['renderProjetos','renderRDO','renderDocumentacao','renderGarantias','renderArts','renderMedicoes','renderSatisfacao','renderObservacoes','renderCronograma','renderDashboard','renderSumario','updateBadges','populateAllSelects'].forEach(function(n){try{if(typeof window[n]==='function')window[n]();}catch(e){}});setTimeout(hardRenderPoints,120);setTimeout(hardRenderPoints,500);}
+  function valid(data){return !!(data&&typeof data==='object'&&Array.isArray(data.PROJETOS)&&Array.isArray(data.MEDICOES));}
+  function importV122(){
+    var inp=document.createElement('input');inp.type='file';inp.accept='.json,.zip,application/json,application/zip';inp.style.display='none';document.body.appendChild(inp);
+    inp.onchange=async function(){var f=inp.files&&inp.files[0];if(!f){inp.remove();return;}try{var txt='';if(/\.zip$/i.test(f.name)){if(!window.JSZip)throw new Error('Leitor ZIP indisponível.');var z=await JSZip.loadAsync(await f.arrayBuffer()),names=Object.keys(z.files).filter(function(n){return /\.json$/i.test(n)&&!z.files[n].dir;});if(!names.length)throw new Error('ZIP sem JSON de backup.');txt=await z.files[names[0]].async('string');}else txt=await f.text();var data=JSON.parse(txt);if(!valid(data))throw new Error('Backup inválido: faltam Projetos ou Medições.');restoreV122(data);refreshAll();alert('✅ Backup restaurado.\n\nOs Pontos de Atenção foram aplicados como espelho da origem e continuam vinculados à semana correta.');}catch(err){alert('Erro ao importar o backup: '+err.message+'\n\nNenhum dado foi apagado.');}finally{inp.remove();}};inp.click();
+  }
+  window.importBackup=importV122;try{importBackup=importV122;}catch(e){}
+
+  /* Primeira abertura desta versão: a lista v122 da semana corrente nasce vazia. Isso impede qualquer linha histórica dos patches antigos de sobreviver visualmente. */
+  initWeek();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{window.renderSumario();}catch(e){}hardRenderPoints();},800);});else setTimeout(function(){try{window.renderSumario();}catch(e){}hardRenderPoints();},300);
+  window.__siog_v122_points=currentPoints;
+  window.__siog_v122_force_render=hardRenderPoints;
+})();
+</script>
