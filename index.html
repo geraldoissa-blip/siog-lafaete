@@ -18788,3 +18788,107 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   window.__siog_v122_force_render=hardRenderPoints;
 })();
 </script>
+
+
+<script>
+/* v123 — correção final dos Pontos de Atenção semanais.
+   - Na PRIMEIRA abertura desta versão, a semana corrente é zerada de forma controlada.
+   - Depois disso, recarregar a página na mesma semana preserva os pontos válidos.
+   - Só entram pontos ativados por novo salvar/editar em Cronograma ou Medições/Financeiro.
+   - O renderer v123 tem prioridade visual sobre patches antigos.
+   - Backup/restauração mantém o espelho exato da semana. */
+(function(){
+  'use strict';
+  if(window.__siog_v123_final_week_fix) return;
+  window.__siog_v123_final_week_fix=true;
+
+  var ACTIVE_STORE='siog_sumario_active_points_v122';
+  var MANUAL_STORE='siog_sumario_manual_points_v122';
+  var SNAP_STORE='siog_sumario_snapshot_v122';
+  var STATE_STORE='siog_sumario_state_v122';
+  var MIGRATION_KEY='siog_sumario_v123_migrated_week';
+
+  function read(k,fb){try{var r=localStorage.getItem(k);if(r==null||r==='')return fb;return JSON.parse(r);}catch(e){return fb;}}
+  function write(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+  function rem(k){try{localStorage.removeItem(k);}catch(e){}}
+  function monday(){var d=new Date();d.setHours(0,0,0,0);var day=d.getDay();d.setDate(d.getDate()-(day===0?6:day-1));return d;}
+  function wk(){var d=monday();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function norm(s){try{return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}catch(e){return String(s||'').toLowerCase().trim();}}
+
+  function resetThisWeekOnce(){
+    var k=wk(), migrated=localStorage.getItem(MIGRATION_KEY)||'';
+    if(migrated===k) return;
+    var a=read(ACTIVE_STORE,{weeks:{}}); if(!a||typeof a!=='object')a={weeks:{}}; if(!a.weeks||typeof a.weeks!=='object')a.weeks={}; a.weeks[k]={}; write(ACTIVE_STORE,a);
+    var m=read(MANUAL_STORE,{weeks:{}}); if(!m||typeof m!=='object')m={weeks:{}}; if(!m.weeks||typeof m.weeks!=='object')m.weeks={}; m.weeks[k]={}; write(MANUAL_STORE,m);
+    rem(SNAP_STORE);
+    write(STATE_STORE,{week:k,startedAt:Date.now(),resetBy:'v123'});
+    try{localStorage.setItem(MIGRATION_KEY,k);}catch(e){}
+  }
+
+  function points(){
+    try{
+      if(typeof window.__siog_v122_points==='function'){
+        var p=window.__siog_v122_points();
+        return Array.isArray(p)?p:[];
+      }
+    }catch(e){}
+    return [];
+  }
+
+  function isPontosTable(tbl){
+    if(!tbl)return false;
+    var h=norm((((tbl.querySelector&&tbl.querySelector('thead'))||tbl).textContent)||'');
+    return h.indexOf('ponto')>=0&&h.indexOf('detalhe')>=0;
+  }
+
+  var drawing=false;
+  function draw(){
+    if(drawing)return; drawing=true;
+    try{
+      var host=document.getElementById('sumario-content'); if(!host)return;
+      var tbl=Array.prototype.slice.call(host.querySelectorAll('table')).find(isPontosTable); if(!tbl)return;
+      var tbody=tbl.querySelector('tbody'); if(!tbody){tbody=document.createElement('tbody');tbl.appendChild(tbody);}
+      var ps=points();
+      var current=[];
+      Array.prototype.forEach.call(tbody.querySelectorAll('textarea[data-v123-key]'),function(ta){
+        current.push([ta.getAttribute('data-v123-key')||'',ta.value]);
+      });
+      tbody.innerHTML='';
+      ps.forEach(function(p){
+        var tr=document.createElement('tr');
+        var dot=p.cor==='🔴'?'#ff5b62':'#ffc107';
+        tr.innerHTML='<td style="font-weight:700;vertical-align:top"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:'+dot+'"></span>'+esc(p.titulo)+'</td><td style="vertical-align:top"><textarea data-v123-key="'+esc(p._key||'')+'" data-v123-title="'+esc(p.titulo||'')+'" style="width:100%;min-height:42px;border:1px solid rgba(232,119,34,.85);border-radius:6px;padding:6px 8px;background:rgba(232,119,34,.08);color:var(--tx);font:inherit;font-size:11px;line-height:1.25;resize:vertical;box-sizing:border-box"></textarea></td>';
+        var ta=tr.querySelector('textarea'); ta.value=String(p.detalhe==null?'':p.detalhe);
+        function save(){
+          try{
+            var key=ta.getAttribute('data-v123-key')||'', title=ta.getAttribute('data-v123-title')||'';
+            if(typeof window.__siogSaveSumarioDetalhe==='function') window.__siogSaveSumarioDetalhe(title,ta.value);
+            var root=read(MANUAL_STORE,{weeks:{}}); if(!root||typeof root!=='object')root={weeks:{}}; if(!root.weeks||typeof root.weeks!=='object')root.weeks={}; if(!root.weeks[wk()])root.weeks[wk()]={}; root.weeks[wk()][key]={value:ta.value,title:title,updatedAt:Date.now()}; write(MANUAL_STORE,root);
+            var snap=read(SNAP_STORE,null); if(snap&&snap.weekKey===wk()&&Array.isArray(snap.points)){snap.points.forEach(function(x){if(x._key===key)x.detalhe=ta.value;});write(SNAP_STORE,snap);}
+          }catch(e){}
+        }
+        ta.addEventListener('input',save);ta.addEventListener('blur',save);
+        tbody.appendChild(tr);
+      });
+    }finally{drawing=false;}
+  }
+
+  resetThisWeekOnce();
+
+  var prevRender=window.renderSumario;
+  window.renderSumario=function(){var r;try{r=typeof prevRender==='function'?prevRender.apply(this,arguments):undefined;}catch(e){};setTimeout(draw,0);setTimeout(draw,80);setTimeout(draw,300);setTimeout(draw,800);return r;};
+  try{renderSumario=window.renderSumario;if(window.PAGE_RENDERS)window.PAGE_RENDERS.sumario=window.renderSumario;}catch(e){}
+
+  // Garante prioridade sobre MutationObservers antigos que tentam recolocar comentários históricos.
+  try{
+    var obs=new MutationObserver(function(){clearTimeout(window.__siog_v123_draw_timer);window.__siog_v123_draw_timer=setTimeout(draw,35);});
+    var startObs=function(){var h=document.getElementById('sumario-content');if(h)obs.observe(h,{childList:true,subtree:true});};
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(startObs,500);});else setTimeout(startObs,200);
+  }catch(e){}
+
+  function boot(){try{window.renderSumario();}catch(e){}setTimeout(draw,100);setTimeout(draw,600);}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,700);});else setTimeout(boot,250);
+  window.__siog_v123_force_draw=draw;
+})();
+</script>
