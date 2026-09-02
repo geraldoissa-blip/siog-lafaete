@@ -101,6 +101,163 @@ excluirObsPorSeq=function(key){
 try{document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{try{renderSumario();}catch(_e){}},1000));}catch(_e){}
 
 </script>
+
+<style id="siog-v125-ajustes-solicitados">
+/* Alterações isoladas solicitadas: edição centralizada na Base de Projetos. */
+#page-cronograma .filter-bar button[onclick^="openCronoEdit"],
+#page-cronograma .filter-bar button[onclick*="excluirProjetoDaAbaPrompt('cronograma')"]{display:none!important}
+#page-cronograma table thead th:first-child,
+#page-cronograma #tbody-crono td:first-child{display:none!important}
+#page-cronograma .split-layout{grid-template-columns:minmax(0,1fr) 460px}
+#v125-projeto-campos{margin:0 0 12px;padding:12px;border:1px solid var(--bd);border-left:3px solid var(--or);border-radius:var(--rad);background:var(--bg3)}
+#v125-projeto-campos .v125-grid{display:grid;grid-template-columns:repeat(2,minmax(160px,1fr));gap:10px;align-items:end}
+#v125-projeto-campos .v125-title{font-size:12px;font-weight:700;color:var(--or);margin-bottom:9px}
+@media(max-width:1100px){#page-cronograma .split-layout{grid-template-columns:1fr}#page-cronograma .comments-panel{position:static;max-height:none}#v125-projeto-campos .v125-grid{grid-template-columns:1fr 1fr}}
+</style>
+
+<script id="siog-v125-medicoes-projetos">
+/* v125 — correções estritamente isoladas em Medições, Base de Projetos e Cronograma. */
+(function(){
+'use strict';
+function installV125(){
+if(window.__siog_v125_solicitado_ok)return;
+window.__siog_v125_solicitado_ok=true;
+
+var MED_JOURNAL_KEY='siog_medicoes_journal_v125';
+function el(id){return document.getElementById(id);}
+function val(id){var e=el(id);return e?String(e.value||''):'';}
+function num(id){var e=el(id);if(!e||String(e.value).trim()==='')return null;var n=Number(String(e.value).replace(',','.'));return Number.isFinite(n)?n:null;}
+function clampPct(v){return v===null?null:Math.max(0,Math.min(100,v));}
+function projectKey(id,obra){return String(id||'')+'|'+String(obra||'');}
+function partialKey(id,obra,idx){return projectKey(id,obra)+'|PARCIAL|'+String(idx);}
+function readJournal(){try{var x=JSON.parse(localStorage.getItem(MED_JOURNAL_KEY)||'{}');return x&&typeof x==='object'&&!Array.isArray(x)?x:{};}catch(e){return {};}}
+function writeJournal(j){try{localStorage.setItem(MED_JOURNAL_KEY,JSON.stringify(j));}catch(e){}}
+function journalPut(m){if(!m||!m.id_seq)return;var j=readJournal();j[String(m.id_seq)]=m;writeJournal(j);}
+function journalDelete(seq){if(!seq)return;var j=readJournal();delete j[String(seq)];writeJournal(j);}
+function mergeJournal(){
+  try{
+    var j=readJournal(),arr=window.MEDICOES||MEDICOES,changed=false;
+    Object.keys(j).forEach(function(seq){var saved=j[seq];if(!saved)return;var i=arr.findIndex(function(m){return String(m.id_seq||'')===String(seq);});if(i<0){arr.push(saved);changed=true;}else if(JSON.stringify(arr[i])!==JSON.stringify(saved)){arr[i]=Object.assign({},arr[i],saved);changed=true;}});
+    if(changed){window.MEDICOES=arr;try{MEDICOES=arr;}catch(e){}try{window.saveToStorage();}catch(e){}}
+    return changed;
+  }catch(e){return false;}
+}
+
+function optionalFields(target){
+  var map={
+    'fm-adv-natureza':'adiant_natureza','fm-doc-ref':'documento_ref','fm-vinc-nf':'vinculo_nf',
+    'fm-fornecedor':'fornecedor','fm-doc-fornecedor':'documento_fornecedor','fm-cond-pgto':'condicao_pagamento',
+    'fm-status-contratual':'status_contratual','fm-ref-contratual':'referencia_contratual'
+  };
+  Object.keys(map).forEach(function(id){if(el(id))target[map[id]]=val(id).trim();});
+  var vinc=el('fm-adiant-vinculo')?val('fm-adiant-vinculo'):val('fm-vinc-adv');
+  if(el('fm-adiant-vinculo')||el('fm-vinc-adv'))target.vinculo_adiantamento=vinc;
+  var pct=num('fm-comp-pct'),comp=num('fm-comp-valor');
+  if(el('fm-comp-pct'))target.comp_adiant_percentual=pct||0;
+  if(el('fm-comp-valor'))target.comp_adiant_valor=comp||0;
+}
+function medRemoteRow(m){
+  var keys=['id_seq','id','cliente','valor_contrato','tipo','data_med','valor','data_nf','num_nf','prazo_pgto','data_rec_prev','data_rec_real','dias_atraso','farol','obs'];
+  var row={};keys.forEach(function(k){if(m[k]!==undefined)row[k]=m[k];});row.updated_at=new Date().toISOString();return row;
+}
+function persistMedRemote(m){
+  if(!window._sb&&!_sb)return;
+  try{var db=window._sb||_sb;db.from('medicoes').upsert(medRemoteRow(m),{onConflict:'id_seq'}).then(function(res){if(res&&res.error){console.warn('Medição salva localmente; sincronização remota pendente:',res.error.message);try{showSaveStatus('✓ Salva localmente; sincronização pendente','var(--y2)');}catch(e){}}});}catch(e){console.warn('Medição salva localmente; sincronização remota pendente:',e);}
+}
+function resetMedFormKeepingProject(){
+  var projeto=val('fm-proj');
+  ['fm-data-med','fm-data-nf','fm-prev-rec','fm-real-rec','fm-obs','fm-valor','fm-num-nf'].forEach(function(id){if(el(id))el(id).value='';});
+  if(el('fm-prazo'))el('fm-prazo').value='30';if(el('fm-dias-row'))el('fm-dias-row').style.display='none';if(el('fm-proj'))el('fm-proj').value=projeto;
+  if(el('fm-tipo')){el('fm-tipo').value='Medição';el('fm-tipo').dispatchEvent(new Event('change',{bubbles:true}));}
+  try{medProjSelectChanged();}catch(e){} _editMedIdx=null;if(el('mo-med-title'))el('mo-med-title').textContent='Novo Lançamento';
+}
+
+/* Substitui a cadeia sobreposta de salvamentos por uma única gravação atômica. */
+window.salvarMedicao=function(keepOpen){
+  var pv=val('fm-proj');if(!pv){alert('Selecione o projeto.');return;}
+  var si=pv.indexOf('|');if(si<0){alert('Selecione um projeto válido.');return;}
+  var id=pv.slice(0,si),selecionado=pv.slice(si+1),cliente=val('fm-cliente-manual').trim()||selecionado;
+  var idx=(typeof _editMedIdx!=='undefined')?_editMedIdx:null,isNew=idx===null||idx===undefined;
+  var arr=window.MEDICOES||MEDICOES,existente=isNew?null:arr[idx];
+  var projeto=(window.PROJETOS||PROJETOS).find(function(p){return String(p.id)===id&&String(p.obra)===cliente;})||(window.PROJETOS||PROJETOS).find(function(p){return String(p.id)===id&&String(p.obra)===selecionado;})||(window.PROJETOS||PROJETOS).find(function(p){return String(p.id)===id;})||null;
+  var dataNF=val('fm-data-nf');if(dataNF&&el('fm-prev-rec')&&!val('fm-prev-rec')){try{calcPrevRec();}catch(e){}}
+  var prev=val('fm-prev-rec')||null,real=val('fm-real-rec')||null,hoje=new Date().toISOString().slice(0,10),farol=real?1:(prev&&prev<hoje?3:2),dias=0;
+  try{if(prev&&real)dias=daysBetween(prev,real);else if(prev&&prev<hoje)dias=daysBetween(prev,hoje);}catch(e){}
+  var novo=Object.assign({},existente||{}, {
+    id_seq:(existente&&existente.id_seq)||nextSeq('med'),id:id,cliente:cliente,
+    valor_contrato:projeto&&projeto.valor!=null?projeto.valor:(existente&&existente.valor_contrato)||0,
+    tipo:val('fm-tipo')||'Medição',data_med:str2xl(val('fm-data-med')),valor:num('fm-valor')||0,
+    data_nf:str2xl(dataNF),num_nf:val('fm-num-nf').trim(),prazo_pgto:parseInt(val('fm-prazo'),10)||30,
+    data_rec_prev:str2xl(prev),data_rec_real:str2xl(real),dias_atraso:dias,farol:farol,obs:val('fm-obs')
+  });
+  optionalFields(novo);
+  if(isNew)arr.push(novo);else arr[idx]=novo;window.MEDICOES=arr;try{MEDICOES=arr;}catch(e){}
+  journalPut(novo);
+  try{window.saveToStorage();}catch(e){try{saveToStorage();}catch(_e){}}
+  persistMedRemote(novo);
+  try{window.renderMedicoes();}catch(e){try{renderMedicoes();}catch(_e){}}
+  try{showSaveStatus('✓ Medição salva');}catch(e){}
+  if(keepOpen)resetMedFormKeepingProject();else closeMo('mo-med');
+  setTimeout(function(){try{renderDashboard();}catch(e){}try{updateBadges();}catch(e){}try{if(el('page-sumario')&&el('page-sumario').classList.contains('active'))renderSumario();}catch(e){}},80);
+};
+try{salvarMedicao=window.salvarMedicao;}catch(e){}
+
+/* Mantém o diário de segurança coerente quando um lançamento é excluído. */
+var oldExcluir=window.excluirMedicao||((typeof excluirMedicao==='function')?excluirMedicao:null);
+if(oldExcluir){window.excluirMedicao=function(idx){var a=window.MEDICOES||[],seq=a[idx]&&a[idx].id_seq,r=oldExcluir.apply(this,arguments),still=(window.MEDICOES||[]).some(function(m){return String(m.id_seq||'')===String(seq||'');});if(!still)journalDelete(seq);return r;};try{excluirMedicao=window.excluirMedicao;}catch(e){}}
+var oldExcluirObra=window.excluirObraMedicoes||((typeof excluirObraMedicoes==='function')?excluirObraMedicoes:null);
+if(oldExcluirObra){window.excluirObraMedicoes=function(id,cliente){var seqs=(window.MEDICOES||[]).filter(function(m){return String(m.id)===String(id)&&String(m.cliente)===String(cliente);}).map(function(m){return m.id_seq;});var r=oldExcluirObra.apply(this,arguments),remaining=new Set((window.MEDICOES||[]).map(function(m){return String(m.id_seq||'');}));seqs.forEach(function(seq){if(!remaining.has(String(seq||'')))journalDelete(seq);});return r;};try{excluirObraMedicoes=window.excluirObraMedicoes;}catch(e){}}
+
+/* Busca em Medições: evita redesenhar toda a aba a cada tecla digitada. */
+function bindMedSearch(){var q=el('sm-q');if(!q||q.__v125)return;q.__v125=true;q.removeAttribute('oninput');var timer=null;q.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(function(){try{window.renderMedicoes();}catch(e){}},140);});q.addEventListener('change',function(){clearTimeout(timer);try{window.renderMedicoes();}catch(e){}});}
+
+function ensureProjectFields(){
+  if(el('v125-projeto-campos'))return;
+  var anchor=el('pp-parcial');anchor=anchor&&anchor.closest('.fg');if(!anchor)return;
+  var box=document.createElement('div');box.id='v125-projeto-campos';
+  box.innerHTML='<div class="v125-title">Avanço físico</div><div class="v125-grid">'+
+    '<div class="fg"><label>% Avanço Previsto (0–100)</label><input id="pp-av-prev" type="number" min="0" max="100" step="0.1"></div>'+
+    '<div class="fg"><label>% Avanço Realizado (0–100)</label><input id="pp-av-real" type="number" min="0" max="100" step="0.1"></div></div>';
+  anchor.parentNode.insertBefore(box,anchor);
+}
+function addPartialAdvanceInputs(row,p,idx){
+  if(!row||row.querySelector('.parc-prev'))return;
+  row.style.gridTemplateColumns='1.2fr repeat(3,minmax(105px,1fr)) .7fr .7fr auto';
+  var av=p&&((window.AVANCOS||AVANCOS)[partialKey(p.id,p.obra,idx)])||{};
+  var remove=row.querySelector('button');
+  var a=document.createElement('div');a.innerHTML='<label style="font-size:11px;color:var(--tx3);display:block;margin-bottom:3px">% Previsto</label><input type="number" min="0" max="100" step="0.1" class="parc-prev">';a.querySelector('input').value=av.prev==null?'':av.prev;
+  var b=document.createElement('div');b.innerHTML='<label style="font-size:11px;color:var(--tx3);display:block;margin-bottom:3px">% Realizado</label><input type="number" min="0" max="100" step="0.1" class="parc-real">';b.querySelector('input').value=av.real==null?'':av.real;
+  row.insertBefore(a,remove);row.insertBefore(b,remove);
+}
+function decoratePartialRows(p){var rows=el('pp-parciais')?Array.from(el('pp-parciais').children):[];rows.forEach(function(row,i){addPartialAdvanceInputs(row,p,i);});}
+
+var oldOpenProj=window.openProjModal||((typeof openProjModal==='function')?openProjModal:null);
+if(oldOpenProj){window.openProjModal=function(idx){var r=oldOpenProj.apply(this,arguments);ensureProjectFields();var p=(idx===null||idx===undefined)?null:(window.PROJETOS||PROJETOS)[idx],av=p&&((window.AVANCOS||AVANCOS)[projectKey(p.id,p.obra)])||{};if(el('pp-av-prev'))el('pp-av-prev').value=av.prev==null?'':av.prev;if(el('pp-av-real'))el('pp-av-real').value=av.real==null?'':av.real;decoratePartialRows(p);return r;};try{openProjModal=window.openProjModal;}catch(e){}}
+var oldAddPartial=window.addParcialRow||((typeof addParcialRow==='function')?addParcialRow:null);
+if(oldAddPartial){window.addParcialRow=function(){var r=oldAddPartial.apply(this,arguments),rows=el('pp-parciais')?el('pp-parciais').children:[],p=(typeof _editProjIdx!=='undefined'&&_editProjIdx!==null)?(window.PROJETOS||PROJETOS)[_editProjIdx]:null;addPartialAdvanceInputs(rows[rows.length-1],p,rows.length-1);return r;};try{addParcialRow=window.addParcialRow;}catch(e){}}
+
+function setAdvance(key,prev,real,type,idx){var all=window.AVANCOS||AVANCOS,av=all[key]||{};if(prev===null)delete av.prev;else av.prev=clampPct(prev);if(real===null)delete av.real;else av.real=clampPct(real);av.semana='Semana atual';av.tipo=type;av.parcial_idx=idx;all[key]=av;window.AVANCOS=all;try{AVANCOS=all;}catch(e){}try{dbAfterSaveCrono(key,av);}catch(e){}}
+var oldSaveProj=window.salvarProjeto||((typeof salvarProjeto==='function')?salvarProjeto:null);
+if(oldSaveProj){window.salvarProjeto=function(keepOpen){
+  ensureProjectFields();var oldP=(typeof _editProjIdx!=='undefined'&&_editProjIdx!==null)?(window.PROJETOS||PROJETOS)[_editProjIdx]:null;
+  var id=val('pp-id').trim(),obra=val('pp-obra').trim();
+  var mainPrev=num('pp-av-prev'),mainReal=num('pp-av-real'),partials=[];if(el('pp-parciais'))Array.from(el('pp-parciais').children).forEach(function(row){partials.push({prev:numFrom(row,'.parc-prev'),real:numFrom(row,'.parc-real')});});
+  var r=oldSaveProj.apply(this,arguments);var all=window.AVANCOS||AVANCOS,oldKey=oldP?projectKey(oldP.id,oldP.obra):null,newKey=projectKey(id,obra);
+  if(oldKey&&oldKey!==newKey){Object.keys(all).filter(function(k){return k===oldKey||k.indexOf(oldKey+'|PARCIAL|')===0;}).forEach(function(k){var nk=k.replace(oldKey,newKey);if(!all[nk])all[nk]=all[k];delete all[k];});}
+  setAdvance(newKey,mainPrev,mainReal,'Consolidado',null);
+  Object.keys(all).filter(function(k){return k.indexOf(newKey+'|PARCIAL|')===0;}).forEach(function(k){delete all[k];});
+  partials.forEach(function(x,i){setAdvance(partialKey(id,obra,i),x.prev,x.real,'Parcial',i);});
+  try{window.saveToStorage();}catch(e){}try{window.renderCronograma();}catch(e){}try{renderDashboard();}catch(e){}
+  return r;
+};try{salvarProjeto=window.salvarProjeto;}catch(e){}}
+function numFrom(root,selector){var e=root&&root.querySelector(selector);if(!e||String(e.value).trim()==='')return null;var n=Number(String(e.value).replace(',','.'));return Number.isFinite(n)?n:null;}
+
+function start(){bindMedSearch();ensureProjectFields();mergeJournal();setTimeout(function(){if(mergeJournal()){try{window.renderMedicoes();}catch(e){}}},250);setTimeout(mergeJournal,1200);}
+start();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installV125);else installV125();
+})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
