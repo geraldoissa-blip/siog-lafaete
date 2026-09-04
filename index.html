@@ -13192,6 +13192,9 @@ window.addEventListener('load', async () => {
   // Step 1: restaura primeiro o último backup salvo neste computador.
   let loaded = false;
   try { loaded = await __siogLoadLastSavedBackupV126(); } catch(e) { console.warn('Storage error:', e); }
+  // Somente agora libera novas gravações. Durante a leitura assíncrona,
+  // nenhuma rotina de inicialização pode salvar a base antiga sobre o backup.
+  window.__siog_storage_boot_pending_v127 = false;
   if(!loaded) {
     try {
       if(typeof EMBEDDED_BACKUP_DATA !== 'undefined' && isValidStorageData(EMBEDDED_BACKUP_DATA)) {
@@ -13925,6 +13928,7 @@ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded'
   document.addEventListener('DOMContentLoaded',function(){setTimeout(update,900);});
 })();
 </script>
+
 <script>
 /* v65 — Resultado Consolidado: somente importação do PPTX e indicadores automáticos no Sumário Executivo.
    A aba própria e os relatórios internos do Resultado Consolidado foram removidos para evitar duplicidade.
@@ -19287,5 +19291,25 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   }catch(e){}
 
   setTimeout(function(){normalizeRestoredSnapshot();forceEditable();},500);
+})();
+</script>
+
+<script id="siog-v127-trava-inicial-backup-persistente">
+/* v127 — impede que rotinas de abertura sobrescrevam o último backup restaurado
+   enquanto localStorage/IndexedDB ainda estão sendo consultados. */
+(function(){
+  'use strict';
+  if(window.__siog_v127_storage_boot_lock) return;
+  window.__siog_v127_storage_boot_lock=true;
+  window.__siog_storage_boot_pending_v127=true;
+
+  var realSave=window.saveToStorage;
+  if(typeof realSave==='function'){
+    window.saveToStorage=function(){
+      if(window.__siog_storage_boot_pending_v127) return true;
+      return realSave.apply(this,arguments);
+    };
+    try{saveToStorage=window.saveToStorage;}catch(_e){}
+  }
 })();
 </script>
