@@ -13176,10 +13176,23 @@ async function __siogLoadLastSavedBackupV126() {
   } catch(_e) { dbData = null; }
 
   if(!isValidStorageData(dbData)) dbData = null;
-  const chosen = dbData && (!localData || Number(dbData.ts||0) >= Number(localData.ts||0)) ? dbData : localData;
+  let durableData = null;
+  try {
+    if(typeof window.__siogV128Read === 'function') durableData = await window.__siogV128Read();
+  } catch(_e) { durableData = null; }
+  if(!isValidStorageData(durableData)) durableData = null;
+
+  // A cópia dedicada participa da escolha e não é substituída pelo conteúdo
+  // incorporado no index. Entre as cópias reais, vence sempre a mais recente.
+  const candidates = [localData, dbData, durableData].filter(Boolean);
+  candidates.sort((a,b)=>Number(b.ts||0)-Number(a.ts||0));
+  const chosen = candidates[0] || null;
   if(!chosen) return false;
 
   applyStorageData(chosen);
+  try {
+    if(typeof window.__siogV128Write === 'function') await window.__siogV128Write(chosen);
+  } catch(_e) {}
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(chosen)); } catch(_e) {
     // Bases grandes continuam seguras no IndexedDB; a falta de espaço local
     // não autoriza voltar ao backup incorporado.
@@ -19078,7 +19091,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   function valid(data){return !!(data&&typeof data==='object'&&Array.isArray(data.PROJETOS)&&Array.isArray(data.MEDICOES));}
   function importV122(){
     var inp=document.createElement('input');inp.type='file';inp.accept='.json,.zip,application/json,application/zip';inp.style.display='none';document.body.appendChild(inp);
-    inp.onchange=async function(){var f=inp.files&&inp.files[0];if(!f){inp.remove();return;}try{var txt='';if(/\.zip$/i.test(f.name)){if(!window.JSZip)throw new Error('Leitor ZIP indisponível.');var z=await JSZip.loadAsync(await f.arrayBuffer()),names=Object.keys(z.files).filter(function(n){return /\.json$/i.test(n)&&!z.files[n].dir;});if(!names.length)throw new Error('ZIP sem JSON de backup.');txt=await z.files[names[0]].async('string');}else txt=await f.text();var data=JSON.parse(txt);if(!valid(data))throw new Error('Backup inválido: faltam Projetos ou Medições.');restoreV122(data);refreshAll();alert('✅ Backup restaurado.\n\nOs Pontos de Atenção foram aplicados como espelho da origem e continuam vinculados à semana correta.');}catch(err){alert('Erro ao importar o backup: '+err.message+'\n\nNenhum dado foi apagado.');}finally{inp.remove();}};inp.click();
+    inp.onchange=async function(){var f=inp.files&&inp.files[0];if(!f){inp.remove();return;}try{var txt='';if(/\.zip$/i.test(f.name)){if(!window.JSZip)throw new Error('Leitor ZIP indisponível.');var z=await JSZip.loadAsync(await f.arrayBuffer()),names=Object.keys(z.files).filter(function(n){return /\.json$/i.test(n)&&!z.files[n].dir;});if(!names.length)throw new Error('ZIP sem JSON de backup.');txt=await z.files[names[0]].async('string');}else txt=await f.text();var data=JSON.parse(txt);if(!valid(data))throw new Error('Backup inválido: faltam Projetos ou Medições.');restoreV122(data);if(window.__siogLastPersistPromise)await window.__siogLastPersistPromise;refreshAll();alert('✅ Backup restaurado e mantido neste navegador.\n\nOs dados permanecerão carregados quando esta página for fechada e aberta novamente.');}catch(err){alert('Erro ao importar o backup: '+err.message+'\n\nNenhum dado foi apagado.');}finally{inp.remove();}};inp.click();
   }
   window.importBackup=importV122;try{importBackup=importV122;}catch(e){}
 
@@ -19294,20 +19307,63 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 })();
 </script>
 
-<script id="siog-v127-trava-inicial-backup-persistente">
-/* v127 — impede que rotinas de abertura sobrescrevam o último backup restaurado
-   enquanto localStorage/IndexedDB ainda estão sendo consultados. */
+<script id="siog-v128-backup-persistente-definitivo">
+/* v128 — cópia permanente e independente do último estado restaurado.
+   A gravação é concluída antes da confirmação da importação e tem prioridade
+   na próxima abertura, sem alterar as regras funcionais dos módulos. */
 (function(){
   'use strict';
-  if(window.__siog_v127_storage_boot_lock) return;
-  window.__siog_v127_storage_boot_lock=true;
+  if(window.__siog_v128_storage_final) return;
+  window.__siog_v128_storage_final=true;
   window.__siog_storage_boot_pending_v127=true;
+
+  var DB_NAME='SIOG_Persistencia_Backup_V128';
+  var STORE='estado';
+  var RECORD='ultimo_estado_confirmado';
+  var writeQueue=Promise.resolve();
+
+  function openDB(){
+    return new Promise(function(resolve,reject){
+      if(!window.indexedDB){reject(new Error('Armazenamento permanente indisponível neste navegador.'));return;}
+      var req=indexedDB.open(DB_NAME,1);
+      req.onupgradeneeded=function(){var db=req.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE);};
+      req.onsuccess=function(){resolve(req.result);};
+      req.onerror=function(){reject(req.error||new Error('Falha ao abrir o armazenamento permanente.'));};
+    });
+  }
+  function put(data){
+    return openDB().then(function(db){return new Promise(function(resolve,reject){
+      var tx=db.transaction(STORE,'readwrite');
+      tx.objectStore(STORE).put(data,RECORD);
+      tx.oncomplete=function(){db.close();resolve(true);};
+      tx.onerror=function(){var e=tx.error;db.close();reject(e||new Error('Falha ao manter o backup restaurado.'));};
+      tx.onabort=function(){var e=tx.error;db.close();reject(e||new Error('Gravação permanente interrompida.'));};
+    });});
+  }
+  window.__siogV128Read=function(){
+    return openDB().then(function(db){return new Promise(function(resolve,reject){
+      var tx=db.transaction(STORE,'readonly'),req=tx.objectStore(STORE).get(RECORD);
+      req.onsuccess=function(){var value=req.result||null;db.close();resolve(value);};
+      req.onerror=function(){var e=req.error;db.close();reject(e||new Error('Falha ao recuperar o último backup.'));};
+    });});
+  };
+  window.__siogV128Write=function(data){
+    writeQueue=writeQueue.catch(function(){}).then(function(){return put(data);});
+    window.__siogLastPersistPromise=writeQueue;
+    return writeQueue;
+  };
 
   var realSave=window.saveToStorage;
   if(typeof realSave==='function'){
     window.saveToStorage=function(){
       if(window.__siog_storage_boot_pending_v127) return true;
-      return realSave.apply(this,arguments);
+      var result=realSave.apply(this,arguments);
+      try{
+        var data=(typeof window.buildStoragePayload==='function')?window.buildStoragePayload():buildStoragePayload();
+        data.ts=Date.now();
+        window.__siogV128Write(data);
+      }catch(e){console.warn('Persistência permanente:',e);}
+      return result;
     };
     try{saveToStorage=window.saveToStorage;}catch(_e){}
   }
