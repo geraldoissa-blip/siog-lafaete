@@ -13142,10 +13142,56 @@ buildSumarioData=function(){
 
 
 // ── INIT ─────────────────────────────────────────────────
-window.addEventListener('load', () => {
-  // Step 1: Try localStorage; if absent/corrupt, keep embedded Excel seed data
+async function __siogLoadLastSavedBackupV126() {
+  // O backup restaurado neste navegador sempre tem prioridade sobre a base
+  // incorporada ao arquivo, mesmo quando possui menos registros.
+  let localData = null;
+  try {
+    for(const key of STORAGE_KEYS_TO_TRY) {
+      const raw = localStorage.getItem(key);
+      if(!raw) continue;
+      const data = JSON.parse(raw);
+      if(isValidStorageData(data) && (!localData || Number(data.ts||0) > Number(localData.ts||0))) localData = data;
+    }
+  } catch(_e) {}
+
+  let dbData = null;
+  try {
+    dbData = await new Promise((resolve, reject) => {
+      if(!window.indexedDB) { resolve(null); return; }
+      const req = indexedDB.open('SIOG_Lafaete_DB', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains('backups')) db.createObjectStore('backups');
+      };
+      req.onerror = () => reject(req.error || new Error('Falha ao abrir armazenamento interno'));
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction('backups', 'readonly');
+        const get = tx.objectStore('backups').get('dados_principais');
+        get.onsuccess = () => { const value = get.result || null; db.close(); resolve(value); };
+        get.onerror = () => { const err = get.error; db.close(); reject(err || new Error('Falha ao ler armazenamento interno')); };
+      };
+    });
+  } catch(_e) { dbData = null; }
+
+  if(!isValidStorageData(dbData)) dbData = null;
+  const chosen = dbData && (!localData || Number(dbData.ts||0) >= Number(localData.ts||0)) ? dbData : localData;
+  if(!chosen) return false;
+
+  applyStorageData(chosen);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(chosen)); } catch(_e) {
+    // Bases grandes continuam seguras no IndexedDB; a falta de espaço local
+    // não autoriza voltar ao backup incorporado.
+  }
+  console.log('✅ Último backup salvo neste navegador restaurado automaticamente.');
+  return true;
+}
+
+window.addEventListener('load', async () => {
+  // Step 1: restaura primeiro o último backup salvo neste computador.
   let loaded = false;
-  try { loaded = loadFromStorage(); } catch(e) { console.warn('Storage error:', e); }
+  try { loaded = await __siogLoadLastSavedBackupV126(); } catch(e) { console.warn('Storage error:', e); }
   if(!loaded) {
     try {
       if(typeof EMBEDDED_BACKUP_DATA !== 'undefined' && isValidStorageData(EMBEDDED_BACKUP_DATA)) {
