@@ -13142,6 +13142,15 @@ buildSumarioData=function(){
 
 
 // ── INIT ─────────────────────────────────────────────────
+function isValidStorageData(data) {
+  return !!(
+    data &&
+    typeof data === 'object' &&
+    Array.isArray(data.PROJETOS) &&
+    Array.isArray(data.MEDICOES)
+  );
+}
+
 async function __siogLoadLastSavedBackupV126() {
   // O backup restaurado neste navegador sempre tem prioridade sobre a base
   // incorporada ao arquivo, mesmo quando possui menos registros.
