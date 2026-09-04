@@ -102,6 +102,93 @@ try{document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{try{renderS
 
 </script>
 
+<script id="siog-v129-salvar-projeto-seguro">
+/* v129 — correção isolada do salvamento na Base de Projetos.
+   Persiste o projeto antes das renderizações, para que uma falha visual não
+   interrompa a gravação nem impeça o fechamento do formulário. */
+(function(){
+  'use strict';
+  function campo(id){return document.getElementById(id);}
+  function texto(id){var e=campo(id);return e?String(e.value||'').trim():'';}
+  function data(id){var v=texto(id);try{return v?str2xl(v):null;}catch(_e){return null;}}
+  function numeroPt(v){
+    var s=String(v==null?'':v).trim();
+    if(!s)return null;
+    if(s.indexOf(',')>=0)s=s.replace(/\./g,'').replace(',','.');
+    var n=Number(s);return Number.isFinite(n)?n:null;
+  }
+  function percentual(input){return input&&String(input.value).trim()!==''?Math.max(0,Math.min(100,numeroPt(input.value))):null;}
+  function chave(id,obra){return String(id||'')+'|'+String(obra||'');}
+  function chaveParcial(id,obra,idx){return chave(id,obra)+'|PARCIAL|'+String(idx);}
+  function renderSeguro(nome){try{if(typeof window[nome]==='function')window[nome]();}catch(e){console.warn(nome+':',e);}}
+
+  window.salvarProjeto=function(keepOpen){
+    var id=texto('pp-id'),obra=texto('pp-obra');
+    if(!id||!obra){alert('ID e Obra são obrigatórios.');return false;}
+
+    var idx=(typeof _editProjIdx!=='undefined')?_editProjIdx:null;
+    var isNew=idx===null||idx===undefined;
+    var antigo=!isNew&&PROJETOS[idx]?PROJETOS[idx]:null;
+    var parciais=[],avParciais=[];
+    if(texto('pp-parcial')==='sim'){
+      document.querySelectorAll('#pp-parciais > div').forEach(function(row){
+        var nome=row.querySelector('.parc-nome'),cont=row.querySelector('.parc-cont'),cli=row.querySelector('.parc-cli'),tend=row.querySelector('.parc-tend');
+        var n=nome?String(nome.value||'').trim():'';
+        if(!n)return;
+        parciais.push({nome:n,inicio:data('pp-inicio'),prazo_cont:cont&&cont.value?str2xl(cont.value):null,prazo_cli:cli&&cli.value?str2xl(cli.value):null,tendencia:tend&&tend.value?str2xl(tend.value):null});
+        avParciais.push({prev:percentual(row.querySelector('.parc-prev')),real:percentual(row.querySelector('.parc-real'))});
+      });
+    }
+
+    var pcli=data('pp-prazo-cli'),tendencia=data('pp-tend');
+    var np={
+      id:id,obra:obra,status:texto('pp-status')||'Ativo',resp:texto('pp-resp'),
+      inicio:data('pp-inicio'),prazo_cont:data('pp-prazo-cont'),prazo_cli:pcli,tendencia:tendencia,
+      valor:numeroPt(campo('pp-valor')?campo('pp-valor').value:''),obs:campo('pp-obs')?campo('pp-obs').value:'',
+      superintendente:texto('pp-superintendente'),parciais:parciais,ativo_rdo:true
+    };
+    np.alerta=(tendencia&&pcli)?(tendencia<=pcli?'✅ OK':'⚠ Atraso'):'-';
+
+    if(isNew){
+      PROJETOS.push(np);
+      RDO.push({id:id,obra:obra,atualizacao:'NÃO INICIADA',enviado:'NÃO INICIADA',assinado:'NÃO INICIADA',resp:'',modelo:'',histograma:'',obs:'Novo projeto'});
+      DOCUMENTACAO.push({id:id,obra:obra,status:np.status,vig_cto:'',sre_st:'N/A',sre_vig:'',src_st:'N/A',src_vig:'',cf_st:'N/A',cf_vig:'',ga_st:'N/A',ga_vig:'',gp_st:'N/A',gp_vig:'',geo_st:'N/A',geo_vig:'',art_st:'Pendente',art_tipos:[],art_outros:'',crono_st:'-',hbe:'-',hbc:'-',mtr:'-',chi:'-',che:'-',te:'-',atc:'-'});
+      idx=PROJETOS.length-1;
+    }else{
+      PROJETOS[idx]=np;
+      var doc=DOCUMENTACAO.find(function(d){return d.id===(antigo&&antigo.id)&&d.obra===(antigo&&antigo.obra);});
+      if(doc){doc.id=np.id;doc.obra=np.obra;doc.status=np.status;}
+    }
+    window.PROJETOS=PROJETOS;window.RDO=RDO;window.DOCUMENTACAO=DOCUMENTACAO;
+
+    try{lembrarObraNaListaMestre(np.id,np.obra);}catch(e){console.warn('Lista de obras:',e);}
+    try{
+      var todos=AVANCOS||{},antiga=antigo?chave(antigo.id,antigo.obra):null,nova=chave(id,obra);
+      if(antiga&&antiga!==nova){Object.keys(todos).filter(function(k){return k===antiga||k.indexOf(antiga+'|PARCIAL|')===0;}).forEach(function(k){var nk=k.replace(antiga,nova);if(!todos[nk])todos[nk]=todos[k];delete todos[k];});}
+      Object.keys(todos).filter(function(k){return k.indexOf(nova+'|PARCIAL|')===0;}).forEach(function(k){delete todos[k];});
+      var principal=todos[nova]||{},prev=percentual(campo('pp-av-prev')),real=percentual(campo('pp-av-real'));
+      if(prev===null)delete principal.prev;else principal.prev=prev;
+      if(real===null)delete principal.real;else principal.real=real;
+      principal.semana='Semana atual';principal.tipo='Consolidado';principal.parcial_idx=null;todos[nova]=principal;
+      avParciais.forEach(function(av,i){var k=chaveParcial(id,obra,i),item=todos[k]||{};if(av.prev===null)delete item.prev;else item.prev=av.prev;if(av.real===null)delete item.real;else item.real=av.real;item.semana='Semana atual';item.tipo='Parcial';item.parcial_idx=i;todos[k]=item;});
+      AVANCOS=todos;window.AVANCOS=todos;
+    }catch(e){console.warn('Avanços do projeto:',e);}
+
+    /* A gravação vem antes de qualquer redesenho. */
+    try{dbAfterSaveProjeto(np,isNew);}catch(e){try{window.saveToStorage();}catch(_e){}console.warn('Gravação do projeto:',e);}
+    try{window.saveToStorage();}catch(e){console.warn('Persistência local:',e);}
+
+    if(keepOpen){_editProjIdx=idx;try{showSaveStatus('✓ Projeto salvo');}catch(_e){}}
+    else{try{closeMo('mo-proj');}catch(_e){var mo=campo('mo-proj');if(mo)mo.classList.remove('open');}}
+
+    ['renderProjetos','renderDashboard','updateBadges','populateAllSelects','renderCronograma','renderSumario'].forEach(renderSeguro);
+    return true;
+  };
+  window.__siogSalvarProjetoSeguroV129=window.salvarProjeto;
+  try{salvarProjeto=window.salvarProjeto;}catch(_e){}
+})();
+</script>
+
 <style id="siog-v125-ajustes-solicitados">
 /* Alterações isoladas solicitadas: edição centralizada na Base de Projetos. */
 #page-cronograma .filter-bar button[onclick^="openCronoEdit"],
@@ -19376,5 +19463,13 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     };
     try{saveToStorage=window.saveToStorage;}catch(_e){}
   }
+})();
+</script>
+
+<script id="siog-v129-ativar-salvar-projeto-seguro">
+(function(){
+  if(typeof window.__siogSalvarProjetoSeguroV129!=='function')return;
+  window.salvarProjeto=window.__siogSalvarProjetoSeguroV129;
+  try{salvarProjeto=window.salvarProjeto;}catch(_e){}
 })();
 </script>
