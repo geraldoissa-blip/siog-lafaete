@@ -1121,7 +1121,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 </div>
 <div class="fg"><label>Observações Gerais</label><textarea id="pp-obs" rows="2"></textarea></div>
 <div class="fg"><label>Superintendente responsável</label><input id="pp-superintendente" placeholder="Ex.: Nome do superintendente" type="text"/></div>
-<div class="mo-ft"><button class="btn" onclick="closeMo('mo-proj')">Cancelar</button><button class="btn btn-bl" onclick="salvarProjeto(true)">Salvar +</button><button class="btn btn-or" onclick="salvarProjeto()">Salvar Projeto</button></div>
+<div class="mo-ft"><button class="btn" onclick="closeMo('mo-proj')" type="button">Cancelar</button><button class="btn btn-bl" id="btn-salvar-projeto-mais" onclick="salvarProjeto(true)" type="button">Salvar +</button><button class="btn btn-or" id="btn-salvar-projeto" onclick="salvarProjeto()" type="button">Salvar Projeto</button></div>
 </div>
 </div>
 <!-- CRONOGRAMA -->
@@ -19471,5 +19471,20 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   if(typeof window.__siogSalvarProjetoSeguroV129!=='function')return;
   window.salvarProjeto=window.__siogSalvarProjetoSeguroV129;
   try{salvarProjeto=window.salvarProjeto;}catch(_e){}
+  function vincular(id,keepOpen){
+    var botao=document.getElementById(id);if(!botao)return;
+    botao.onclick=function(ev){
+      if(ev){ev.preventDefault();ev.stopPropagation();}
+      try{
+        return window.__siogSalvarProjetoSeguroV129(keepOpen);
+      }catch(e){
+        console.error('Erro ao salvar projeto:',e);
+        alert('Não foi possível salvar o projeto: '+(e&&e.message?e.message:'erro inesperado')+'.');
+        return false;
+      }
+    };
+  }
+  vincular('btn-salvar-projeto',false);
+  vincular('btn-salvar-projeto-mais',true);
 })();
 </script>
