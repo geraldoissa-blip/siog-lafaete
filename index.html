@@ -13239,6 +13239,9 @@ function isValidStorageData(data) {
 }
 
 async function __siogLoadLastSavedBackupV126() {
+  // A v131 faz a escolha autoritativa do último estado. Esta rotina antiga
+  // não pode disputar a restauração durante o F5 e regravar uma cópia anterior.
+  if(window.__siog_v131_autosave_autoritativo) return false;
   // O backup restaurado neste navegador sempre tem prioridade sobre a base
   // incorporada ao arquivo, mesmo quando possui menos registros.
   let localData = null;
@@ -17561,6 +17564,9 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 
   // Ao abrir o arquivo, a cópia do IndexedDB tem prioridade quando for mais recente.
   idbGet().then(function(data){
+    // A versão v131 faz a recuperação autoritativa após todas as rotinas antigas.
+    // Evita que esta leitura legada reaplique uma fotografia anterior depois dela.
+    if(window.__siog_v131_autosave_autoritativo)return;
     if(!data||!Array.isArray(data.PROJETOS)||!Array.isArray(data.MEDICOES))return;
     var currentTs=0;
     try{var cur=JSON.parse(localStorage.getItem(MAIN_KEY)||'null');currentTs=Number(cur&&cur.ts||0);}catch(e){}
@@ -19631,11 +19637,198 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 
   /* Cópia automática interna do estado completo. O arquivo para transferência
      continua sendo gerado pelo botão Backup, sem provocar downloads repetidos. */
-  setInterval(function(){
+  window.__siogAutosaveLegacyTimer=setInterval(function(){
     try{
       if(typeof window.saveToStorage==='function')window.saveToStorage();
       localStorage.setItem('siog_ultimo_backup_automatico',String(Date.now()));
     }catch(e){}
   },60000);
+})();
+</script>
+
+<script id="siog-v131-autosave-autoritativo">
+/* v131 — autosave autoritativo e verificável.
+   Uma única fotografia completa tem prioridade depois do F5. A confirmação
+   visual só é atualizada após a gravação efetiva no armazenamento do navegador. */
+(function(){
+  'use strict';
+  if(window.__siog_v131_autosave_autoritativo)return;
+  window.__siog_v131_autosave_autoritativo=true;
+
+  var DB_NAME='SIOG_Autosave_Autoritativo_V131';
+  var DB_STORE='estado';
+  var DB_RECORD='ultimo_estado_completo';
+  var MAIN_KEY='siog_lafaete_data_v6_original_com_dados';
+  var LAST_KEY='siog_autosave_v131_last_success';
+  var booting=true,pendingWhileBoot=false,lastRequest=0,writeQueue=Promise.resolve(),cachedBootState=null;
+
+  try{if(window.__siogAutosaveLegacyTimer)clearInterval(window.__siogAutosaveLegacyTimer);}catch(e){}
+
+  function valid(data){return !!(data&&typeof data==='object'&&Array.isArray(data.PROJETOS)&&Array.isArray(data.MEDICOES));}
+  function pad(n){return String(n).padStart(2,'0');}
+  function formatDate(ts){var d=new Date(Number(ts)||Date.now());return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());}
+  function ensureIndicator(){
+    var el=document.getElementById('siog-autosave-status');if(el)return el;
+    var foot=document.getElementById('sb-foot');if(!foot)return null;
+    foot.style.flexWrap='wrap';
+    el=document.createElement('div');el.id='siog-autosave-status';
+    el.style.cssText='flex-basis:100%;width:100%;font-size:9.5px;line-height:1.3;color:var(--tx3);white-space:normal;margin-top:2px';
+    el.textContent='Último autosave: ainda não realizado';foot.appendChild(el);return el;
+  }
+  function showSuccess(ts){
+    var el=ensureIndicator();if(el){el.textContent='✓ Último autosave: '+formatDate(ts);el.style.color='var(--g2)';}
+    try{localStorage.setItem(LAST_KEY,String(ts));}catch(e){}
+  }
+  function showFailure(message){var el=ensureIndicator();if(el){el.textContent='⚠ Autosave não concluído'+(message?': '+message:'');el.style.color='var(--r2)';}}
+
+  function openDB(){return new Promise(function(resolve,reject){
+    if(!window.indexedDB){reject(new Error('armazenamento permanente indisponível'));return;}
+    var req=indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded=function(){var db=req.result;if(!db.objectStoreNames.contains(DB_STORE))db.createObjectStore(DB_STORE);};
+    req.onsuccess=function(){resolve(req.result);};
+    req.onerror=function(){reject(req.error||new Error('falha ao abrir o armazenamento'));};
+  });}
+  function dbPut(data){return openDB().then(function(db){return new Promise(function(resolve,reject){
+    var tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).put(data,DB_RECORD);
+    tx.oncomplete=function(){db.close();resolve(true);};
+    tx.onerror=function(){var e=tx.error;db.close();reject(e||new Error('falha ao gravar o autosave'));};
+    tx.onabort=function(){var e=tx.error;db.close();reject(e||new Error('gravação do autosave interrompida'));};
+  });});}
+  function dbGet(){return openDB().then(function(db){return new Promise(function(resolve,reject){
+    var tx=db.transaction(DB_STORE,'readonly'),req=tx.objectStore(DB_STORE).get(DB_RECORD);
+    req.onsuccess=function(){var value=req.result||null;db.close();resolve(value);};
+    req.onerror=function(){var e=req.error;db.close();reject(e||new Error('falha ao ler o autosave'));};
+  });});}
+
+  var excludedKeys={
+    'siog_lafaete_data_v6_original_com_dados':1,
+    'siog_lafaete_index_relatorio_dados_preservados_v10_20260423':1,
+    'siog_lafaete_data_v6_original_com_dados_backup':1,
+    'siog_lafaete_data_v6_original_com_dados_temp':1,
+    'siog_autosave_v131_last_success':1,
+    'siog_ultimo_backup_automatico':1
+  };
+  function captureLocalState(){
+    var out={};
+    try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&/^siog_/i.test(k)&&!excludedKeys[k])out[k]=localStorage.getItem(k);}}catch(e){}
+    return out;
+  }
+  function restoreLocalState(data){
+    var state=data&&data.SIOG_LOCAL_STATE_V131;if(!state||typeof state!=='object')return;
+    Object.keys(state).forEach(function(k){if(/^siog_/i.test(k)&&!excludedKeys[k]&&typeof state[k]==='string'){try{localStorage.setItem(k,state[k]);}catch(e){}}});
+  }
+
+  var previousBuild=window.buildStoragePayload;
+  if(typeof previousBuild==='function'){
+    window.buildStoragePayload=function(){
+      var p;try{p=previousBuild.apply(this,arguments)||{};}catch(e){p={};}
+      try{p.PETROBRAS_IMPORTS=JSON.parse(localStorage.getItem('siog_petrobras_v75_imports')||'null');}catch(e){}
+      p.SIOG_LOCAL_STATE_V131=captureLocalState();
+      return p;
+    };
+    try{buildStoragePayload=window.buildStoragePayload;}catch(e){}
+  }
+
+  var previousApply=window.applyStorageData;
+  if(typeof previousApply==='function'){
+    window.applyStorageData=function(data){var r=previousApply.apply(this,arguments);restoreLocalState(data);return r;};
+    try{applyStorageData=window.applyStorageData;}catch(e){}
+  }
+
+  function payload(source){
+    var p={};try{p=typeof window.buildStoragePayload==='function'?(window.buildStoragePayload()||{}):{};}catch(e){}
+    var now=Date.now();p.ts=now;p.SIOG_AUTOSAVE_V131={version:131,savedAt:now,source:source||'alteração',complete:true};
+    try{p.PETROBRAS_IMPORTS=JSON.parse(localStorage.getItem('siog_petrobras_v75_imports')||'null');}catch(e){}
+    return p;
+  }
+  function writeLocalMirror(data){try{localStorage.setItem(MAIN_KEY,JSON.stringify(data));return true;}catch(e){return false;}}
+  function persistData(data,source){
+    if(!valid(data))return Promise.reject(new Error('estado incompleto'));
+    var now=Date.now();data.ts=now;data.SIOG_AUTOSAVE_V131={version:131,savedAt:now,source:source||'alteração',complete:true};
+    var localOk=writeLocalMirror(data);lastRequest=now;
+    writeQueue=writeQueue.catch(function(){}).then(function(){return dbPut(data);}).then(function(){showSuccess(now);return data;}).catch(function(err){
+      if(localOk){showSuccess(now);return data;}
+      showFailure(err&&err.message?err.message:'falha de armazenamento');throw err;
+    });
+    window.__siogAutosavePromise=writeQueue;return writeQueue;
+  }
+  function autosave(source,force){
+    if(booting&&!force){pendingWhileBoot=true;return Promise.resolve(null);}
+    return persistData(payload(source),source);
+  }
+
+  window.saveToStorage=function(){autosave('alteração no sistema',false).catch(function(){});return true;};
+  try{saveToStorage=window.saveToStorage;}catch(e){}
+  window.__siogAutosaveNow=function(){return autosave('autosave de 1 minuto',true);};
+
+  function refresh(){
+    ['renderProjetos','renderRDO','renderDocumentacao','renderGarantias','renderArts','renderMedicoes','renderSatisfacao','renderObservacoes','renderCronograma','renderDashboard','renderSumario','updateBadges','populateAllSelects'].forEach(function(n){try{if(typeof window[n]==='function')window[n]();}catch(e){}});
+  }
+  function applyExact(data){
+    if(!valid(data))return false;
+    try{window.applyStorageData(data);}catch(e){try{applyStorageData(data);}catch(_e){return false;}}
+    /* Um backup é um espelho: cada coleção presente substitui a atual,
+       inclusive quando foi esvaziada intencionalmente em outro computador. */
+    try{if(Array.isArray(data.PROJETOS))PROJETOS=data.PROJETOS;}catch(e){}
+    try{if(Array.isArray(data.RDO))RDO=data.RDO;}catch(e){}
+    try{if(Array.isArray(data.DOCUMENTACAO))DOCUMENTACAO=data.DOCUMENTACAO;}catch(e){}
+    try{if(Array.isArray(data.MEDICOES))MEDICOES=data.MEDICOES;}catch(e){}
+    try{if(Array.isArray(data.PESQUISAS))PESQUISAS=data.PESQUISAS;}catch(e){}
+    try{if(Array.isArray(data.OBSERVACOES))OBSERVACOES=data.OBSERVACOES;}catch(e){}
+    try{if(data.AVANCOS&&typeof data.AVANCOS==='object')AVANCOS=data.AVANCOS;}catch(e){}
+    try{if(data.EXCLUIDOS_ABA&&typeof data.EXCLUIDOS_ABA==='object')EXCLUIDOS_ABA=data.EXCLUIDOS_ABA;}catch(e){}
+    try{if(typeof data.SAT_RELATORIO_OBS==='string')SAT_RELATORIO_OBS=data.SAT_RELATORIO_OBS;}catch(e){}
+    try{if(Array.isArray(data.MASTER_OBRAS))MASTER_OBRAS=data.MASTER_OBRAS;}catch(e){}
+    restoreLocalState(data);
+    if(Object.prototype.hasOwnProperty.call(data,'PETROBRAS_IMPORTS')){try{localStorage.setItem('siog_petrobras_v75_imports',JSON.stringify(data.PETROBRAS_IMPORTS));}catch(e){}}
+    refresh();return true;
+  }
+
+  function readBackupFile(file){
+    if(/\.zip$/i.test(file.name||'')){
+      if(!window.JSZip)return Promise.reject(new Error('leitor ZIP indisponível'));
+      return file.arrayBuffer().then(function(buf){return JSZip.loadAsync(buf);}).then(function(zip){
+        var names=Object.keys(zip.files).filter(function(n){return /\.json$/i.test(n)&&!zip.files[n].dir;});
+        if(!names.length)throw new Error('ZIP sem arquivo JSON');return zip.files[names[0]].async('string');
+      });
+    }
+    return file.text();
+  }
+  function importFinal(){
+    var inp=document.createElement('input');inp.type='file';inp.accept='.json,.zip,application/json,application/zip';inp.style.display='none';document.body.appendChild(inp);
+    inp.onchange=function(){
+      var file=inp.files&&inp.files[0];if(!file){inp.remove();return;}
+      readBackupFile(file).then(function(txt){var data=JSON.parse(txt);if(!valid(data))throw new Error('backup inválido: faltam Projetos ou Medições');
+        booting=false;restoreLocalState(data);if(!applyExact(data))throw new Error('não foi possível aplicar os dados');
+        return persistData(payload('backup restaurado: '+file.name),'backup restaurado: '+file.name);
+      }).then(function(saved){
+        refresh();setTimeout(refresh,150);setTimeout(refresh,600);
+        alert('✅ Backup restaurado e autosave confirmado.\n\nO estado completo permanecerá neste computador após atualizar a página.\n\nÚltimo autosave: '+formatDate(saved.ts));
+      }).catch(function(err){alert('Erro ao restaurar o backup: '+(err&&err.message?err.message:err)+'\n\nNenhum dado foi apagado.');}).finally(function(){inp.remove();});
+    };inp.click();
+  }
+  window.importBackup=importFinal;try{importBackup=window.importBackup;}catch(e){}
+
+  function boot(){
+    ensureIndicator();
+    var shown=Number(localStorage.getItem(LAST_KEY)||0);if(shown)showSuccess(shown);
+    dbGet().then(function(data){
+      if(!valid(data)){cachedBootState=null;return;}
+      cachedBootState=data;applyExact(data);showSuccess(data.SIOG_AUTOSAVE_V131&&data.SIOG_AUTOSAVE_V131.savedAt||data.ts);
+      setTimeout(function(){if(cachedBootState)applyExact(cachedBootState);},450);
+      setTimeout(function(){if(cachedBootState)applyExact(cachedBootState);},1250);
+    }).catch(function(err){console.warn('Autosave autoritativo:',err);}).finally(function(){
+      setTimeout(function(){
+        if(cachedBootState)applyExact(cachedBootState);
+        booting=false;
+        autosave(cachedBootState?'recuperação após F5':'inicialização',true).catch(function(){});
+        if(pendingWhileBoot){pendingWhileBoot=false;autosave('alteração pendente da inicialização',true).catch(function(){});}
+      },1700);
+    });
+  }
+  if(document.readyState==='complete')boot();else window.addEventListener('load',boot);
+
+  setInterval(function(){autosave('autosave de 1 minuto',false).catch(function(){});},60000);
+  window.addEventListener('beforeunload',function(){try{writeLocalMirror(payload('fechamento da página'));}catch(e){}});
 })();
 </script>
