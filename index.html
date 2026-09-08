@@ -12558,7 +12558,7 @@ function dbAfterSaveCrono(key,av){saveToStorage();showSaveStatus('✓ Cronograma
 async function pushLocalDataToSupabase(){
   if(!_sb)return;
   const ts=new Date().toISOString();
-  function showMsg(m){const ind=document.getElementById('save-indicator');if(ind){ind.textContent=m;ind.style.opacity='1';ind.style.color='var(--bl2)';}}
+  function showMsg(m){const ind=document.getElementById('save-indicator');if(ind){ind.textContent=m;ind.style.opacity='1';ind.style.color='var(--bl2)';clearTimeout(ind._syncLimit);ind._syncLimit=setTimeout(()=>{if(ind.textContent===m)ind.style.opacity='0';},15000);}}
   try{
     showMsg('⬆ Sincronizando dados do arquivo index...');
     // Força os dados embarcados desta versão a prevalecerem no backup remoto.
@@ -18548,6 +18548,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   ];
   var PETRO_KEY='siog_petrobras_v75_imports';
   var MAIN_KEY='siog_lafaete_data_v6_original_com_dados';
+  var WEEKLY_SUM_KEY='siog_sumario_pontos_semana_v119';
 
   function norm(s){
     try{return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
@@ -19737,6 +19738,18 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 
   function payload(source){
     var p={};try{p=typeof window.buildStoragePayload==='function'?(window.buildStoragePayload()||{}):{};}catch(e){}
+    /* O núcleo do estado não pode desaparecer se uma camada visual antiga
+       falhar ao preparar algum campo complementar. */
+    try{if(!Array.isArray(p.PROJETOS))p.PROJETOS=PROJETOS;}catch(e){}
+    try{if(!Array.isArray(p.RDO))p.RDO=RDO;}catch(e){}
+    try{if(!Array.isArray(p.DOCUMENTACAO))p.DOCUMENTACAO=DOCUMENTACAO;}catch(e){}
+    try{if(!Array.isArray(p.MEDICOES))p.MEDICOES=MEDICOES;}catch(e){}
+    try{if(!Array.isArray(p.PESQUISAS))p.PESQUISAS=PESQUISAS;}catch(e){}
+    try{if(!Array.isArray(p.OBSERVACOES))p.OBSERVACOES=OBSERVACOES;}catch(e){}
+    try{if(!p.AVANCOS||typeof p.AVANCOS!=='object')p.AVANCOS=AVANCOS;}catch(e){}
+    try{if(!p.EXCLUIDOS_ABA||typeof p.EXCLUIDOS_ABA!=='object')p.EXCLUIDOS_ABA=EXCLUIDOS_ABA;}catch(e){}
+    try{if(typeof p.SAT_RELATORIO_OBS!=='string')p.SAT_RELATORIO_OBS=SAT_RELATORIO_OBS;}catch(e){}
+    try{if(!Array.isArray(p.MASTER_OBRAS))p.MASTER_OBRAS=MASTER_OBRAS;}catch(e){}
     var now=Date.now();p.ts=now;p.SIOG_AUTOSAVE_V131={version:131,savedAt:now,source:source||'alteração',complete:true};
     try{p.PETROBRAS_IMPORTS=JSON.parse(localStorage.getItem('siog_petrobras_v75_imports')||'null');}catch(e){}
     return p;
@@ -19800,7 +19813,12 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       var file=inp.files&&inp.files[0];if(!file){inp.remove();return;}
       readBackupFile(file).then(function(txt){var data=JSON.parse(txt);if(!valid(data))throw new Error('backup inválido: faltam Projetos ou Medições');
         booting=false;restoreLocalState(data);if(!applyExact(data))throw new Error('não foi possível aplicar os dados');
-        return persistData(payload('backup restaurado: '+file.name),'backup restaurado: '+file.name);
+        /* Confirma primeiro o próprio arquivo já validado. Assim, uma falha
+           acessória da tela nunca impede a permanência do backup restaurado. */
+        var confirmed=Object.assign({},data);
+        confirmed.SIOG_LOCAL_STATE_V131=captureLocalState();
+        try{confirmed.PETROBRAS_IMPORTS=JSON.parse(localStorage.getItem('siog_petrobras_v75_imports')||'null');}catch(e){}
+        return persistData(confirmed,'backup restaurado: '+file.name);
       }).then(function(saved){
         refresh();setTimeout(refresh,150);setTimeout(refresh,600);
         alert('✅ Backup restaurado e autosave confirmado.\n\nO estado completo permanecerá neste computador após atualizar a página.\n\nÚltimo autosave: '+formatDate(saved.ts));
