@@ -19756,6 +19756,11 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   }
   function writeLocalMirror(data){try{localStorage.setItem(MAIN_KEY,JSON.stringify(data));return true;}catch(e){return false;}}
   function persistData(data,source){
+    data=data&&typeof data==='object'?data:{};
+    /* Última proteção: mesmo que uma camada antiga altere o objeto recebido,
+       recompõe as duas coleções obrigatórias a partir do estado já aplicado. */
+    try{if(!Array.isArray(data.PROJETOS))data.PROJETOS=PROJETOS;}catch(e){}
+    try{if(!Array.isArray(data.MEDICOES))data.MEDICOES=MEDICOES;}catch(e){}
     if(!valid(data))return Promise.reject(new Error('estado incompleto'));
     var now=Date.now();data.ts=now;data.SIOG_AUTOSAVE_V131={version:131,savedAt:now,source:source||'alteração',complete:true};
     var localOk=writeLocalMirror(data);lastRequest=now;
@@ -19812,10 +19817,12 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     inp.onchange=function(){
       var file=inp.files&&inp.files[0];if(!file){inp.remove();return;}
       readBackupFile(file).then(function(txt){var data=JSON.parse(txt);if(!valid(data))throw new Error('backup inválido: faltam Projetos ou Medições');
+        /* A cópia confirmada nasce antes de qualquer rotina de tela tocar no
+           objeto original do arquivo. */
+        var confirmed=JSON.parse(JSON.stringify(data));
         booting=false;restoreLocalState(data);if(!applyExact(data))throw new Error('não foi possível aplicar os dados');
         /* Confirma primeiro o próprio arquivo já validado. Assim, uma falha
            acessória da tela nunca impede a permanência do backup restaurado. */
-        var confirmed=Object.assign({},data);
         confirmed.SIOG_LOCAL_STATE_V131=captureLocalState();
         try{confirmed.PETROBRAS_IMPORTS=JSON.parse(localStorage.getItem('siog_petrobras_v75_imports')||'null');}catch(e){}
         return persistData(confirmed,'backup restaurado: '+file.name);
