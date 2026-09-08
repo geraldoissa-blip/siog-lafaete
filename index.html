@@ -19055,14 +19055,14 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   function deleted(o,i){try{return typeof window.__siog_get_deleted_obs_keys==='function'&&window.__siog_get_deleted_obs_keys().has(window.__siog_obs_key(o,i));}catch(e){return false;}}
   function projectName(o){return String(o&&(o.obra||o.projeto||o.cliente)||'Geral').trim()||'Geral';}
   function commentTitle(o){return String(o&&o.titulo||'').trim();}
-  function displayTitle(o){var projeto=projectName(o),titulo=commentTitle(o);return titulo?projeto+' — '+titulo:projeto;}
   function sourceKey(o,i){
-    /* id pertence ao projeto e pode se repetir em vários comentários. Somente o
-       identificador próprio do comentário pode ser usado como chave primária. */
+    /* "id" identifica o projeto e pode se repetir. A chave do comentário usa
+       apenas o identificador próprio; o fallback inclui todo o seu contexto. */
     var id=String(o&&(o.id_seq||o.uuid)||'').trim();if(id)return 'id:'+id;
     var born=String(o&&(o.created_at_local||o.created_at||'')).trim();
     return 'obs:'+norm(projectName(o))+'|'+norm(o&&o.tipo)+'|'+norm(commentTitle(o))+'|'+norm(o&&o.texto)+'|'+born+'|'+i;
   }
+  function groupKey(project){return 'project:'+norm(project);}
   function weekBucket(storeKey){var x=read(storeKey,{weeks:{}});if(!x||typeof x!=='object')x={weeks:{}};if(!x.weeks||typeof x.weeks!=='object')x.weeks={};var wk=weekKey();if(!x.weeks[wk]||typeof x.weeks[wk]!=='object')x.weeks[wk]={};return {root:x,bucket:x.weeks[wk],week:wk};}
 
   function initWeek(){
@@ -19082,7 +19082,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   function setManual(key,value,title){if(!key)return;var w=weekBucket(MANUAL_STORE);w.bucket[key]={value:String(value==null?'':value),title:String(title||''),updatedAt:Date.now()};write(MANUAL_STORE,w.root);updateSnapshotDetail(key,value,title);}
   function clearSnapshot(){remove(SNAP_STORE);}
   function getSnapshot(){var s=read(SNAP_STORE,null);return (s&&s.weekKey===weekKey()&&Array.isArray(s.points))?s:null;}
-  function saveSnapshot(points){var s={version:122,weekKey:weekKey(),savedAt:Date.now(),points:(points||[]).map(function(p){return {cor:p.cor,titulo:p.titulo,projeto:p.projeto||'',tituloComentario:p.tituloComentario||'',detalhe:String(p.detalhe==null?'':p.detalhe),categoria:p.categoria||'',_key:p._key||''};})};write(SNAP_STORE,s);return s;}
+  function saveSnapshot(points){var s={version:131,weekKey:weekKey(),savedAt:Date.now(),points:(points||[]).map(function(p){return {cor:p.cor,titulo:p.titulo,detalhe:String(p.detalhe==null?'':p.detalhe),categoria:p.categoria||'',_key:p._key||'',_sourceKeys:Array.isArray(p._sourceKeys)?p._sourceKeys.slice():[]};})};write(SNAP_STORE,s);return s;}
   function updateSnapshotDetail(key,value,title){var s=getSnapshot();if(!s)return;var hit=false;s.points.forEach(function(p){if(p._key===key){p.detalhe=String(value==null?'':value);hit=true;}});if(hit){s.savedAt=Date.now();write(SNAP_STORE,s);}}
 
   function sourceByKey(key){
@@ -19090,32 +19090,56 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     for(var i=0;i<all.length;i++)if(all[i]&&sourceKey(all[i],i)===key)return all[i];
     return null;
   }
-  function decoratePoint(p){
-    var out=Object.assign({},p),o=sourceByKey(String(out._key||''));
-    if(o){
-      out.projeto=projectName(o);
-      out.tituloComentario=commentTitle(o);
-      out.titulo=displayTitle(o);
-      out.categoria=String(o.tipo||out.categoria||'Comentário');
-    }
-    return out;
+
+  function makeGroups(items,manual){
+    var groups={};
+    (items||[]).forEach(function(item){
+      var o=item.obs,c=item.cor,k=item.key,project=projectName(o),title=commentTitle(o);
+      if(!title)return;
+      var gk=groupKey(project),g=groups[gk];
+      if(!g)g=groups[gk]={cor:c,titulo:project,detalhe:'',categoria:'',_key:gk,_ts:item.ts||0,_titles:[],_titleNorms:{},_types:[],_sourceKeys:[]};
+      if(c==='🔴')g.cor='🔴';
+      g._ts=Math.min(g._ts||item.ts||0,item.ts||g._ts||0);
+      var nt=norm(title);if(nt&&!g._titleNorms[nt]){g._titleNorms[nt]=true;g._titles.push(title);}
+      var type=String(o.tipo||'Comentário');if(g._types.indexOf(type)<0)g._types.push(type);
+      if(k&&g._sourceKeys.indexOf(k)<0)g._sourceKeys.push(k);
+    });
+    return Object.keys(groups).map(function(gk){
+      var g=groups[gk],mv=manual&&manual[gk];
+      g.detalhe=g._titles.join(' / ');
+      if(mv&&typeof mv==='object'&&Object.prototype.hasOwnProperty.call(mv,'value'))g.detalhe=String(mv.value==null?'':mv.value);
+      g.categoria=g._types.join(' / ');
+      delete g._titles;delete g._titleNorms;delete g._types;
+      return g;
+    }).sort(function(a,b){return (a.cor==='🔴'?0:1)-(b.cor==='🔴'?0:1)||a._ts-b._ts;});
   }
 
   function calculatedPoints(){
     initWeek();
-    var all=Array.isArray(window.OBSERVACOES)?window.OBSERVACOES:[], act=activeMap(), man=manualMap(), rows=[];
+    var all=Array.isArray(window.OBSERVACOES)?window.OBSERVACOES:[], act=activeMap(), man=manualMap(), items=[];
     all.forEach(function(o,i){
       if(!o||!isModule(o)||deleted(o,i))return;
       var c=pointColor(o);if(!c)return;
       var k=sourceKey(o,i);if(!act[k]||!act[k].active)return;
-      var detail=String(o.texto||o.titulo||'').trim(), mv=man[k];
-      if(mv&&typeof mv==='object'&&Object.prototype.hasOwnProperty.call(mv,'value'))detail=String(mv.value==null?'':mv.value);
-      rows.push({cor:c,titulo:displayTitle(o),projeto:projectName(o),tituloComentario:commentTitle(o),detalhe:detail,categoria:String(o.tipo||'Comentário'),_key:k,_ts:Number((act[k]&&act[k].updatedAt)||0)});
+      items.push({obs:o,cor:c,key:k,ts:Number((act[k]&&act[k].updatedAt)||0)});
     });
-    rows.sort(function(a,b){return (a.cor==='🔴'?0:1)-(b.cor==='🔴'?0:1)||a._ts-b._ts;});
-    return rows;
+    return makeGroups(items,man);
   }
-  function currentPoints(){var s=getSnapshot();return s?s.points.map(decoratePoint):calculatedPoints();}
+  function legacySnapshotPoints(points){
+    var items=[],orphans=[];
+    (points||[]).forEach(function(p){
+      if(String(p&&p._key||'').indexOf('project:')===0){orphans.push(Object.assign({},p));return;}
+      var o=sourceByKey(String(p&&p._key||''));
+      if(o)items.push({obs:o,cor:p.cor||pointColor(o),key:p._key,ts:0});else orphans.push(Object.assign({},p));
+    });
+    return makeGroups(items,manualMap()).concat(orphans);
+  }
+  function currentPoints(){
+    var s=getSnapshot();
+    if(!s)return calculatedPoints();
+    if(Number(s.version)>=131)return s.points.map(function(p){return Object.assign({},p);});
+    return legacySnapshotPoints(s.points);
+  }
 
   function findSavedObservation(){
     var all=Array.isArray(window.OBSERVACOES)?window.OBSERVACOES:[], best=null,bestI=-1,bestTs=-1;
@@ -19160,7 +19184,15 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 
   var prevSalvar=window.salvarObs;
   if(typeof prevSalvar==='function'){
-    window.salvarObs=function(){var r=prevSalvar.apply(this,arguments);setTimeout(function(){activateLatestSaved();try{window.renderSumario();}catch(e){}},25);return r;};
+    window.salvarObs=function(){
+      var r=prevSalvar.apply(this,arguments);
+      /* A observação já foi atualizada de forma síncrona. Ativa e persiste no
+         mesmo clique para que um Backup feito logo em seguida leve o novo texto. */
+      activateLatestSaved();
+      try{if(typeof window.saveToStorage==='function')window.saveToStorage();}catch(e){}
+      setTimeout(function(){try{window.renderSumario();}catch(e){}},25);
+      return r;
+    };
     try{salvarObs=window.salvarObs;}catch(e){}
   }
   var prevExcluir=window.excluirObsPorSeq;
@@ -19278,10 +19310,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   }
 
   var drawing=false,observerMuted=false;
-  function editingNow(){
-    var a=document.activeElement;
-    return !!(a&&a.matches&&a.matches('#sumario-content textarea[data-v123-key]'));
-  }
+  function editingNow(){var a=document.activeElement;return !!(a&&a.matches&&a.matches('#sumario-content textarea[data-v123-key]'));}
   function draw(){
     if(drawing||editingNow())return; drawing=true;observerMuted=true;
     try{
@@ -19516,5 +19545,97 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   }
   vincular('btn-salvar-projeto',false);
   vincular('btn-salvar-projeto-mais',true);
+})();
+</script>
+
+<script id="siog-v130-persistencia-comentarios">
+/* v130 — correção isolada da persistência dos comentários.
+   Mantém no mesmo estado permanente: observações de Cronograma/Financeiro,
+   pontos ativos, textos editados no Sumário e snapshot visível. */
+(function(){
+  'use strict';
+  if(window.__siog_v130_comentarios_persistentes)return;
+  window.__siog_v130_comentarios_persistentes=true;
+
+  var ACTIVE='siog_sumario_active_points_v122';
+  var MANUAL='siog_sumario_manual_points_v122';
+  var SNAP='siog_sumario_snapshot_v122';
+  var STATE='siog_sumario_state_v122';
+  var PETRO='siog_petrobras_v75_imports';
+  var saveTimer=0;
+
+  function read(k,fb){try{var s=localStorage.getItem(k);if(s==null||s==='')return fb;var v=JSON.parse(s);return v==null?fb:v;}catch(e){return fb;}}
+  function write(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+  function addCommentState(p){
+    p=p&&typeof p==='object'?p:{};
+    try{p.OBSERVACOES=Array.isArray(window.OBSERVACOES)?window.OBSERVACOES:p.OBSERVACOES||[];}catch(e){}
+    p.SUMARIO_ACTIVE_POINTS_V122=read(ACTIVE,{weeks:{}});
+    p.SUMARIO_MANUAL_POINTS_V122=read(MANUAL,{weeks:{}});
+    p.SUMARIO_SNAPSHOT_V122=read(SNAP,null);
+    p.SUMARIO_STATE_V122=read(STATE,{});
+    p.PETROBRAS_IMPORTS=read(PETRO,null);
+    return p;
+  }
+  function restoreCommentState(data){
+    if(!data||typeof data!=='object')return;
+    if(Object.prototype.hasOwnProperty.call(data,'SUMARIO_ACTIVE_POINTS_V122'))write(ACTIVE,data.SUMARIO_ACTIVE_POINTS_V122||{weeks:{}});
+    if(Object.prototype.hasOwnProperty.call(data,'SUMARIO_MANUAL_POINTS_V122'))write(MANUAL,data.SUMARIO_MANUAL_POINTS_V122||{weeks:{}});
+    if(Object.prototype.hasOwnProperty.call(data,'SUMARIO_SNAPSHOT_V122')){
+      if(data.SUMARIO_SNAPSHOT_V122)write(SNAP,data.SUMARIO_SNAPSHOT_V122);
+      else try{localStorage.removeItem(SNAP);}catch(e){}
+    }
+    if(Object.prototype.hasOwnProperty.call(data,'SUMARIO_STATE_V122'))write(STATE,data.SUMARIO_STATE_V122||{});
+    if(Object.prototype.hasOwnProperty.call(data,'PETROBRAS_IMPORTS')){
+      if(data.PETROBRAS_IMPORTS&&typeof data.PETROBRAS_IMPORTS==='object')write(PETRO,data.PETROBRAS_IMPORTS);
+      else try{localStorage.removeItem(PETRO);}catch(e){}
+    }
+  }
+
+  var oldBuild=window.buildStoragePayload;
+  if(typeof oldBuild==='function'){
+    window.buildStoragePayload=function(){var p;try{p=oldBuild.apply(this,arguments)||{};}catch(e){p={};}return addCommentState(p);};
+    try{buildStoragePayload=window.buildStoragePayload;}catch(e){}
+  }
+
+  var oldApply=window.applyStorageData;
+  if(typeof oldApply==='function'){
+    window.applyStorageData=function(data){var r=oldApply.apply(this,arguments);restoreCommentState(data);return r;};
+    try{applyStorageData=window.applyStorageData;}catch(e){}
+  }
+
+  function persist(){
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(function(){
+      try{if(typeof window.saveToStorage==='function')window.saveToStorage();}catch(e){}
+    },120);
+  }
+
+  /* O editor v123 grava o texto no localStorage no próprio evento input. Este
+     listener roda depois e leva esse mesmo estado para a cópia permanente. */
+  document.addEventListener('input',function(ev){
+    var el=ev.target;
+    if(el&&el.matches&&el.matches('#sumario-content textarea[data-v123-key],#sumario-content textarea[data-v122-key]'))persist();
+  },false);
+
+  document.addEventListener('change',function(ev){
+    var el=ev.target;
+    if(el&&el.closest&&el.closest('#mo-obs'))persist();
+  },false);
+
+  window.addEventListener('beforeunload',function(){
+    try{
+      clearTimeout(saveTimer);
+      if(typeof window.buildStoragePayload==='function'&&typeof window.__siogV128Write==='function')window.__siogV128Write(window.buildStoragePayload());
+    }catch(e){}
+  });
+
+  /* Cópia automática interna do estado completo. O arquivo para transferência
+     continua sendo gerado pelo botão Backup, sem provocar downloads repetidos. */
+  setInterval(function(){
+    try{
+      if(typeof window.saveToStorage==='function')window.saveToStorage();
+      localStorage.setItem('siog_ultimo_backup_automatico',String(Date.now()));
+    }catch(e){}
+  },60000);
 })();
 </script>
