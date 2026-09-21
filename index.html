@@ -736,6 +736,10 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <div class="access-grid">
 <div class="access-box">
 <h4>Administradores</h4>
+<div class="access-row">
+<input autocomplete="off" id="admin-email-input" placeholder="e-mail do administrador" type="email"/>
+<button class="btn btn-sm" onclick="addAccessEmail('admins')">Adicionar</button>
+</div>
 <div class="access-list" id="admin-list"></div>
 <div class="access-note">Administradores podem editar dados e também gerenciar as listas de acesso.</div>
 </div>
@@ -764,7 +768,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 </div>
 </div>
 <div class="access-footer">
-<button class="btn btn-sm" onclick="saveAccessControl(true)">Salvar lista</button>
+<span class="access-note" style="margin-right:12px">A remoção só é efetiva em todos os dispositivos após sincronização e bloqueio no Supabase.</span><button class="btn btn-sm" onclick="saveAccessControl(true)">Salvar lista</button>
 </div>
 </div>
 </div>
@@ -12004,13 +12008,13 @@ function uniqueEmails(list){ return [...new Set((Array.isArray(list)?list:[]).ma
 function sanitizeAccessControl(cfg){
   const base = cfg && typeof cfg === 'object' ? cfg : {};
   const out = {
-    admins: uniqueEmails([...(base.admins && base.admins.length ? base.admins : ACCESS_CONTROL_DEFAULT.admins), ...ACCESS_CONTROL_DEFAULT.admins]),
-    editors: uniqueEmails(base.editors && base.editors.length ? base.editors : ACCESS_CONTROL_DEFAULT.editors),
-    viewers: uniqueEmails(base.viewers && base.viewers.length ? base.viewers : ACCESS_CONTROL_DEFAULT.viewers)
+    admins: uniqueEmails(Array.isArray(base.admins) ? base.admins : ACCESS_CONTROL_DEFAULT.admins),
+    editors: uniqueEmails(Array.isArray(base.editors) ? base.editors : ACCESS_CONTROL_DEFAULT.editors),
+    viewers: uniqueEmails(Array.isArray(base.viewers) ? base.viewers : ACCESS_CONTROL_DEFAULT.viewers)
   };
   out.editors = out.editors.filter(e => !out.admins.includes(e));
   out.viewers = out.viewers.filter(e => !out.admins.includes(e) && !out.editors.includes(e));
-  if(!out.admins.length) out.admins = [...ACCESS_CONTROL_DEFAULT.admins];
+  if(!out.admins.length) out.admins = [ACCESS_CONTROL_DEFAULT.admins[0]];
   return out;
 }
 function loadAccessControl(){
@@ -12277,9 +12281,13 @@ async function saveAccessControl(showOk){
       const row = { key:'access_control', value:ACCESS_CONTROL, updated_at:new Date().toISOString(), updated_by:getUserEmail()||'sistema' };
       const { error } = await _sb.from('app_settings').upsert(row, { onConflict:'key' });
       if(error) throw error;
-    } catch(e){ console.warn('Access control save:', e.message || e); }
+    } catch(e){
+      console.warn('Access control save:', e.message || e);
+      alert('A lista foi salva apenas neste navegador: o Supabase não confirmou a alteração. A exclusão NÃO está garantida em outros computadores.');
+      return false;
+    }
   }
-  if(showOk) alert('Lista de acessos atualizada com sucesso.');
+  if(showOk) alert('Lista salva neste navegador. Confira a sincronização no Supabase antes de considerar usuários bloqueados em outros computadores.');
   return true;
 }
 function renderRoleList(containerId, role){
@@ -12288,10 +12296,21 @@ function renderRoleList(containerId, role){
   const roleMap = {admins:'admin', editors:'editors', viewers:'viewers'};
   const key = roleMap[role] || role;
   const arr = ACCESS_CONTROL[key] || [];
-  box.innerHTML = arr.map(email => {
-    const canRemove = key !== 'admins' || ACCESS_CONTROL.admins.length > 1;
-    return '<span class="access-pill">'+email+(hasAdminAccess() && canRemove ? '<button type="button" onclick="removeAccessEmail(\''+key+'\',\''+email+'\')">remover</button>' : '')+'</span>';
-  }).join('') || '<span class="access-note">Nenhum e-mail cadastrado.</span>';
+  box.innerHTML = '';
+  if(!arr.length){ box.textContent = 'Nenhum e-mail cadastrado.'; return; }
+  arr.forEach(email => {
+    const pill = document.createElement('span');
+    pill.className = 'access-pill';
+    pill.appendChild(document.createTextNode(email));
+    if(hasAdminAccess() && (key !== 'admins' || ACCESS_CONTROL.admins.length > 1)){
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = 'remover';
+      btn.addEventListener('click', () => removeAccessEmail(key, email));
+      pill.appendChild(btn);
+    }
+    box.appendChild(pill);
+  });
 }
 function renderAccessLists(){
   renderRoleList('admin-list','admins');
@@ -12316,10 +12335,10 @@ function moveEmailBetweenRoles(email, targetRole){
 }
 function addAccessEmail(role){
   if(!hasAdminAccess()) { alert('⛔ Apenas o administrador pode alterar a lista de acessos.'); return; }
-  const inputId = role === 'editors' ? 'editor-email-input' : 'viewer-email-input';
+  const inputId = role === 'admins' ? 'admin-email-input' : (role === 'editors' ? 'editor-email-input' : 'viewer-email-input');
   const input = document.getElementById(inputId);
   const email = normalizeEmail(input && input.value);
-  if(!email){ alert('Informe um e-mail válido.'); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ alert('Informe um e-mail válido.'); return; }
   moveEmailBetweenRoles(email, role);
   if(input) input.value = '';
   saveAccessControl(false);
