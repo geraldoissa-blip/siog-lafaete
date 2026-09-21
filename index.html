@@ -683,7 +683,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <div class="auth-head">SIOG — Grupo Lafaete</div>
 <div class="auth-sub">Gestão de Projetos Especiais</div>
 <div class="auth-step on" id="auth-s1">
-<label class="auth-lbl">Seu e-mail corporativo</label>
+<label class="auth-lbl">Seu e-mail autorizado</label>
 <input class="auth-inp" id="auth-email" onkeydown="if(event.key==='Enter')doPasswordLogin()" placeholder="nome@lafaete.com.br" type="email"/>
 <label class="auth-lbl" style="margin-top:12px">Sua senha</label>
 <input class="auth-inp" id="auth-password" onkeydown="if(event.key==='Enter')doPasswordLogin()" placeholder="Digite sua senha" type="password"/>
@@ -695,7 +695,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <div class="auth-msg" id="auth-msg"></div>
 </div>
 <div class="auth-step" id="auth-s2">
-<label class="auth-lbl">Seu e-mail corporativo</label>
+<label class="auth-lbl">Seu e-mail autorizado</label>
 <input class="auth-inp" id="auth-create-email" onkeydown="if(event.key==='Enter')doCreatePassword()" placeholder="nome@lafaete.com.br" type="email"/>
 <label class="auth-lbl" style="margin-top:12px">Crie sua senha</label>
 <input class="auth-inp" id="auth-create-password" onkeydown="if(event.key==='Enter')doCreatePassword()" placeholder="Mínimo de 6 caracteres" type="password"/>
@@ -706,7 +706,7 @@ tr:hover td.acoes-left{background:var(--bg3)!important;}
 <button onclick="showStep(1)" style="background:none;border:none;color:#555;font-size:12px;cursor:pointer;width:100%;margin-top:8px;font-family:inherit">← Voltar ao login</button>
 </div>
 <div class="auth-step" id="auth-s3">
-<label class="auth-lbl">Seu e-mail corporativo</label>
+<label class="auth-lbl">Seu e-mail autorizado</label>
 <input class="auth-inp" id="auth-reset-email" onkeydown="if(event.key==='Enter')doResetPassword()" placeholder="nome@lafaete.com.br" type="email"/>
 <button class="auth-btn" id="auth-reset-btn" onclick="doResetPassword()">🔄 Enviar redefinição de senha</button>
 <div class="auth-msg" id="auth-reset-msg"></div>
@@ -11993,7 +11993,7 @@ let _user = null;
 let _isAdmin = false;
 const ACCESS_CONTROL_KEY = 'siog_access_control_v1';
 const ACCESS_CONTROL_DEFAULT = {
-  admins: ['geraldo.issa@lafaete.com.br'],
+  admins: ['geraldo.issa@lafaete.com.br','geraldo.issa@gmail.com'],
   editors: ['romersson.freitas@lafaete.com.br','john.barbosa@lafaete.com.br','daniel.prata@lafaete.com.br','victor.figueredo@lafaete.com.br'],
   viewers: ['mariana.silva@lafaete.com.br']
 };
@@ -12004,7 +12004,7 @@ function uniqueEmails(list){ return [...new Set((Array.isArray(list)?list:[]).ma
 function sanitizeAccessControl(cfg){
   const base = cfg && typeof cfg === 'object' ? cfg : {};
   const out = {
-    admins: uniqueEmails(base.admins && base.admins.length ? base.admins : ACCESS_CONTROL_DEFAULT.admins),
+    admins: uniqueEmails([...(base.admins && base.admins.length ? base.admins : ACCESS_CONTROL_DEFAULT.admins), ...ACCESS_CONTROL_DEFAULT.admins]),
     editors: uniqueEmails(base.editors && base.editors.length ? base.editors : ACCESS_CONTROL_DEFAULT.editors),
     viewers: uniqueEmails(base.viewers && base.viewers.length ? base.viewers : ACCESS_CONTROL_DEFAULT.viewers)
   };
@@ -12136,7 +12136,7 @@ async function saveConfig(){
     const msg = document.getElementById('cfg-msg');
     if(msg){ msg.textContent = 'Conectando...'; msg.className = 'auth-msg'; }
     await ensureSupabaseClient();
-    if(msg){ msg.textContent = 'Conectado. Faça login com seu e-mail corporativo.'; msg.className = 'auth-msg auth-ok'; }
+    if(msg){ msg.textContent = 'Conectado. Faça login com seu e-mail autorizado.'; msg.className = 'auth-msg auth-ok'; }
     showAuth();
   }catch(e){
     const msg = document.getElementById('cfg-msg');
@@ -12165,7 +12165,7 @@ async function doPasswordLogin(){
   try{
     const email = normalizeEmail(document.getElementById('auth-email').value);
     const password = (document.getElementById('auth-password').value || '').trim();
-    if(!email){ setAuthMessage('Informe um e-mail corporativo válido.', false); return; }
+    if(!email){ setAuthMessage('Informe um e-mail autorizado válido.', false); return; }
     if(!password){ setAuthMessage('Informe sua senha.', false); return; }
     if(!hasViewAccess(email)) { setAuthMessage('Este e-mail não está autorizado para acessar o sistema.', false); return; }
     const btn = document.getElementById('auth-btn');
@@ -12187,7 +12187,7 @@ async function doCreatePassword(){
     const email = normalizeEmail(document.getElementById('auth-create-email').value);
     const password = (document.getElementById('auth-create-password').value || '').trim();
     const confirm = (document.getElementById('auth-create-password2').value || '').trim();
-    if(!email){ setStepMessage(2, 'Informe um e-mail corporativo válido.', false); return; }
+    if(!email){ setStepMessage(2, 'Informe um e-mail autorizado válido.', false); return; }
     if(!hasViewAccess(email)) { setStepMessage(2, 'Este e-mail não está autorizado para acessar o sistema.', false); return; }
     if(password.length < 6){ setStepMessage(2, 'A senha precisa ter pelo menos 6 caracteres.', false); return; }
     if(password !== confirm){ setStepMessage(2, 'A confirmação da senha não confere.', false); return; }
@@ -12209,7 +12209,7 @@ async function doCreatePassword(){
 async function doResetPassword(){
   try{
     const email = normalizeEmail(document.getElementById('auth-reset-email').value);
-    if(!email){ setStepMessage(3, 'Informe um e-mail corporativo válido.', false); return; }
+    if(!email){ setStepMessage(3, 'Informe um e-mail autorizado válido.', false); return; }
     if(!hasViewAccess(email)) { setStepMessage(3, 'Este e-mail não está autorizado para acessar o sistema.', false); return; }
     const redirectUrl = getAuthRedirectUrl();
     if(!redirectUrl){
